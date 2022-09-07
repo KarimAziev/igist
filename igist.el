@@ -546,7 +546,6 @@ If PUBLIC is non nil, create PUBLIC gist, othervise private."
                                  (buffer-substring-no-properties
                                   (point-min)
                                   (point-max))))))))))
-        (print payload)
         (ghub-post "/gists"
                    nil
                    :payload payload
