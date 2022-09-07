@@ -39,11 +39,8 @@ Download repository and it to your load path in your init file:
 			         ("M-o" . igist-transient-api)
 			         ("C-c C-c" . igist-save-current-gist)
 			         ("C-c C-k" . kill-current-buffer)))
-	:commands (igist-ivy-read-gists
-			       igist-edit-gists
-			       igist-refresh-current-gist
-			       igist-read-filename
-			       igist-read-description))
+	:commands (igist-edit-gists
+             igist-create-new-gist))
 
 #+end_src
 

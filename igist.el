@@ -298,7 +298,7 @@ code of the process and OUTPUT is its stdout output."
 (defun igist-make-gist-key (gist idx)
   "Create KEY from GIST's props and IDX."
   (let ((vals
-         (seq-remove 'string-empty-p
+         (seq-remove #'string-empty-p
                      (mapcar (igist-rpartial
                               igist-alist-get gist)
                              '(filename
@@ -348,6 +348,7 @@ If PUBLIC is non nil, create PUBLIC gist, othervise private."
                  (when callback
                    (run-with-timer 0.5 nil callback igist-list))))))
 
+;;;###autoload
 (defun igist-create-new-gist ()
   "Create new gist without saving and open it in edit buffer."
   (interactive)
@@ -372,6 +373,7 @@ If PUBLIC is non nil, create PUBLIC gist, othervise private."
 (defvar-local igist-current-filename nil
   "Current gist filename.")
 
+;;;###autoload
 (defun igist-toggle-public (&rest _)
   "Toggle value of variable `igist-current-public'."
   (interactive)
