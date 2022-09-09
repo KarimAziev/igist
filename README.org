@@ -4,6 +4,8 @@
 
 * igist
 
+Edit, create and view Github gists in Emacs.
+
 ** Requirements
 
 + Emacs >= 28.1
@@ -35,12 +37,12 @@ Download repository and it to your load path in your init file:
 			       :repo "KarimAziev/igist"
 			       :type git
 			       :host github)
-	:bind ((:map igist-edit-buffer-default-keymap
-			         ("M-o" . igist-transient-api)
-			         ("C-c C-c" . igist-save-current-gist)
-			         ("C-c C-k" . kill-current-buffer)))
-	:commands (igist-edit-gists
-             igist-create-new-gist))
+	:bind (("M-o" . igist-dispatch)
+         (:map igist-edit-buffer-keymap
+			         ("M-o" . igist-dispatch)
+			         ("C-c C-c" . igist-save-current-gist-and-exit)
+			         ("C-c C-k" . kill-current-buffer)
+			         ("C-c '" . igist-save-current-gist))))
 
 #+end_src
 
@@ -53,27 +55,9 @@ Assuming your Github username is "ziggy", you have created a token "012345abcdef
 machine api.github.com login ziggy^forge password 012345abcdefgde
 #+end_example
 
-You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual as igist relies on the provided api. 
+You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual as igist relies on the provided api.
 
-** Keymaps
 ** Usage
 
-*** ~M-x igist-edit-gists~
-Read user gists in minibuffer and open it in edit buffer.
-
-*** Edit buffer commands:
-**** ~igist-save-current-gist~
-Save current gist.
-**** ~igist-refresh-current-gist~
-Refresh current ~gist.~
-**** ~igist-read-filename~
-Rename current gist without saving.
-**** ~igist-read-description~
-Update description for current gist without saving.
-*** Edit buffer keymap
-
-| Command                 | Key     |
-|-------------------------+---------|
-| igist-transient-api     | M-o     |
-| igist-save-current-gist | C-c C-c |
-| kill-current-buffer     | C-c C-k |
+*** ~M-x igist-dispatch~
+Invoke popup with list of available commands. 
