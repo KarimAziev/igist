@@ -393,7 +393,7 @@ code of the process and OUTPUT is its stdout output."
     buffer))
 
 ;;;###autoload
-(defun igist-new-gist-from-buffer ()
+(defun igist-new-gist-from-buffer (&rest _ignore)
   "Setup new gist buffer whole buffer contents."
   (interactive)
   (when-let ((content (or (igist-get-region-content)
@@ -422,7 +422,7 @@ code of the process and OUTPUT is its stdout output."
     (string-join (split-string (buffer-name) "[^a-zZ-A0-9-]" t) "")))
 
 ;;;###autoload
-(defun igist-create-new-gist ()
+(defun igist-create-new-gist (&rest _ignore)
   "Setup new gist buffer with currently active region content or empty."
   (interactive)
   (let ((region-content (igist-get-region-content)))
@@ -481,7 +481,7 @@ code of the process and OUTPUT is its stdout output."
           (igist-refresh-buffer-vars gist))))))
 
 ;;;###autoload
-(defun igist-refresh-current-gist ()
+(defun igist-refresh-current-gist (&rest _ignore)
   "Refresh current GIST."
   (interactive)
   (let ((buff (current-buffer)))
@@ -519,7 +519,7 @@ code of the process and OUTPUT is its stdout output."
                                           (point-max)
                                           (lambda ()
                                             content))
-                 (set-buffer-modified-p content))))))))))
+                 (set-buffer-modified-p nil))))))))))
 
 (defun igist-refresh-gists-async ()
   "Refresh all gists buffer asynchronously."
@@ -531,6 +531,12 @@ code of the process and OUTPUT is its stdout output."
    (igist-and buffer-live-p
               (apply-partially #'buffer-local-value 'igist-current-gist))
    (buffer-list)))
+
+(defun igist-delete-all-gists-buffers ()
+  "Delete all gists buffers."
+  (interactive)
+  (dolist (buff (igist-get-all-gists-buffers))
+    (kill-buffer buff)))
 
 (defun igist-get-gist-buffers-by-id (id)
   "Return all live gist buffers with ID."
@@ -780,8 +786,7 @@ With optional argument PROMPT also update `ivy--prompt'."
            ("l" "List" igist-edit-gists)
            ("n" "New" igist-create-new-gist)
            ("f" "Add file to gist" igist-add-file-to-gist)
-           ("b" "New gist from buffer"
-            igist-new-gist-from-buffer)
+           ("b" "New gist from buffer" igist-new-gist-from-buffer)
            ("q" "Quit" transient-quit-one)]])
 
 ;;;###autoload
@@ -957,7 +962,8 @@ With optional argument PROMPT also update `ivy--prompt'."
           (igist-setup-local-vars new-gist file)
           (replace-region-contents (point-min)
                                    (point-max)
-                                   (lambda () content)))))))
+                                   (lambda () content))
+          (set-buffer-modified-p nil))))))
 
 ;;;###autoload
 (defun igist-save-current-gist (&optional arg)
@@ -1026,14 +1032,12 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
         (setq buffer-read-only nil)
         (progn
           (set-buffer-modified-p nil)
-          (setq buffer-undo-list nil)
           (save-excursion
             (if (active-minibuffer-window)
                 (delay-mode-hooks
                   (igist-get-major-mode filename))
               (igist-get-major-mode filename)))
           (insert content)
-          (set-buffer-modified-p nil)
           (add-hook 'kill-buffer-hook
                     'igist-popup-minibuffer-select-window
                     nil t)
@@ -1050,7 +1054,9 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
              map)))
         (when stx-table
           (set-syntax-table stx-table))
-        (igist-setup-local-vars gist filename))
+        (igist-setup-local-vars gist filename)
+        (setq buffer-undo-list nil)
+        (set-buffer-modified-p nil))
       buffer)))
 
 (defun igist-edit-buffer (gist &rest setup-args)
