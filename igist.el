@@ -5,7 +5,7 @@
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
 ;; URL: https://github.com/KarimAziev/igist
 ;; Version: 0.1.0
-;; Keywords: vc
+;; Keywords: tools
 ;; Package-Requires: ((emacs "28.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,6 +32,25 @@
 (require 'ivy nil t)
 (require 'ghub)
 (require 'transient)
+
+(defvar-local igist-current-gist nil
+  "Current gist.")
+
+(defvar-local igist-current-description nil
+  "Current gist description.")
+
+(defvar-local igist-current-public nil
+  "Current gist visibility.")
+
+(defvar-local igist-current-filename nil
+  "Current gist filename.")
+
+(defvar-keymap igist-edit-buffer-keymap
+  :doc "Keymap for edit gist buffer."
+  "C-c C-c" 'igist-save-current-gist-and-exit
+  "C-c C-k" 'kill-current-buffer
+  "C-c '" 'igist-save-current-gist
+  "M-o" 'igist-dispatch)
 
 (defmacro igist-unless (pred fn)
   "Return an unary function that invoke FN if result of calling PRED is nil.
@@ -352,14 +371,6 @@ code of the process and OUTPUT is its stdout output."
     (buffer-substring-no-properties (region-beginning)
                                     (region-end))))
 
-(defvar igist-edit-buffer-keymap
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'igist-save-current-gist-and-exit)
-    (define-key map (kbd "C-c C-k") 'kill-current-buffer)
-    (define-key map (kbd "C-c '") 'igist-save-current-gist)
-    (define-key map (kbd "M-o") 'igist-dispatch)
-    map))
-
 (defun igist-setup-new-gist-buffer (filename content)
   "Setup edit buffer for new gist with FILENAME and CONTENT."
   (let ((buffer (get-buffer-create
@@ -431,18 +442,6 @@ code of the process and OUTPUT is its stdout output."
                                    (igist-suggest-filename)))))
       (pop-to-buffer (igist-setup-new-gist-buffer filename
                                                   (or region-content ""))))))
-
-(defvar-local igist-current-gist nil
-  "Current gist.")
-
-(defvar-local igist-current-description nil
-  "Current gist description.")
-
-(defvar-local igist-current-public nil
-  "Current gist visibility.")
-
-(defvar-local igist-current-filename nil
-  "Current gist filename.")
 
 (defun igist-refresh-buffer-vars (gist)
   "Setup buffer gist variables from GIST."
