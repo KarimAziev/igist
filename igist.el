@@ -532,6 +532,7 @@ code of the process and OUTPUT is its stdout output."
               (apply-partially #'buffer-local-value 'igist-current-gist))
    (buffer-list)))
 
+;;;###autoload
 (defun igist-delete-all-gists-buffers ()
   "Delete all gists buffers."
   (interactive)
@@ -926,7 +927,9 @@ With optional argument PROMPT also update `ivy--prompt'."
   (let* ((file (buffer-local-value 'igist-current-filename
                                    buffer))
          (payload
-          `((description . ,file)
+          `((description . ,(or (buffer-local-value 'igist-current-description
+                                                    buffer)
+                                ""))
             (public . ,(buffer-local-value 'igist-current-public
                                            buffer))
             (files
