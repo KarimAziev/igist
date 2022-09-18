@@ -6,6 +6,8 @@
 
 Edit, create and view Github gists in Emacs.
 
+[[./igists-demo.gif]]
+
 ** Requirements
 
 + Emacs >= 28.1
