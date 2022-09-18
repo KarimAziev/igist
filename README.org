@@ -1,4 +1,3 @@
-#+TITLE: igist
 #+AUTHOR: Karim Aziiev
 #+EMAIL: karim.aziiev@gmail.com
 
