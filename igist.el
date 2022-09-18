@@ -34,6 +34,50 @@
 (require 'timezone)
 (require 'ivy nil t)
 
+(defcustom igist-list-format '((id "Id" 10 nil (lambda (id)
+                                                 (cons
+                                                  (format "%s" id)
+                                                  (list
+                                                   'action
+                                                   #'igist-files-button-action
+                                                   'help-echo
+                                                   "Show gist"))))
+                               (updated_at "Updated" 20 t "%D %R")
+                               (visibility "Visibility" 10 t
+                                           (lambda (public)
+                                             (or
+                                              (and public
+                                                   "public")
+                                              "private")))
+                               (description "Description" 0 t identity)
+                               (files "Files" 0 t
+                                      (lambda (files)
+                                        (if (<= (length files) 1)
+                                            (car files)
+                                          (concat "\n" (mapconcat
+                                                        (apply-partially
+                                                         #'format
+                                                         "\t\t%s")
+                                                        files "\n"))))))
+  "Format for gist list."
+  :type '(alist
+          :key-type
+          (choice
+           (const :tag "Id" id)
+           (const :tag "Updated" updated_at)
+           (const :tag "Visibility" visibility)
+           (const :tag "Description" description)
+           (const :tag "Files" files))
+          :value-type
+          (list
+           (string :tag "Label")
+           (integer :tag "Field length")
+           (boolean :tag "Sortable")
+           (choice
+            (string :tag "Format")
+            (function :tag "Formatter"))))
+  :group 'igist)
+
 (defvar-local igist-current-gist nil
   "Current gist.")
 
@@ -412,8 +456,8 @@ except that ] is never special and \ quotes ^, - or \ (but
              (file-at-pos
               (when word-at-pos
                 (seq-find (igist-compose
-                           (apply-partially 'equal word-at-pos)
-                           (apply-partially 'igist-alist-get
+                           (apply-partially #'equal word-at-pos)
+                           (apply-partially #'igist-alist-get
                                             'filename))
                           files))))
         (if (= (length files) 1)
@@ -427,7 +471,7 @@ except that ] is never special and \ quotes ^, - or \ (but
     (let* ((files (mapcar #'cdr (igist-get-gists-by-id id)))
            (file-at-pos
             (car (member (igist-word-at-point)
-                         (mapcar (apply-partially 'igist-alist-get
+                         (mapcar (apply-partially #'igist-alist-get
                                                   'filename)
                                  files))))
            (gist (if (or file-at-pos
@@ -485,51 +529,6 @@ except that ] is never special and \ quotes ^, - or \ (but
                   gist))))
       (switch-to-buffer-other-window buff))))
 
-(defcustom igist-list-format '((id "Id" 10 nil (lambda (id)
-                                                 (cons
-                                                  (format "%s" id)
-                                                  (list 'action
-                                                        #'igist-files-button-action
-                                                        'help-echo
-                                                        "Show gist"))))
-                               (updated_at "Updated" 20 t "%D %R")
-                               (visibility "Visibility" 10 t
-                                           (lambda (public)
-                                             (propertize (or
-                                                          (and public
-                                                               "public")
-                                                          "private")
-                                                         'face
-                                                         'font-lock-keyword-face)))
-                               (description "Description" 0 t identity)
-                               (files "Files" 0 t
-                                      (lambda (files)
-                                        (if (<= (length files) 1)
-                                            (car files)
-                                          (concat "\n" (mapconcat
-                                                        (apply-partially
-                                                         #'format
-                                                         "\t\t%s")
-                                                        files "\n"))))))
-  "Format for gist list."
-  :type '(alist
-          :key-type
-          (choice
-           (const :tag "Id" id)
-           (const :tag "Updated" updated_at)
-           (const :tag "Visibility" visibility)
-           (const :tag "Description" description)
-           (const :tag "Files" files))
-          :value-type
-          (list
-           (string :tag "Label")
-           (integer :tag "Field length")
-           (boolean :tag "Sortable")
-           (choice
-            (string :tag "Format")
-            (function :tag "Formatter"))))
-  :group 'gist)
-
 (defun igist-parse-gist (gist)
   "Return a list of the GIST's attributes for display."
   (mapcar
@@ -567,8 +566,8 @@ except that ] is never special and \ quotes ^, - or \ (but
 
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
-\\<gist-list-menu-mode-map>
-\\{gist-list-menu-mode-map}"
+\\<igist-list-menu-mode-map>
+\\{igist-list-menu-mode-map}"
   (setq tabulated-list-format
         (apply #'vector
                (mapcar
