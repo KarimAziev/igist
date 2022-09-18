@@ -1,4 +1,4 @@
-#+TITLE:README
+#+TITLE: igist
 #+AUTHOR: Karim Aziiev
 #+EMAIL: karim.aziiev@gmail.com
 
@@ -66,4 +66,5 @@ You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-C
 ** Usage
 
 *** ~M-x igist-dispatch~
-Invoke popup with list of available commands. 
+
+Invoke transient popup with list of available commands.
