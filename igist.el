@@ -42,14 +42,14 @@
                                                    #'igist-files-button-action
                                                    'help-echo
                                                    "Show gist"))))
-                               (updated_at "Updated" 20 t "%D %R")
+                               (description "Description" 30 t identity)
                                (visibility "Visibility" 10 t
                                            (lambda (public)
                                              (or
                                               (and public
                                                    "public")
                                               "private")))
-                               (description "Description" 0 t identity)
+                               (updated_at "Updated" 20 t "%D %R")
                                (files "Files" 0 t
                                       (lambda (files)
                                         (if (<= (length files) 1)
@@ -64,8 +64,8 @@
           :key-type
           (choice
            (const :tag "Id" id)
-           (const :tag "Updated" updated_at)
            (const :tag "Visibility" visibility)
+           (const :tag "Updated" updated_at)
            (const :tag "Description" description)
            (const :tag "Files" files))
           :value-type
