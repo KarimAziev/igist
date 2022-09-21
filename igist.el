@@ -692,6 +692,19 @@ except that ] is never special and \ quotes ^, - or \ (but
         (let ((buff (igist-setup-edit-buffer gist)))
           (switch-to-buffer-other-window buff))))))
 
+(defun igist-tabulated-edit-description ()
+  "Edit description for current gist at point in tabulated list mode."
+  (interactive)
+  (when-let* ((id (tabulated-list-get-id))
+              (gist (igist-find-by-id-in-response id))
+              (description (read-string "Description: " (igist-alist-get
+                                                         'description gist))))
+    (igist-patch (concat "/gists/" id)
+                 nil
+                 :payload `((description . ,description))
+                 :callback (lambda (&rest _)
+                             (igist-request-gists-async)))))
+
 (defun igist-read-filename-new (gist)
   "Read new filename for GIST."
   (let ((filenames (mapcar (apply-partially #'igist-alist-get 'filename)
@@ -1315,6 +1328,7 @@ MAX is length of most longest key."
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map "+" 'igist-list-add-file)
     (define-key map "g" 'igist-list-gists)
+    (define-key map "e" 'igist-tabulated-edit-description)
     (define-key map (kbd "RET") 'igist-list-fetch-current)
     map))
 
