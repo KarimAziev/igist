@@ -10,10 +10,11 @@ Edit, create and view Github gists in Emacs.
 ** Requirements
 
 + Emacs >= 28.1
-+ ivy (optional)
 + ghub
 + transient
-- [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][Github API token]]
++ timezone
++ spinner (optional)
++ [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][Github API token]]
 
 ** Installation
 
@@ -67,3 +68,14 @@ You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-C
 *** ~M-x igist-dispatch~
 
 Invoke transient popup with list of available commands.
+
+** Customization
+
+*** ~igist-current-user-auth~
+Suffix of user name in Auth-Sources. For example, your github username is km, you have a token "012345abcdef...", add such an entry in ~auth-sources.~ machine api.github.com login km^gist password 012345abcdef..., where ~gist~ is a suffix (default value).
+*** ~igist-per-page-limit~
+The number of results per page (max 100).
+*** ~igist-ask-for-description~
+When to prompt for description before posting new gists.
+*** ~igist-list-format~
+Format for gist list.
