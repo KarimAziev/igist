@@ -4,7 +4,7 @@
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
 ;; URL: https://github.com/KarimAziev/igist
-;; Version: 0.4.0
+;; Version: 0.4.1
 ;; Keywords: tools
 ;; Package-Requires: ((emacs "28.1"))
 
@@ -41,9 +41,11 @@
                                                   (format "%s" id)
                                                   (list
                                                    'action
-                                                   #'igist-files-button-action
+                                                   (lambda (&_)
+                                                     (interactive)
+                                                     (igist-list-edit-gist-at-point))
                                                    'help-echo
-                                                   "Show gist"))))
+                                                   "Edit gist"))))
                                (description "Description" 30 t identity)
                                (visibility "Visibility" 10 t
                                            (lambda (public)
@@ -615,7 +617,9 @@ Put normalized response to the variable `igist-normalized-gists'."
 (defun igist-set-major-mode (filename)
   "Guess major mode for FILENAME."
   (let ((buffer-file-name (expand-file-name filename default-directory)))
-    (set-auto-mode)))
+    (delay-mode-hooks
+      (set-auto-mode)
+      (font-lock-ensure))))
 
 (defun igist--get-time (gist key)
   "Return timestamp from value of KEY in GIST."
@@ -651,6 +655,12 @@ except that ] is never special and \ quotes ^, - or \ (but
     (buffer-substring-no-properties (car bounds)
                                     (cdr bounds))))
 
+(defun igist-tabulated-gist-parent-at-point ()
+  "Run an action for BUTTON."
+  (when (eq major-mode 'igist-list-mode)
+    (let ((id (tabulated-list-get-id)))
+      (igist-find-by-id-in-response id))))
+
 (defun igist-tabulated-gist-at-point ()
   "Run an action for BUTTON."
   (when (eq major-mode 'igist-list-mode)
@@ -668,29 +678,32 @@ except that ] is never special and \ quotes ^, - or \ (but
             (car files)
           file-at-pos)))))
 
-(defun igist-files-button-action (_button)
-  "Run an action for BUTTON."
-  (let ((id (tabulated-list-get-id))
-        (current-window (selected-window)))
-    (let* ((files (mapcar #'cdr (igist-get-gists-by-id id)))
-           (file-at-pos
-            (car (member (igist-word-at-point)
-                         (mapcar (apply-partially #'igist-alist-get
-                                                  'filename)
-                                 files))))
-           (gist (if (or file-at-pos
-                         (> (length files) 1))
-                     (igist-find-by-id-and-file
-                      id
-                      (or file-at-pos
-                          (completing-read "Files" (mapcar (apply-partially
-                                                            #'igist-alist-get
-                                                            'filename)
-                                                           files))))
-                   (car files))))
-      (with-selected-window current-window
-        (let ((buff (igist-setup-edit-buffer gist)))
-          (switch-to-buffer-other-window buff))))))
+(defun igist-list-gist-to-fetch ()
+  "Get tabulated gist with file at point."
+  (let* ((id (tabulated-list-get-id))
+         (files (mapcar #'cdr (igist-get-gists-by-id id)))
+         (file-at-pos
+          (car (member (igist-word-at-point)
+                       (mapcar (apply-partially #'igist-alist-get
+                                                'filename)
+                               files)))))
+    (if (or file-at-pos
+            (> (length files) 1))
+        (igist-find-by-id-and-file
+         id
+         (or file-at-pos
+             (completing-read "Files" (mapcar (apply-partially
+                                               #'igist-alist-get
+                                               'filename)
+                                              files))))
+      (car files))))
+
+(defun igist-list-edit-gist-at-point ()
+  "Open tabulated gist at point in edit buffer."
+  (interactive)
+  (when-let ((gist (igist-list-gist-to-fetch)))
+    (let ((buff (igist-setup-edit-buffer gist)))
+      (switch-to-buffer-other-window buff))))
 
 (defun igist-tabulated-edit-description ()
   "Edit description for current gist at point in tabulated list mode."
@@ -1084,40 +1097,35 @@ If LOADING is non nil show spinner, otherwise hide."
                  nil
                  :unpaginate t
                  :payload payload
-                 :callback (lambda (&rest _ignored)
-                             (igist-request-gists-async
-                              (lambda ()
-                                (when-let* ((new-gist
-                                             (cdr
-                                              (igist-find-by-id-and-file
-                                               id
-                                               new-file-name)))
-                                            (content
-                                             (igist-alist-get
-                                              'content
-                                              new-gist)))
-                                  (when (buffer-live-p buffer)
-                                    (with-current-buffer
-                                        buffer
-                                      (unless (equal
-                                               orig-filename
-                                               new-file-name)
-                                        (rename-buffer
-                                         (concat
-                                          "*"
-                                          id
-                                          "-"
-                                          new-file-name
-                                          "*")))
-                                      (igist-setup-local-vars
-                                       new-gist new-file-name)
-                                      (replace-region-contents
-                                       (point-min)
-                                       (point-max)
-                                       (lambda ()
-                                         content))
-                                      (set-buffer-modified-p
-                                       nil))))))))))
+                 :callback (lambda (val &rest _ignored)
+                             (when (igist-alist-get 'id val)
+                               (igist-request-gists-async
+                                (lambda ()
+                                  (when-let* ((new-gist
+                                               (cdr
+                                                (igist-find-by-id-and-file
+                                                 id
+                                                 new-file-name))))
+                                    (when (buffer-live-p buffer)
+                                      (with-current-buffer buffer
+                                        (unless (equal
+                                                 orig-filename
+                                                 new-file-name)
+                                          (message "Renameing")
+                                          (rename-buffer
+                                           (concat
+                                            "*"
+                                            id
+                                            "-"
+                                            new-file-name
+                                            "*"))
+                                          (igist-set-major-mode
+                                           new-file-name)
+                                          (igist-edit-mode))
+                                        (igist-setup-local-vars
+                                         new-gist new-file-name)
+                                        (set-buffer-modified-p
+                                         nil)))))))))))
 
 (defun igist-save-new-gist (buffer)
   "Save new gist in BUFFER."
@@ -1185,9 +1193,11 @@ If LOADING is non nil show spinner, otherwise hide."
 (defun igist-setup-local-vars (gist filename)
   "Setup local variables for GIST with FILENAME."
   (let ((gist-id (igist-alist-get 'id gist)))
-    (setq header-line-format (or (concat "Gist " filename
-                                         (igist-make-file-counter
-                                          gist))))
+    (setq-local igist-current-filename (igist-alist-get 'filename gist))
+    (setq-local header-line-format (format
+                                    "Gist %s %s"
+                                    igist-current-filename
+                                    (igist-make-file-counter gist)))
     (setq-local igist-current-gist gist)
     (setq-local igist-current-filename (if gist-id
                                            (or igist-current-filename
@@ -1205,6 +1215,12 @@ If LOADING is non nil show spinner, otherwise hide."
                                               gist))
                                        (yes-or-no-p "Public?")))))
 
+(defun igist-edit-ensure-edit-mode ()
+  "Set `igist-edit-mode' if it is not enabled."
+  (unless (and (boundp 'igist-edit-mode)
+               (symbol-value 'igist-edit-mode))
+    (igist-edit-mode)))
+
 (defun igist-setup-edit-buffer (gist &rest setup-args)
   "Setup edit buffer for GIST in popup window.
 
@@ -1213,33 +1229,46 @@ A filename can be opened with \\<igist-edit-buffer-default-keymap>\.
 A function will be called without args inside quit function.
 
 If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
-  (let ((filename (or (igist-alist-get 'filename gist)
-                      (read-string "Filename: ")))
-        (gist-id (igist-alist-get 'id gist))
-        (url (igist-alist-get 'raw_url gist)))
-    (let ((content (if url (igist-download-url url) ""))
-          (buffer (if gist-id
-                      (get-buffer-create (concat "*" (igist-make-gist-key gist)
-                                                 "*"))
-                    (get-buffer-create
-                     (concat "*" "newgist" "-" filename "*"))))
-          (mode-fn (seq-find #'functionp setup-args)))
-      (with-current-buffer buffer
-        (erase-buffer)
-        (setq buffer-read-only nil)
-        (progn
-          (set-buffer-modified-p nil)
-          (save-excursion
-            (delay-mode-hooks
-              (igist-set-major-mode filename))
-            (insert content))
-          (igist-edit-mode)
-          (when mode-fn
-            (funcall mode-fn)))
-        (igist-setup-local-vars gist filename)
-        (setq buffer-undo-list nil)
-        (set-buffer-modified-p nil))
-      buffer)))
+  (let* ((filename (or (igist-alist-get 'filename gist)
+                       (read-string "Filename: ")))
+         (gist-id (igist-alist-get 'id gist))
+         (buffer (and filename
+                      gist-id
+                      (igist-get-gist-buffer gist-id filename))))
+    (if (and buffer
+             (buffer-live-p buffer)
+             (buffer-modified-p buffer))
+        (with-current-buffer buffer
+          (igist-set-major-mode filename)
+          (igist-setup-local-vars gist filename)
+          (igist-edit-ensure-edit-mode)
+          (current-buffer))
+      (setq buffer (if gist-id
+                       (get-buffer-create
+                        (concat "*" (igist-make-gist-key gist) "*"))
+                     (get-buffer-create
+                      (concat "*" "newgist" "-" filename "*"))))
+      (let ((content
+             (if
+                 (igist-alist-get 'raw_url gist)
+                 (igist-download-url (igist-alist-get 'raw_url gist))
+               ""))
+            (mode-fn (seq-find #'functionp setup-args)))
+        (with-current-buffer buffer
+          (erase-buffer)
+          (setq buffer-read-only nil)
+          (progn
+            (set-buffer-modified-p nil)
+            (save-excursion
+              (insert content))
+            (igist-set-major-mode filename)
+            (when mode-fn
+              (funcall mode-fn)))
+          (igist-setup-local-vars gist filename)
+          (igist-edit-ensure-edit-mode)
+          (setq buffer-undo-list nil)
+          (set-buffer-modified-p nil))
+        buffer))))
 
 (defun igist-setup-new-gist-buffer (filename content)
   "Setup edit buffer for new gist with FILENAME and CONTENT."
@@ -1252,8 +1281,7 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
         (set-buffer-modified-p nil)
         (setq buffer-undo-list nil)
         (save-excursion
-          (delay-mode-hooks
-            (igist-set-major-mode filename))
+          (igist-set-major-mode filename)
           (when content
             (insert content)))
         (igist-edit-mode))
@@ -1327,9 +1355,13 @@ MAX is length of most longest key."
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map "+" 'igist-list-add-file)
+    (define-key map "-" 'igist-list-delete-file-at-point)
     (define-key map "g" 'igist-list-gists)
     (define-key map "e" 'igist-tabulated-edit-description)
-    (define-key map (kbd "RET") 'igist-list-fetch-current)
+    (define-key map "D" 'igist-delete-current-gist)
+    (define-key map (kbd "RET") 'igist-list-edit-gist-at-point)
+    (define-key map (kbd "C-j") 'igist-list-fetch-current)
+    (define-key map (kbd "v") 'igist-list-fetch-current)
     map))
 
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
@@ -1351,7 +1383,11 @@ MAX is length of most longest key."
 (defun igist-list-fetch-current ()
   "Fetch tabulated gist entry at point."
   (interactive)
-  (igist-files-button-action nil))
+  (when-let ((current-window (selected-window))
+             (gist (igist-list-gist-to-fetch)))
+    (with-selected-window current-window
+      (let ((buff (igist-setup-edit-buffer gist)))
+        (switch-to-buffer-other-window buff)))))
 
 ;;;###autoload
 (defun igist-list-add-file ()
@@ -1362,11 +1398,12 @@ MAX is length of most longest key."
               (gist (cdr (car (igist-get-gists-by-id id))))
               (filename (igist-read-filename-new gist)))
     (let ((buff (igist-setup-edit-buffer
-                 (igist-pick-from-alist
-                  '(owner
-                    id files
-                    description)
-                  gist))))
+                 (append `((filename . ,filename))
+                         (igist-pick-from-alist
+                          '(owner
+                            id files
+                            description)
+                          gist)))))
       (switch-to-buffer-other-window buff))))
 
 ;;;###autoload
@@ -1498,7 +1535,7 @@ MAX is length of most longest key."
          (actions `((?y "delete only filename")
                     (?Y
                      ,(if-let ((files (igist-alist-get 'files gist)))
-                          (format "yes, remove gist with %s files"
+                          (format "Remove gist with %s files"
                                   (length
                                    files))
                         "Remove whole gist."))
@@ -1515,9 +1552,15 @@ MAX is length of most longest key."
 (defun igist-delete-current-gist ()
   "Delete current gist."
   (interactive)
-  (if-let ((id (igist-alist-get 'id igist-current-gist)))
-      (igist-delete-gist igist-current-gist)
-    (message "Not in gist buffer")))
+  (cond ((igist-alist-get 'id igist-current-gist)
+         (igist-delete-gist igist-current-gist))
+        ((and igist-current-gist)
+         (kill-current-buffer))
+        ((eq major-mode 'igist-list-mode)
+         (when-let ((id (tabulated-list-get-id)))
+           (when (yes-or-no-p (format "Remove gist %s and all its files?" id))
+             (igist-delete-gists-buffers-by-id id)
+             (igist-request-delete id))))))
 
 ;;;###autoload
 (defun igist-toggle-public (&rest _)
@@ -1537,14 +1580,17 @@ MAX is length of most longest key."
                  (description (or (igist-alist-get 'description gist) ""))
                  (files (igist-alist-get 'files gist)))
              (setq igist-current-description description)
-             (setq igist-current-gist `((id . ,id)
-                                        (description . ,(or
-                                                         description
-                                                         ""))
-                                        (files . ,files)
-                                        (owner . ,(igist-alist-get 'owner gist))
-                                        (idx . ,(1+ (length files)))
-                                        (total . ,(1+ (length files))))))))
+             (setq igist-current-gist
+                   `((id . ,id)
+                     (description . ,(or
+                                      description
+                                      ""))
+                     (files . ,files)
+                     (owner . ,(igist-alist-get 'owner gist))
+                     (idx . ,(1+ (length files)))
+                     (total . ,(1+ (length files))))))))
+        ((eq major-mode 'igist-list-mode)
+         (igist-list-add-file))
         (t
          (let* ((gist (or igist-current-gist
                           (igist-completing-read-gists "Add file to gist ")))
@@ -1584,12 +1630,11 @@ MAX is length of most longest key."
   "Save current gist and with argument ARG kill buffer."
   (interactive "P")
   (let ((buff (current-buffer)))
+    (with-current-buffer buff
+      (run-hooks igist-before-save-hook))
     (if (igist-alist-get 'id (buffer-local-value 'igist-current-gist buff))
         (igist-save-existing-gist buff)
       (igist-save-new-gist buff))
-    (with-current-buffer buff
-      (set-auto-mode)
-      (run-hooks igist-before-save-hook))
     (when arg
       (kill-buffer buff)
       (message "Saved"))))
@@ -1726,6 +1771,21 @@ If ACTION is non nil, call it with gist."
   :reader #'igist-toggle-public
   :argument "affirmative")
 
+(defun igist-list-delete-file-at-point ()
+  "Delete tabulated gist filename at pont."
+  (interactive)
+  (if-let ((gist (igist-tabulated-gist-at-point)))
+      (igist-delete-gist-filename gist)
+    (when-let* ((id (tabulated-list-get-id))
+                (files (mapcar #'cdr (igist-get-gists-by-id id)))
+                (gist (igist-find-by-id-and-file
+                       id
+                       (completing-read "Files" (mapcar (apply-partially
+                                                         #'igist-alist-get
+                                                         'filename)
+                                                        files)))))
+      (igist-delete-gist-filename gist))))
+
 (transient-define-prefix igist-dispatch-transient ()
   "Invoke transient popup with list of available commands."
   [:class transient-columns
@@ -1742,19 +1802,36 @@ If ACTION is non nil, call it with gist."
                ("r" igist-set-current-filename-variable)
                ("d" igist-set-current-description-variable)
                ("p" igist-transient-toggle-public)
+               ("R" "Remove" igist-delete-current-gist)
                ("g" "Refresh" igist-refresh-current-gist
                 :if (lambda () igist-current-gist))
                ("RET" "Save" igist-save-current-gist
                 :if (lambda () (or igist-current-filename
                               igist-current-gist)))
                ("f" "Add file" igist-add-file-to-gist)]
+          [:if (lambda () (and (eq major-mode 'igist-list-mode)
+                          (tabulated-list-get-id)))
+               :description
+               (lambda ()
+                 (tabulated-list-get-id))
+               ("D" "Delete gist" igist-delete-current-gist)
+               ("d" "Description" igist-tabulated-edit-description)
+               ("+" "Add file" igist-list-add-file)
+               ("-" igist-list-delete-file-at-point
+                :description
+                (lambda () (format
+                       "Delete %s "
+                       (or
+                        (when-let ((gist-file (igist-tabulated-gist-at-point)))
+                          (igist-alist-get 'filename gist-file))
+                        ""))))]
           ["User"
            ("u" igist-set-current-user)]
           ["Gists"
-           ("D" "Delete" igist-delete-gist)
+           ("R" "Remove" igist-delete-gist)
            ("l" "Edit gist" igist-edit-gists)
            ("L" "List gists" igist-list-gists)
-           ("n" "New" igist-create-new-gist)
+           ("n" "New" igist-new-gist-from-buffer)
            ("f" "Add file to gist" igist-add-file-to-gist)
            ("b" "New gist from buffer" igist-new-gist-from-buffer)
            ("B" "Kill all gists buffers" igist-kill-all-gists-buffers)
