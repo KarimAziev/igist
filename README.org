@@ -20,7 +20,7 @@ Edit, create and view Github gists in Emacs.
 
 *** Manually
 
-Download repository and it to your load path in your init file:
+Download the repository and it to your load path in your init file:
 
 #+begin_src elisp :eval no
 
@@ -35,47 +35,35 @@ Download repository and it to your load path in your init file:
 #+begin_src elisp :eval no
 
 (use-package igist
-	:straight (igist
-			       :repo "KarimAziev/igist"
-			       :type git
-			       :host github)
+  :straight (igist
+             :repo "KarimAziev/igist"
+             :type git
+             :host github)
   :commands (igist-list-mode)
-	:bind (("M-o" . igist-dispatch)
+  :bind (("M-o" . igist-dispatch)
          (:map igist-edit-buffer-keymap
-			         ("C-c C-c" . igist-save-current-gist-and-exit)
-			         ("C-c C-k" . kill-current-buffer)
-			         ("C-c '" . igist-save-current-gist))
+               ("C-c C-c" . igist-save-current-gist-and-exit)
+               ("C-c C-k" . kill-current-buffer)
+               ("C-c '" . igist-save-current-gist))
          (:map igist-list-menu-mode-map
-			         ("RET" . igist-list-fetch-current)
-			         ("+" . igist-list-add-file)
-			         ("g" . igist-list-gists))))
+               ("RET" . igist-list-fetch-current)
+               ("+" . igist-list-add-file)
+               ("g" . igist-list-gists))))
 
 #+end_src
 
 ** Auth
-You need to ensure that you have [[https://github.com/settings/tokens][a Github API token]] with scope ~gist~.
+You need to ensure that you have [[https://github.com/settings/tokens][a GitHub API token]] with scope ~gist~.
 
-Assuming your Github username is "ziggy", you have created a token "012345abcdefgde", so you need to add such entry in one of files listed in the the variable ~auth-sources~ (~M-x describe-variable~ ~RET~ and type ~auth-sources~, usually it is =~/.authinfo= or =~/.authinfo.gpg=):
+For example, your GitHub username is km, and you have a token "012345abcdef...". Add such an entry in ~auth-sources~ (~M-x describe-variable~ ~RET~ and type ~auth-sources~, usually it is =~/.authinfo= or =~/.authinfo.gpg=). 
 
 #+begin_example
-machine api.github.com login ziggy^forge password 012345abcdefgde
+machine api.github.com login km^gist password 012345abcdef
 #+end_example
 
-You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual as igist relies on the provided api.
+You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual as igist relies on the provided API.
 
 ** Usage
 
 *** ~M-x igist-dispatch~
-
-Invoke transient popup with list of available commands.
-
-** Customization
-
-*** ~igist-current-user-auth~
-Suffix of user name in Auth-Sources. For example, your github username is km, you have a token "012345abcdef...", add such an entry in ~auth-sources.~ machine api.github.com login km^gist password 012345abcdef..., where ~gist~ is a suffix (default value).
-*** ~igist-per-page-limit~
-The number of results per page (max 100).
-*** ~igist-ask-for-description~
-When to prompt for description before posting new gists.
-*** ~igist-list-format~
-Format for gist list.
+Invoke a transient popup with the list of available commands.
