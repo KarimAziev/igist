@@ -3,9 +3,27 @@
 
 * igist
 
-Edit, create and view Github gists in Emacs.
+List, create, update and delete GitHub gists in Emacs.
+
 
 [[./igists-demo.gif]]
+
+** Overview
+The Emacs everywhere goal continues. These are the main features of
+~igist~ to help you never leave Emacs to do manage your gists.
+
+     - [X] List gists
+     - [X] Use auth-sources
+     - [X] Create a gist
+     - [X] Update a gist
+     - [X] Delete a gist
+     - [X] Fork a gist
+     - [ ] Star a gist
+     - [X] Comments
+       - [X] Create a comment
+       - [X] List comments
+       - [X] Delete a comment
+       - [X] Edit a comment
 
 ** Requirements
 
@@ -41,7 +59,7 @@ Download the repository and it to your load path in your init file:
              :host github)
   :commands (igist-list-mode)
   :bind (("M-o" . igist-dispatch)
-         (:map igist-edit-buffer-keymap
+         (:map igist-edit-buffer-map
                ("C-c C-c" . igist-save-current-gist-and-exit)
                ("C-c C-k" . kill-current-buffer)
                ("C-c '" . igist-save-current-gist))
@@ -55,7 +73,7 @@ Download the repository and it to your load path in your init file:
 ** Auth
 You need to ensure that you have [[https://github.com/settings/tokens][a GitHub API token]] with scope ~gist~.
 
-For example, your GitHub username is km, and you have a token "012345abcdef...". Add such an entry in ~auth-sources~ (~M-x describe-variable~ ~RET~ and type ~auth-sources~, usually it is =~/.authinfo= or =~/.authinfo.gpg=). 
+For example, your GitHub username is =km=, and you have a token "012345abcdef...". Add such an entry in ~auth-sources~ (~M-x describe-variable~ ~RET~ and type ~auth-sources~, usually it is =~/.authinfo= or =~/.authinfo.gpg=). 
 
 #+begin_example
 machine api.github.com login km^gist password 012345abcdef

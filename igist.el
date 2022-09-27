@@ -1,4 +1,4 @@
-;;; igist.el --- Edit, create and view your github gists -*- lexical-binding: t; -*-
+;;; igist.el --- List, create, update and delete GitHub gists -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2022 Karim Aziiev <karim.aziiev@gmail.com>
 
@@ -134,13 +134,12 @@ Program `pandoc' should be installed for `org-mode'."
 (defvar igist-owner-username nil
   "Name of the user to get gists from.")
 
-(defcustom igist-current-user-auth 'gist
-  "Suffix of user name in Auth-Sources.
-For example, your github username is km, you have a token \"012345abcdef...\",
-add such an entry in `auth-sources'.
+(defcustom igist-auth-marker 'gist
+  "The auth marker in Auth-Sources appended to username and divided with \"^\".
 
-machine api.github.com login km^gist password 012345abcdef...,
-where `gist' is a suffix (default value)."
+For example, if the value of marker is `gist', you need to add such entry:
+
+\"machine api.github.com login GITHUB_USERNAME^gist password GITHUB_TOKEN\"."
   :group 'igist
   :type 'symbol)
 
@@ -176,7 +175,7 @@ only serves as documentation.")
 
 (defvar igist-batch-buffer nil)
 
-(defvar igist-edit-buffer-keymap
+(defvar igist-edit-buffer-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") 'igist-save-current-gist-and-exit)
     (define-key map (kbd "C-c '") 'igist-save-current-gist-and-exit)
@@ -314,7 +313,7 @@ Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
  meaning, as in `ghub-request'."
   (if igist-current-user-name
-      (setq igist-current-user-auth (or auth igist-current-user-auth))
+      (setq igist-auth-marker (or auth igist-auth-marker))
     (igist-change-user))
   (igist-list-set-loading t)
   (when buffer
@@ -325,7 +324,7 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
                            params
                            :username (or username igist-current-user-name)
                            :query query
-                           :auth igist-current-user-auth
+                           :auth igist-auth-marker
                            :forge (or forge 'github)
                            :host (or host "api.github.com")
                            :callback
@@ -463,7 +462,7 @@ have the same meaning, as in `ghub-request'."
 (defun igist-request-gists-async (&optional cb &rest args)
   "Load gists asynchronously with callback CB and ARGS."
   (if igist-current-user-name
-      (setq igist-current-user-auth igist-current-user-auth)
+      (setq igist-auth-marker igist-auth-marker)
     (igist-change-user))
   (let ((request-user-name
          (let ((user igist-current-user-name))
@@ -482,7 +481,7 @@ have the same meaning, as in `ghub-request'."
                                                   100)
                                                100
                                              (length igist-gists-response)))))
-                   :auth igist-current-user-auth
+                   :auth igist-auth-marker
                    :forge 'github
                    :host "api.github.com"
                    :callback (lambda (value &rest _)
@@ -1381,7 +1380,7 @@ MAX is length of most longest key."
       (concat (file-name-base buffer-file-name) "." ext)
     (string-join (split-string (buffer-name) "[^a-zZ-A0-9-]" t) "")))
 
-(defvar igist-list-menu-mode-map
+(defvar igist-list-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map "+" 'igist-list-add-file)
@@ -1392,14 +1391,14 @@ MAX is length of most longest key."
     (define-key map "e" 'igist-list-edit-description)
     (define-key map "D" 'igist-delete-current-gist)
     (define-key map (kbd "RET") 'igist-list-edit-gist-at-point)
-    (define-key map (kbd "C-j") 'igist-list-fetch-current)
-    (define-key map (kbd "v") 'igist-list-fetch-current)
+    (define-key map (kbd "C-j") 'igist-list-view-current)
+    (define-key map (kbd "v") 'igist-list-view-current)
     map))
 
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
-\\<igist-list-menu-mode-map>
-\\{igist-list-menu-mode-map}"
+\\<igist-list-mode-map>
+\\{igist-list-mode-map}"
   (setq tabulated-list-format
         (apply #'vector
                (mapcar
@@ -1409,7 +1408,7 @@ MAX is length of most longest key."
         tabulated-list-padding 2
         tabulated-list-sort-key nil)
   (tabulated-list-init-header)
-  (use-local-map igist-list-menu-mode-map))
+  (use-local-map igist-list-mode-map))
 
 (defun igist-pandoc-from-string (string input-type output-type &rest options)
   "Execute `pandoc' on STRING in INPUT-TYPE to OUTPUT-TYPE additional OPTIONS."
@@ -1664,7 +1663,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                   :payload `((body . ,content))))))
 
 ;;;###autoload
-(defun igist-list-fetch-current ()
+(defun igist-list-view-current ()
   "Fetch tabulated gist entry at point."
   (interactive)
   (when-let ((current-window (selected-window))
@@ -1722,7 +1721,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                                    100)
                                                 100
                                               (length resp))))))
-                    :auth igist-current-user-auth
+                    :auth igist-auth-marker
                     :forge 'github
                     :host "api.github.com"
                     :errorback
@@ -1857,7 +1856,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
               (parts (split-string gist-user "\\^" t))
               (auth (car (reverse parts)))
               (user (string-join (nbutlast parts 1) "^")))
-    (setq igist-current-user-auth (intern auth)
+    (setq igist-auth-marker (intern auth)
           igist-current-user-name user)))
 
 ;;;###autoload
@@ -1892,7 +1891,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                                    100)
                                                 100
                                               (length resp))))))
-                    :auth igist-current-user-auth
+                    :auth igist-auth-marker
                     :forge 'github
                     :host "api.github.com"
                     :errorback
@@ -2065,7 +2064,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
 (define-minor-mode igist-edit-mode
   "Minor mode for editable gists buffers."
   :lighter " Igist"
-  :map 'igist-edit-buffer-keymap
+  :map 'igist-edit-buffer-map
   :global nil
   (when igist-edit-mode
     (progn
@@ -2073,7 +2072,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
       (set-buffer-modified-p nil)
       (use-local-map
        (let ((map (copy-keymap
-                   igist-edit-buffer-keymap)))
+                   igist-edit-buffer-map)))
          (set-keymap-parent map (current-local-map))
          map)))))
 
