@@ -63,8 +63,8 @@ Download the repository and it to your load path in your init file:
                ("C-c C-c" . igist-save-current-gist-and-exit)
                ("C-c C-k" . kill-current-buffer)
                ("C-c '" . igist-save-current-gist))
-         (:map igist-list-menu-mode-map
-               ("RET" . igist-list-fetch-current)
+         (:map igist-list-mode-map
+               ("RET" . igist-list-view-current)
                ("+" . igist-list-add-file)
                ("g" . igist-list-gists))))
 
