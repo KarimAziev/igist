@@ -1083,26 +1083,25 @@ If LOADING is non nil show spinner, otherwise hide."
          (orig-filename (igist-alist-get 'filename gist))
          (new-filename (buffer-local-value
                         'igist-current-filename
-                        buffer))
-         (payload (igist-make-gist-payload
-                   (or orig-filename
-                       new-filename)
-                   new-filename
-                   (or
-                    (buffer-local-value
-                     'igist-current-description
-                     buffer)
-                    (igist-alist-get
-                     'description
-                     igist-current-gist))
-                   (with-current-buffer
-                       buffer
-                     (buffer-substring-no-properties
-                      (point-min)
-                      (point-max))))))
+                        buffer)))
     (igist-patch (concat "/gists/" id)
                  nil
-                 :payload payload
+                 :payload (igist-make-gist-payload
+                           (or orig-filename
+                               new-filename)
+                           new-filename
+                           (or
+                            (buffer-local-value
+                             'igist-current-description
+                             buffer)
+                            (igist-alist-get
+                             'description
+                             igist-current-gist))
+                           (with-current-buffer
+                               buffer
+                             (buffer-substring-no-properties
+                              (point-min)
+                              (point-max))))
                  :buffer buffer
                  :callback
                  (lambda (val &rest _ignored)
@@ -1127,7 +1126,7 @@ If LOADING is non nil show spinner, otherwise hide."
                                 (funcall cb))))))
                      (message "Couldn't save gist."))))))
 
-(defun igist-update-created-gist (filename buffer response &optional callback)
+(defun igist-update-created-gist (filename buffer response)
   "Update BUFFER with RESPONSE data for freshly created gist with FILENAME.
 If callback is non nil, call it without args."
   (igist-with-exisiting-buffer buffer
@@ -1151,9 +1150,7 @@ If callback is non nil, call it without args."
       (replace-region-contents (point-min)
                                (point-max)
                                (lambda () content))
-      (set-buffer-modified-p nil)
-      (when callback
-        (funcall callback)))))
+      (set-buffer-modified-p nil))))
 
 (defun igist-save-new-gist (buffer &optional callback)
   "Save new gist in BUFFER, refresh gists and execute CALLBACK without args."
@@ -1183,12 +1180,12 @@ If callback is non nil, call it without args."
                 :buffer buffer
                 :callback
                 (lambda (value &rest _)
+                  (igist-with-exisiting-buffer buffer
+                    (when callback
+                      (funcall callback)))
                   (igist-request-gists-async
-                   (lambda ()
-                     (igist-update-created-gist file
-                                                buffer
-                                                value
-                                                callback)))))))
+                   #'igist-update-created-gist
+                   file buffer value)))))
 
 (defun igist-setup-local-vars (gist filename)
   "Setup local variables for GIST with FILENAME."
@@ -1604,6 +1601,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                   gist-id)
                                  t))))
 
+;;;###autoload
 (defun igist-delete-comment-at-point (&rest _)
   "Add or edit comment for gist at point or edit buffer."
   (interactive)
@@ -2038,7 +2036,9 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
       (run-hooks igist-before-save-hook))
     (if (igist-alist-get 'id (buffer-local-value 'igist-current-gist buff))
         (igist-save-existing-gist buff 'kill-current-buffer)
-      (igist-save-new-gist buff 'kill-current-buffer))))
+      (igist-save-new-gist buff (lambda ()
+                                  (kill-current-buffer)
+                                  (message "Gist created"))))))
 
 ;;;###autoload
 (define-minor-mode igist-comment-mode
