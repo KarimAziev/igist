@@ -6,24 +6,24 @@
 List, create, update and delete GitHub gists in Emacs.
 
 
-[[./igists-demo.gif]]
+[[./igist-demo.gif]]
 
 ** Overview
 The Emacs everywhere goal continues. These are the main features of
 ~igist~ to help you never leave Emacs to do manage your gists.
 
-     - [X] List gists
-     - [X] Use auth-sources
-     - [X] Create a gist
-     - [X] Update a gist
-     - [X] Delete a gist
-     - [X] Fork a gist
-     - [ ] Star a gist
-     - [X] Comments
-       - [X] Create a comment
-       - [X] List comments
-       - [X] Delete a comment
-       - [X] Edit a comment
+- [X] List gists
+- [X] Use auth-sources
+- [X] Create a gist
+- [X] Update a gist
+- [X] Delete a gist
+- [X] Fork a gist
+- [ ] Star a gist
+- [X] Comments
+  - [X] Create a comment
+  - [X] List comments
+  - [X] Delete a comment
+  - [X] Edit a comment
 
 ** Requirements
 
@@ -83,5 +83,60 @@ You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-C
 
 ** Usage
 
-*** ~M-x igist-dispatch~
-Invoke a transient popup with the list of available commands.
+*** General
+
+The simplest way is just to invoke transient popup with list of available commands for current buffer:
+
+- ~M-x igist-dispatch~ - in ~igists~ buffers it is bound to =M-o=.
+
+*** List gists
+You can view list of gists either in tabulated list mode (~igist-list-gists~), either it minibuffer (~M-x igist-edit-gists~).
+
+- ~igist-list-gists~
+
+In ~igist~ tabulated list mode such commands are available:
+
+| Key | Command       |
+|-----+---------------|
+| C-j | view gist     |
+| v   | view gist     |
+| RET | edit gist     |
+| -   | delete file   |
+| +   | add file      |
+| D   | delete gist   |
+| c   | load comments |
+| g   | refresh gists |
+| f   | fork gist     |
+
+
+*** Edit gist
+
+In editing buffer such commands are available:
+
+| Key     | Command              |
+|---------+----------------------|
+| M-o     | transient popup      |
+| C-c C-c | save and exit        |
+| C-c '   | save and exit        |
+| C-x C-s | save without exiting |
+
+
+*** List comments
+
+In comments list mode such commands are available:
+
+| Key | Command                 |
+|-----+-------------------------|
+| +   | add comment             |
+| -   | delete comment at point |
+| D   | delete comment at point |
+| e   | add or edit             |
+| g   | refresh comments        |
+
+*** Editing comment
+
+Keymap for posting and editing comments.
+
+| Key     | Command      |
+|---------+--------------|
+| C-c C-c | post comment |
