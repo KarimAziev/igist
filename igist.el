@@ -2016,29 +2016,43 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                     igist-current-gist)))))
     (setq igist-current-filename file)))
 
+(defun igist-gist-modified-p (buffer)
+  "Return t current gist's BUFFER is modified."
+  (or (buffer-modified-p buffer)
+      (let ((gist (buffer-local-value 'igist-current-gist buffer))
+            (description (buffer-local-value 'igist-current-description buffer))
+            (filename (buffer-local-value 'igist-current-filename buffer)))
+        (or (not (equal filename (igist-alist-get 'filename gist)))
+            (not (equal description (igist-alist-get 'description gist)))))))
+
+(defun igist-save-gist-buffer (buffer &optional callback)
+  "Run hooks `igist-before-save-hook' and save gist in BUFFER if it is edited.
+With CALLBACK call it without args after success request."
+  (with-current-buffer buffer
+    (run-hooks igist-before-save-hook))
+  (if
+      (not (igist-alist-get 'id (buffer-local-value
+                                 'igist-current-gist buffer)))
+      (igist-save-new-gist buffer callback)
+    (when (igist-gist-modified-p buffer)
+      (igist-save-existing-gist buffer callback))))
+
 ;;;###autoload
 (defun igist-save-current-gist ()
-  "Save current gist and with argument ARG kill buffer."
+  "Save current gist."
   (interactive)
-  (let ((buff (current-buffer)))
-    (with-current-buffer buff
-      (run-hooks igist-before-save-hook))
-    (if (igist-alist-get 'id (buffer-local-value 'igist-current-gist buff))
-        (igist-save-existing-gist buff)
-      (igist-save-new-gist buff))))
+  (igist-save-gist-buffer (current-buffer)
+                          (lambda ()
+                            (message "Gist saved"))))
 
 ;;;###autoload
 (defun igist-save-current-gist-and-exit ()
   "Save current gist."
   (interactive)
-  (let ((buff (current-buffer)))
-    (with-current-buffer buff
-      (run-hooks igist-before-save-hook))
-    (if (igist-alist-get 'id (buffer-local-value 'igist-current-gist buff))
-        (igist-save-existing-gist buff 'kill-current-buffer)
-      (igist-save-new-gist buff (lambda ()
-                                  (kill-current-buffer)
-                                  (message "Gist created"))))))
+  (igist-save-gist-buffer (current-buffer)
+                          (lambda ()
+                            (kill-current-buffer)
+                            (message "Gist created"))))
 
 ;;;###autoload
 (define-minor-mode igist-comment-mode
