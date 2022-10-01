@@ -1515,16 +1515,20 @@ GIST-ID is used to create comments buffer."
             (seq-find #'igist-has-comments
                       (list
                        (or igist-current-gist
-                           (igist-tabulated-gist-at-point))) )))
-      (if (or igist-current-gist (igist-tabulated-gist-at-point))
+                           (igist-tabulated-gist-parent-at-point))))))
+      (if (or igist-current-gist
+              (igist-tabulated-gist-parent-at-point))
           (message "Gist has no comments."))
-    (when-let ((gist-id
-                (or
-                 igist-comment-gist-id
-                 (igist-alist-get 'id
-                                  (or igist-current-gist
-                                      (igist-tabulated-gist-at-point))))))
-      (igist-with-exisiting-buffer (concat "*" gist-id "-comments*")
+    (when-let
+        ((gist-id
+          (or
+           igist-comment-gist-id
+           (igist-alist-get 'id
+                            (or igist-current-gist
+                                (igist-tabulated-gist-parent-at-point))))))
+      (igist-with-exisiting-buffer
+          (get-buffer-create
+           (concat "*" gist-id "-comments*"))
         (igist-spinner-show))
       (igist-get (concat "/gists/" gist-id "/comments") nil
                  :callback
