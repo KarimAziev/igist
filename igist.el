@@ -1450,7 +1450,7 @@ MAX is length of most longest key."
 (define-minor-mode igist-comments-list-mode
   "Mode for viewing and rendering gist comments."
   :lighter " igists"
-  :map igist-comments-list-map
+  :keymap igist-comments-list-map
   :global nil
   (when igist-comments-list-mode
     (use-local-map
@@ -2044,7 +2044,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
 (define-minor-mode igist-comment-mode
   "Minor mode for commenting gists."
   :lighter " Igist"
-  :map 'igist-comments-edit-mode-map
+  :keymap igist-comments-edit-mode-map
   :global nil
   (when igist-comment-mode
     (pcase igist-mode-for-comments
@@ -2064,7 +2064,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
 (define-minor-mode igist-edit-mode
   "Minor mode for editable gists buffers."
   :lighter " Igist"
-  :map 'igist-edit-buffer-map
+  :keymap igist-edit-buffer-map
   :global nil
   (when igist-edit-mode
     (progn
