@@ -732,6 +732,15 @@ except that ] is never special and \ quotes ^, - or \ (but
             (car files)
           file-at-pos)))))
 
+(defun igist-browse-gist ()
+  "Browse gist at point or currently open."
+  (interactive)
+  (when-let ((gist-url
+              (igist-alist-get 'html_url
+                               (or (igist-tabulated-gist-parent-at-point)
+                                   igist-current-gist))))
+    (browse-url gist-url)))
+
 (defun igist-list-gist-to-fetch ()
   "Get tabulated gist with file at point."
   (let* ((id (tabulated-list-get-id))
@@ -2251,7 +2260,9 @@ If ACTION is non nil, call it with gist."
                ("g" "Refresh" igist-refresh-current-gist
                 :if (lambda () igist-current-gist))
                ("RET" "Save" igist-save-current-gist)
-               ("+" "Add file" igist-add-file-to-gist)]
+               ("+" "Add file" igist-add-file-to-gist)
+               ("b r" "Browse gist" igist-browse-gist
+                :if (lambda () (alist-get 'url igist-current-gist)))]
           [:if (lambda () (or (igist-alist-get 'id igist-current-gist)
                          (tabulated-list-get-id)))
                :description
@@ -2269,7 +2280,8 @@ If ACTION is non nil, call it with gist."
                :description
                (lambda ()
                  (tabulated-list-get-id))
-               ("f" "Fork" igist-fork-gist)]
+               ("f" "Fork" igist-fork-gist)
+               ("b r" "Browse gist" igist-browse-gist)]
           [:if (lambda () (and (eq major-mode 'igist-list-mode)
                           (tabulated-list-get-id)
                           (igist-editable-p)))
@@ -2288,7 +2300,8 @@ If ACTION is non nil, call it with gist."
                        (or
                         (when-let ((gist-file (igist-tabulated-gist-at-point)))
                           (igist-alist-get 'filename gist-file))
-                        ""))))]
+                        ""))))
+               ("b r" "Browse gist" igist-browse-gist)]
           ["User"
            ("u" igist-set-current-user)
            ("o" igist-transient-change-owner)]
@@ -2299,7 +2312,7 @@ If ACTION is non nil, call it with gist."
            ("L" "List gists" igist-list-gists)
            ("n" "New" igist-create-new-gist)
            ("a" "Add file to gist" igist-add-file-to-gist)
-           ("b" "New gist from buffer" igist-new-gist-from-buffer)
+           ("b b" "New gist from buffer" igist-new-gist-from-buffer)
            ("B" "Kill all gists buffers" igist-kill-all-gists-buffers)
            ("q" "Quit" transient-quit-all)]])
 
