@@ -643,7 +643,7 @@ code of the process and OUTPUT is its stdout output."
   "Put RESPONSE  to the variable `igist-gists-response'.
 Put normalized response to the variable `igist-normalized-gists'."
   (setq igist-gists-response response)
-  (setq igist-normalized-gists (igists-normalize-gists igist-gists-response)))
+  (setq igist-normalized-gists (igist-normalize-gists igist-gists-response)))
 
 (defun igist-get-gists-by-id (id)
   "Return gists with ID."
@@ -888,7 +888,7 @@ If LOADING is non nil show spinner, otherwise hide."
 If LOADING is non nil show spinner, otherwise hide."
   (igist-list-set-loading loading))
 
-(defun igists-normalize-gists (gists)
+(defun igist-normalize-gists (gists)
   "Normalize GISTS."
   (seq-reduce
    (lambda (acc cell)
@@ -1747,7 +1747,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                   (igist-with-exisiting-buffer buffer
                                     (setq-local igist-gists-response value)
                                     (setq-local igist-normalized-gists
-                                                (igists-normalize-gists
+                                                (igist-normalize-gists
                                                  igist-gists-response))
                                     (unless (eq major-mode 'igist-list-mode)
                                       (igist-list-mode))
@@ -1917,7 +1917,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                   (igist-with-exisiting-buffer buffer
                                     (setq-local igist-gists-response value)
                                     (setq-local igist-normalized-gists
-                                                (igists-normalize-gists
+                                                (igist-normalize-gists
                                                  igist-gists-response))
                                     (unless (eq major-mode 'igist-list-mode)
                                       (igist-list-mode))
