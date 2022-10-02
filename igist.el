@@ -29,10 +29,11 @@
 
 ;;; Code:
 
-(require 'cl-lib)
-(require 'ghub)
+
+
 (require 'transient)
 (require 'timezone)
+(require 'ghub)
 
 (eval-when-compile
   (require 'subr-x))
