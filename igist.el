@@ -6,7 +6,7 @@
 ;; URL: https://github.com/KarimAziev/igist
 ;; Version: 0.6.0
 ;; Keywords: tools
-;; Package-Requires: ((emacs "28.1"))
+;; Package-Requires: ((emacs "28.1") (ghub "20220621"))
 
 ;; This file is NOT part of GNU Emacs.
 
