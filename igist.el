@@ -210,9 +210,8 @@
                                   'help-echo
                                   "Show comments"))))
     (files "Files" 0 t
-           (lambda (files gist-cell)
-             (let ((one-or-none (<= (length files) 1))
-                   (gists (igist-normalize-gist gist-cell)))
+           (lambda (files gist)
+             (let ((one-or-none (<= (length files) 1)))
                (concat
                 (if one-or-none "" "\n")
                 (mapconcat
@@ -224,7 +223,7 @@
                             file
                             'filename file
                             'face 'link
-                            'gist gist-cell)))
+                            'gist gist)))
                  files
                  "\n")))))))
 
@@ -1414,7 +1413,7 @@ MAX is length of most longest key."
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map "+" 'igist-list-add-file)
-    (define-key map "-" 'igist-delete-current-gist)
+    (define-key map "-" 'igist-delete-current-filename)
     (define-key map "g" 'igist-list-gists)
     (define-key map "c" 'igist-load-comments)
     (define-key map "a" 'igist-add-comment)
@@ -1693,11 +1692,9 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
   "Add new file name to gist at point."
   (interactive)
   (when-let* ((current-window (selected-window))
-              (gist (cdr
-                     (igist-normalize-gist
-                      (or
-                       (igist-tabulated-gist-at-point)
-                       igist-current-gist))))
+              (gist (or (cdar (igist-normalize-gist
+                               (igist-tabulated-gist-at-point)))
+                        igist-current-gist))
               (filename
                (when (igist-alist-get 'id gist)
                  (igist-read-filename-new gist))))
