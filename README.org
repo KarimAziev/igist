@@ -12,19 +12,16 @@ List, create, update and delete GitHub gists in Emacs.
 The Emacs everywhere goal continues. These are the main features of
 ~igist~ to help you never leave Emacs to manage your gists.
 
-- [X] List gists
-- [X] Use auth-sources
-- [X] Create a gist
-- [X] Update a gist
-- [X] Delete a gist
-- [X] Fork a gist
-- [ ] Star a gist
-- [X] Comments
-  - [X] Create a comment
-  - [X] List comments
-  - [X] Delete a comment
-  - [X] Edit a comment
-
+- Edit a gist
+- List gists
+- Create a gist
+- Delete a gist
+- Fork a gist
+- Edit, view, list and create comments
+- UI
+  - transient api
+  - tabulated/minibuffer display
+- Use auth-sources
 ** Requirements
 
 + Emacs >= 28.1
