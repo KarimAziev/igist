@@ -923,13 +923,13 @@ If LOADING is non nil show spinner, otherwise hide."
 
 (defun igist-get-github-users ()
   "Return list of users in auth sources with host `api.github.com'."
-  (remove nil (mapcar (igist-rpartial plist-get :user)
-                      (auth-source-search
-                       :host "api.github.com"
-                       :require
-                       '(:user :secret)
-                       :max
-                       most-positive-fixnum))))
+  (delq nil (mapcar (igist-rpartial plist-get :user)
+                    (auth-source-search
+                     :host "api.github.com"
+                     :require
+                     '(:user :secret)
+                     :max
+                     most-positive-fixnum))))
 
 (defun igist-popup-minibuffer-select-window ()
   "Select minibuffer window if it is active."
@@ -1628,13 +1628,16 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
   "Change user for retrieving gist."
   (interactive)
   (when-let* ((users (igist-get-github-users))
+              (auth-marker (symbol-name igist-auth-marker))
               (gist-user
                (completing-read "User: " users nil nil
                                 (car
                                  (seq-filter
-                                  (apply-partially
-                                   #'string-match-p
-                                   "\\^gist$")
+                                  (igist-compose
+                                   (apply-partially #'equal auth-marker)
+                                   car
+                                   last
+                                   (igist-rpartial split-string "[\\^]" t))
                                   (mapcar
                                    (apply-partially
                                     #'format

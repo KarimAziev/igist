@@ -73,7 +73,7 @@ You need to ensure that you have [[https://github.com/settings/tokens][a GitHub 
 For example, your GitHub username is =km=, and you have a token "012345abcdef...". Add such an entry in ~auth-sources~ (~M-x describe-variable~ ~RET~ and type ~auth-sources~, usually it is =~/.authinfo= or =~/.authinfo.gpg=). 
 
 #+begin_example
-machine api.github.com login km^gist password 012345abcdef
+machine api.github.com login km^igist password 012345abcdef
 #+end_example
 
 You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual as igist relies on the provided API.
