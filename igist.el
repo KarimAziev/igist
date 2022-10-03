@@ -6,7 +6,7 @@
 ;; URL: https://github.com/KarimAziev/igist
 ;; Version: 0.6.0
 ;; Keywords: tools
-;; Package-Requires: ((emacs "28.1") (ghub "20220621"))
+;; Package-Requires: ((emacs "28.1") (ghub "3.5.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -2059,11 +2059,15 @@ If ACTION is non nil, call it with gist."
                ("+" "Add file" igist-add-file-to-gist :inapt-if
                 igist-not-editable-p)
                ("f" "Fork" igist-fork-gist :inapt-if igist-editable-p)
-               ("RET" "Save" igist-save-current-gist :inapt-if igist-not-editable-p)
+               ("RET" "Save" igist-save-current-gist
+                :inapt-if igist-not-editable-p)
                ("b r" "Browse" igist-browse-gist
-                :inapt-if-not (lambda () (or (alist-get 'html_url igist-current-gist)
-                                        (igist-alist-get 'html_url
-                                                         (igist-tabulated-gist-at-point)))))
+                :inapt-if-not (lambda ()
+                                (or
+                                 (alist-get 'html_url igist-current-gist)
+                                 (igist-alist-get
+                                  'html_url
+                                  (igist-tabulated-gist-at-point)))))
                ("r" igist-set-current-filename-variable)
                ("d" igist-set-current-description-variable)
                ("p" igist-transient-toggle-public)]
