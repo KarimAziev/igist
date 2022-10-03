@@ -327,7 +327,7 @@ only serves as documentation.")
     (define-key map (kbd "M-o") 'igist-dispatch)
     (define-key map [remap save-buffer] 'igist-save-current-gist)
     map)
-  "Keymap for edit gist buffer.")
+  "Keymap used in edit gist buffers.")
 
 (defvar igist-comments-edit-mode-map
   (let ((map (make-sparse-keymap)))
@@ -1252,14 +1252,10 @@ If callback is non nil, call it without args."
   "Return login name of owner in GIST."
   (igist-alist-get 'login (igist-alist-get 'owner gist)))
 
-(defun igist-setup-edit-buffer (gist &rest setup-args)
+(defun igist-setup-edit-buffer (gist &optional setup-fn)
   "Setup edit buffer for GIST in popup window.
 
-SETUP-ARGS can includes keymaps, syntax table, filename and function.
-A filename can be opened with \\<igist-edit-buffer-default-keymap>\.
-A function will be called without args inside quit function.
-
-If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
+If SETUP-FN is a non nil, it will be called without args."
   (let* ((filename (or (igist-alist-get 'filename gist)
                        (read-string "Filename: ")))
          (gist-id (igist-alist-get 'id gist))
@@ -1284,8 +1280,7 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
              (if
                  (igist-alist-get 'raw_url gist)
                  (igist-download-url (igist-alist-get 'raw_url gist))
-               ""))
-            (mode-fn (seq-find #'functionp setup-args)))
+               "")))
         (with-current-buffer buffer
           (erase-buffer)
           (setq buffer-read-only nil)
@@ -1293,8 +1288,8 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
             (save-excursion
               (insert content))
             (igist-set-major-mode filename)
-            (when mode-fn
-              (funcall mode-fn)))
+            (when setup-fn
+              (funcall setup-fn)))
           (igist-setup-local-vars gist filename)
           (igist-edit-ensure-edit-mode)
           (setq buffer-undo-list nil)
@@ -1352,15 +1347,10 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
         (setq-local igist-comment-id comment-id))
       buffer)))
 
-(defun igist-edit-buffer (gist &rest setup-args)
+(defun igist-edit-buffer (gist &optional setup-fn)
   "Display GIST in popup window.
-
-SETUP-ARGS can includes keymaps, syntax table, filename and function.
-A filename can be opened with \\<igist-edit-buffer-default-keymap>\.
-A function will be called without args inside quit function.
-
-If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
-  (pop-to-buffer (apply #'igist-setup-edit-buffer (list gist setup-args)))
+If SETUP-FN is a non nil, it will be called without args."
+  (pop-to-buffer (apply #'igist-setup-edit-buffer (list gist setup-fn)))
   (igist-popup-minibuffer-select-window))
 
 (defun igist-edit-gist (gist-cell)
@@ -1488,7 +1478,8 @@ MAX is length of most longest key."
 
 This minor mode is turned on after command `igist-load-comments'.
 
-\\<igist-comments-list-mode-map>."
+\\<igist-comments-list-mode-map>
+\\{igist-comments-list-mode-map}."
   :lighter " igists"
   :keymap igist-comments-list-mode-map
   :global nil
@@ -2027,6 +2018,7 @@ With CALLBACK call it without args after success request."
 This minor mode is turned on after commands `igist-add-comment'
 and `igist-edit-comment'.
 
+\\<igist-comments-edit-mode-map>
 \\{igist-comments-edit-mode-map}."
   :lighter " Igist"
   :keymap igist-comments-edit-mode-map
@@ -2051,7 +2043,8 @@ and `igist-edit-comment'.
 
 This minor mode is turned on after command `igist-edit-gist'.
 
-\\{igist-edit-mode-map}
+\\<{igist-edit-mode-map}>
+\\{{igist-edit-mode-map}}
 
 See also `igist-before-save-hook'."
   :lighter " Igist"

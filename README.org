@@ -80,14 +80,15 @@ Download the repository and it to your load path in your init file:
                ("C-j" . igist-list-view-current)
                ("RET" . igist-list-view-current)
                ("+" . igist-list-add-file)
-               ("-" . igist-delete-current-gist)
+               ("-" . igist-delete-current-filename)
                ("D" . igist-delete-current-gist)
                ("a" . igist-add-comment)
                ("c" . igist-load-comments)
                ("e" . igist-list-edit-description)
                ("f" . igist-fork-gist)
                ("g" . igist-list-gists)
-               ("v" . igist-list-view-current))
+               ("v" . igist-list-view-current)
+               ("b" . igist-browse-gist)
          (:map igist-comments-edit-mode-map
                ("M-o" . igist-dispatch)
                ("C-c C-c" . igist-post-comment)
@@ -142,6 +143,7 @@ In ~igist~ tabulated list mode, such commands are available:
 | c   | load comments |
 | g   | refresh gists |
 | f   | fork gist     |
+| b   | browse gist   |
 
 To customize these keys, see the variable =igist-list-mode-map=.
 
