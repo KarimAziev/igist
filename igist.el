@@ -1190,7 +1190,7 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
       (setq-local igist-current-filename filename)
       (setq-local igist-current-description
                   (when (eq igist-ask-for-description 'immediately)
-                    (read-string "Description")))
+                    (read-string "Description: ")))
       (setq-local igist-current-public (yes-or-no-p "Public?")))
     buffer))
 
