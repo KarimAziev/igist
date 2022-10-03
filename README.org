@@ -17,7 +17,7 @@ The Emacs everywhere goal continues. These are the main features of
 - Create a gist
 - Delete a gist
 - Fork a gist
-- Edit, view, list and create comments
+- Edit, view, list, and create comments
 - UI
   - transient api
   - tabulated/minibuffer display
@@ -42,10 +42,10 @@ Download the repository and it to your load path in your init file:
 (add-to-list 'load-path "/path/to/igist)
 
 (require 'igist)
-
 #+end_src
 
 *** With use-package and straight
+
 
 #+begin_src elisp :eval no
 
@@ -54,18 +54,54 @@ Download the repository and it to your load path in your init file:
              :repo "KarimAziev/igist"
              :type git
              :host github)
-  :commands (igist-list-mode)
-  :bind (("M-o" . igist-dispatch)
-         (:map igist-edit-buffer-map
-               ("C-c C-c" . igist-save-current-gist-and-exit)
-               ("C-c C-k" . kill-current-buffer)
-               ("C-c '" . igist-save-current-gist))
-         (:map igist-list-mode-map
-               ("RET" . igist-list-view-current)
-               ("+" . igist-list-add-file)
-               ("g" . igist-list-gists))))
+  :bind (("M-o" . igist-dispatch)))
 
 #+end_src
+
+#+begin_export html
+
+<details>
+  <summary>Example configuration with default keybindings</summary>
+
+```elisp
+(use-package igist
+  :straight (igist
+             :repo "KarimAziev/igist"
+             :type git
+             :host github)
+  :bind (("M-o" . igist-dispatch)
+         (:map igist-edit-mode-map
+               ([remap save-buffer] . igist-save-current-gist)
+               ("M-o" . igist-dispatch)
+               ("C-c C-c" . igist-save-current-gist-and-exit)
+               ("C-c C-k" . kill-current-buffer)
+               ("C-c '" . igist-save-current-gist-and-exit))
+         (:map igist-list-mode-map
+               ("C-j" . igist-list-view-current)
+               ("RET" . igist-list-view-current)
+               ("+" . igist-list-add-file)
+               ("-" . igist-delete-current-gist)
+               ("D" . igist-delete-current-gist)
+               ("a" . igist-add-comment)
+               ("c" . igist-load-comments)
+               ("e" . igist-list-edit-description)
+               ("f" . igist-fork-gist)
+               ("g" . igist-list-gists)
+               ("v" . igist-list-view-current))
+         (:map igist-comments-edit-mode-map
+               ("M-o" . igist-dispatch)
+               ("C-c C-c" . igist-post-comment)
+               ("C-c C-k" . kill-current-buffer))
+         (:map igist-comments-list-mode-map
+               ("+" . igist-add-comment)
+               ("-" . igist-delete-comment-at-point)
+               ("D" . igist-delete-comment-at-point)
+               ("e" . igist-add-or-edit-comment)
+               ("g" . igist-load-comments))))
+```
+</details>
+#+end_export
+
 
 ** Auth
 You need to ensure that you have [[https://github.com/settings/tokens][a GitHub API token]] with scope ~gist~.
@@ -82,14 +118,16 @@ You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-C
 
 *** General
 
-The simplest way is to invoke transient popup with the list of available commands for the current buffer:
+The simplest way is to invoke a transient popup with the list of available commands for the current buffer:
 
 - ~M-x igist-dispatch~ - in ~igists~ buffers it is bound to =M-o=.
 
 *** List gists
-You can view a list of gists either in tabulated list mode (~igist-list-gists~), or in minibuffer (~M-x igist-edit-gists~).
 
-- ~igist-list-gists~
+There are two ways in which gists can be presented, as a table or as minibuffer completions.
+
+- ~M-x igist-list-gists~ - to display your gists
+- ~M-x igist-list-other-user-gists~ - to display public gists of any user.
 
 In ~igist~ tabulated list mode, such commands are available:
 
@@ -105,10 +143,14 @@ In ~igist~ tabulated list mode, such commands are available:
 | g   | refresh gists |
 | f   | fork gist     |
 
+To customize these keys, see the variable =igist-list-mode-map=.
+
+- ~M-x igist-edit-list~ - to list gists in the minibuffer.
 
 *** Edit gist
 
-In the editing buffer such commands are available:
+You can view, edit and save gists in buffers with =igist-comments-edit-mode=.
+This minor mode is turned on after command ~igist-edit-gist~.
 
 | Key     | Command              |
 |---------+----------------------|
@@ -117,8 +159,11 @@ In the editing buffer such commands are available:
 | C-c '   | save and exit        |
 | C-x C-s | save without exiting |
 
+To customize these keys see the variable =igist-comments-edit-mode-map=.
 
 *** List comments
+
+This minor mode is turned on after command ~igist-load-comments~.
 
 In comments list mode, such commands are available:
 
@@ -130,10 +175,15 @@ In comments list mode, such commands are available:
 | e   | add or edit                 |
 | g   | refresh comments            |
 
+To customize these keybindings edit the variable =igist-comments-list-mode-map=.
+
 *** Editing comment
 
+This minor mode is turned on after commands ~igist-edit-comment~ and ~igist-add-comment~.
 Keymap for posting and editing comments:
 
 | Key     | Command      |
 |---------+--------------|
 | C-c C-c | post comment |
+
+To customize these keybindings edit the variable =igist-comments-edit-mode-map=.

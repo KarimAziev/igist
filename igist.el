@@ -27,6 +27,138 @@
 
 ;; Edit, create and view your github gists.
 
+;; Usage
+
+;;  `igist-dispatch' - to invoke transient popup with the list of available commands
+
+;; Display commands:
+
+;; M-x `igist-list-gists' - to display your gists as table.
+;; M-x `igist-list-other-user-gists' - to display public gists of any user.
+;; M-x `igist-edit-list' - Read user gists in minibuffer and open it in edit buffer.
+
+;;; Create commands:
+
+;; M-x `igist-create-new-gist'
+;;      Setup new gist buffer with currently active region content or empty.
+
+;; M-x `igist-new-gist-from-buffer' (&rest _ignore)
+;;      Setup new gist buffer whole buffer contents.
+
+;; M-x `igist-list-add-file'
+;;      Add new file name to gist at point.
+
+;; M-x `igist-fork-gist'
+;;      Fork gist at point in `igist-list-mode' or currently opened.
+
+;; Delete commands:
+
+;; M-x `igist-delete-current-gist'
+;;      Delete current gist with all files.
+
+;; M-x `igist-delete-current-filename'
+;;      Delete current file from gist.
+
+;; M-x `igist-delete-other-gist-or-file' (gist)
+;;      Delete GIST with id.
+
+;; M-x `igist-kill-all-gists-buffers'
+;;      Delete all gists buffers.
+
+;;; Edit commands:
+
+;; M-x `igist-list-view-current'
+;;      Fetch tabulated gist entry at point.
+
+;; M-x `igist-list-edit-gist-at-point' (&optional _entry)
+;;      Open tabulated GIST-ITEM at point in edit buffer.
+
+;; M-x `igist-browse-gist'
+;;      Browse gist at point or currently open.
+
+;; M-x `igist-save-current-gist-and-exit'
+;;      Save current gist.
+
+;; M-x `igist-save-current-gist'
+;;      Save current gist.
+
+;; M-x `igist-read-filename' (&rest _args)
+;;      Update filename for current gist without saving.
+
+;; M-x `igist-read-description' (&rest _args)
+;;      Update description for current gist without saving.
+
+;; M-x `igist-add-file-to-gist'
+;;      Add new file to existing gist.
+
+;; M-x `igist-toggle-public' (&rest _)
+;;      Toggle value of variable `igist-current-public'.
+
+;; M-x `igist-list-edit-description' (&rest _)
+;;      Edit description for current gist at point in tabulated list mode.
+
+
+;; Comments commands:
+
+;; M-x `igist-post-comment'
+;;      Post current comment.
+
+;; M-x `igist-delete-comment-at-point' (&rest _)
+;;      Add or edit comment for gist at point or edit buffer.
+
+;; M-x `igist-add-or-edit-comment' (&rest _)
+;;      Add or edit comment for gist at point or edit buffer.
+
+;; M-x `igist-add-comment' (&rest _)
+;;      Add new comment for gist.
+
+;; M-x `igist-load-comments' (&rest _)
+;;      Load comments for gist at point or edit buffer.
+
+;; User commands:
+
+;; M-x `igist-change-user' (&rest _)
+;;      Change user for retrieving gist.
+
+;;; Customization
+
+;; `igist-auth-marker' - default valie is `igist'.
+
+;;  The auth marker in Auth-Sources appended to username and divided with ^.
+
+;;  For example, if the value of marker is `igist',
+;;  you need to add such entry:
+
+;;  machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN.
+
+;; `igist-per-page-limit'
+;;  The number of results per page (max 100).
+
+;; `igist-ask-for-description'
+;;   When to prompt for description before posting new gists.
+
+;; `igist-mode-for-comments'
+;;  Major mode when editing and viewing comments.
+
+;;  Program `pandoc' should be installed for `org-mode' (currently not implemented).
+
+;; `igist-list-format'
+;;    Format for gist list.
+
+;;; Keymaps
+
+;; `igist-list-mode-map'
+;;   Keymap for display gists as table.
+
+;; `igist-edit-mode-map'
+;;    Keymap for edit gist buffer.
+
+;; `igist-comments-edit-mode-map'
+;;      Keymap for posting and editing comments.
+
+;; `igist-comments-list-mode-map'
+;;      A keymap used for displaying comments.
+
 ;;; Code:
 
 
@@ -188,7 +320,7 @@ only serves as documentation.")
 (defvar igist-gists-list-buffer-name "*igists*"
   "Buffer name for tabulated gists display.")
 
-(defvar igist-edit-buffer-map
+(defvar igist-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") 'igist-save-current-gist-and-exit)
     (define-key map (kbd "C-c '") 'igist-save-current-gist-and-exit)
@@ -1205,7 +1337,7 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
              (buffer-live-p buffer)
              (buffer-modified-p buffer))
         (with-current-buffer buffer
-          (igist-comment-mode)
+          (igist-comments-edit-mode)
           (setq-local igist-comment-gist-id gist-id)
           (setq-local igist-comment-id comment-id)
           (current-buffer))
@@ -1214,7 +1346,7 @@ If SETUP-ARGS contains syntax table, it will be used in the inspect buffer."
         (erase-buffer)
         (when comment-body
           (insert comment-body))
-        (igist-comment-mode)
+        (igist-comments-edit-mode)
         (setq buffer-undo-list nil)
         (set-buffer-modified-p nil)
         (setq-local igist-comment-gist-id gist-id)
@@ -1288,11 +1420,13 @@ MAX is length of most longest key."
     (define-key map "a" 'igist-add-comment)
     (define-key map "f" 'igist-fork-gist)
     (define-key map "e" 'igist-list-edit-description)
+    (define-key map "b" 'igist-browse-gist)
     (define-key map "D" 'igist-delete-current-gist)
     (define-key map (kbd "RET") 'igist-list-edit-gist-at-point)
     (define-key map (kbd "C-j") 'igist-list-view-current)
     (define-key map (kbd "v") 'igist-list-view-current)
-    map))
+    map)
+  "Keymap used in tabulated gists views.")
 
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
@@ -1325,7 +1459,7 @@ MAX is length of most longest key."
         (when (eq 0 status)
           (buffer-string))))))
 
-(defvar igist-comments-list-map
+(defvar igist-comments-list-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "g") 'igist-load-comments)
     (define-key map (kbd "D") 'igist-delete-comment-at-point)
@@ -1333,7 +1467,8 @@ MAX is length of most longest key."
     (define-key map (kbd "+") 'igist-add-comment)
     (define-key map (kbd "-") 'igist-delete-comment-at-point)
     (define-key map (kbd "q") 'kill-current-buffer)
-    map))
+    map)
+  "A keymap used for displaying comments.")
 
 (defun igist-render-comment-to-md (gist-id comment-alist)
   "Render and comment COMMENT-ALIST for gist with GIST-ID in markdown format."
@@ -1350,14 +1485,18 @@ MAX is length of most longest key."
 
 ;;;###autoload
 (define-minor-mode igist-comments-list-mode
-  "Mode for viewing and rendering gist comments."
+  "Minor mode for viewing and rendering gists comments.
+
+This minor mode is turned on after command `igist-load-comments'.
+
+\\<igist-comments-list-mode-map>."
   :lighter " igists"
-  :keymap igist-comments-list-map
+  :keymap igist-comments-list-mode-map
   :global nil
   (when igist-comments-list-mode
     (use-local-map
      (let ((map (copy-keymap
-                 igist-comments-list-map)))
+                 igist-comments-list-mode-map)))
        (set-keymap-parent map (current-local-map))
        map))))
 
@@ -1650,10 +1789,10 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
           igist-current-user-name user)))
 
 ;;;###autoload
-(defun igist-list-other-user-gists (prompt &optional input history)
+(defun igist-list-other-user-gists (&optional prompt input history)
   "Read owner of gists to load in minibuffer with PROMPT, INPUT and HISTORY."
   (interactive)
-  (setq igist-other-username (read-string prompt input history))
+  (setq igist-other-username (read-string (or prompt "User: ") input history))
   (when igist-other-username
     (let* ((request-user-name
             (let ((user igist-other-username))
@@ -1869,7 +2008,7 @@ With CALLBACK call it without args after success request."
 
 ;;;###autoload
 (defun igist-save-current-gist ()
-  "Save current gist."
+  "Post current gist and stay in the buffer."
   (interactive)
   (igist-save-gist-buffer (current-buffer)
                           (lambda ()
@@ -1877,7 +2016,7 @@ With CALLBACK call it without args after success request."
 
 ;;;###autoload
 (defun igist-save-current-gist-and-exit ()
-  "Save current gist."
+  "Post current gist and exit."
   (interactive)
   (igist-save-gist-buffer (current-buffer)
                           (lambda ()
@@ -1885,12 +2024,17 @@ With CALLBACK call it without args after success request."
                             (message "Gist created"))))
 
 ;;;###autoload
-(define-minor-mode igist-comment-mode
-  "Minor mode for commenting gists."
+(define-minor-mode igist-comments-edit-mode
+  "Minor mode for editing and creating gists comments.
+
+This minor mode is turned on after commands `igist-add-comment'
+and `igist-edit-comment'.
+
+\\{igist-comments-edit-mode-map}."
   :lighter " Igist"
   :keymap igist-comments-edit-mode-map
   :global nil
-  (when igist-comment-mode
+  (when igist-comments-edit-mode
     (pcase igist-mode-for-comments
       ('org-mode
        (when (not (executable-find "pandoc"))
@@ -1906,9 +2050,15 @@ With CALLBACK call it without args after success request."
   
 ;;;###autoload
 (define-minor-mode igist-edit-mode
-  "Minor mode for editable gists buffers."
+  "Minor mode for language major mode buffers generated by `igist'.
+
+This minor mode is turned on after command `igist-edit-gist'.
+
+\\{igist-edit-buffer-map}
+
+See also `igist-before-save-hook'."
   :lighter " Igist"
-  :keymap igist-edit-buffer-map
+  :keymap igist-edit-mode-map
   :global nil
   (when igist-edit-mode
     (progn
@@ -1916,7 +2066,7 @@ With CALLBACK call it without args after success request."
       (set-buffer-modified-p nil)
       (use-local-map
        (let ((map (copy-keymap
-                   igist-edit-buffer-map)))
+                   igist-edit-mode-map)))
          (set-keymap-parent map (current-local-map))
          map)))))
 
@@ -1971,7 +2121,7 @@ If ACTION is non nil, call it with gist."
              (funcall enhanced-action key))))))
 
 ;;;###autoload
-(defun igist-edit-gists ()
+(defun igist-edit-list ()
   "Read user gists in minibuffer and open it in edit buffer."
   (interactive)
   (igist-request-gists-async #'igist-completing-read-gists
@@ -2086,7 +2236,7 @@ If ACTION is non nil, call it with gist."
            ("o" igist-transient-change-owner)]
           ["My gists"
            ("R" "Remove" igist-delete-other-gist-or-file)
-           ("l" "Edit gist" igist-edit-gists)
+           ("l" "Edit gist" igist-edit-list)
            ("L" "List gists" igist-list-gists)
            ("n" "New" igist-create-new-gist)
            ("a" "Add file to gist" igist-add-file-to-gist
