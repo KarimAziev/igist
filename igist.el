@@ -2054,7 +2054,7 @@ and `igist-edit-comment'.
 
 This minor mode is turned on after command `igist-edit-gist'.
 
-\\{igist-edit-buffer-map}
+\\{igist-edit-mode-map}
 
 See also `igist-before-save-hook'."
   :lighter " Igist"
