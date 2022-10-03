@@ -10,7 +10,7 @@ List, create, update and delete GitHub gists in Emacs.
 
 ** Overview
 The Emacs everywhere goal continues. These are the main features of
-~igist~ to help you never leave Emacs to do manage your gists.
+~igist~ to help you never leave Emacs to manage your gists.
 
 - [X] List gists
 - [X] Use auth-sources
@@ -85,16 +85,16 @@ You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-C
 
 *** General
 
-The simplest way is just to invoke transient popup with list of available commands for current buffer:
+The simplest way is to invoke transient popup with the list of available commands for the current buffer:
 
 - ~M-x igist-dispatch~ - in ~igists~ buffers it is bound to =M-o=.
 
 *** List gists
-You can view list of gists either in tabulated list mode (~igist-list-gists~), either it minibuffer (~M-x igist-edit-gists~).
+You can view a list of gists either in tabulated list mode (~igist-list-gists~), or in minibuffer (~M-x igist-edit-gists~).
 
 - ~igist-list-gists~
 
-In ~igist~ tabulated list mode such commands are available:
+In ~igist~ tabulated list mode, such commands are available:
 
 | Key | Command       |
 |-----+---------------|
@@ -111,7 +111,7 @@ In ~igist~ tabulated list mode such commands are available:
 
 *** Edit gist
 
-In editing buffer such commands are available:
+In the editing buffer such commands are available:
 
 | Key     | Command              |
 |---------+----------------------|
@@ -123,19 +123,19 @@ In editing buffer such commands are available:
 
 *** List comments
 
-In comments list mode such commands are available:
+In comments list mode, such commands are available:
 
-| Key | Command                 |
-|-----+-------------------------|
-| +   | add comment             |
-| -   | delete comment at point |
-| D   | delete comment at point |
-| e   | add or edit             |
-| g   | refresh comments        |
+| Key | Command                     |
+|-----+-----------------------------|
+| +   | add comment                 |
+| -   | delete the comment at point |
+| D   | delete the comment at point |
+| e   | add or edit                 |
+| g   | refresh comments            |
 
 *** Editing comment
 
-Keymap for posting and editing comments.
+Keymap for posting and editing comments:
 
 | Key     | Command      |
 |---------+--------------|
