@@ -1397,7 +1397,8 @@ MAX is length of most longest key."
             (when buffer-file-name (file-name-extension
                                     buffer-file-name))))
       (concat (file-name-base buffer-file-name) "." ext)
-    (string-join (split-string (buffer-name) "[^a-zZ-A0-9-]" t) "")))
+    (let ((case-fold-search t))
+      (string-join (split-string (buffer-name) "[^-a-z0-9.]" t) ""))))
 
 (defvar igist-list-mode-map
   (let ((map (make-sparse-keymap)))
