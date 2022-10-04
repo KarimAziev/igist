@@ -188,7 +188,7 @@
                                            (format "%s" description)
                                            (list
                                             'action
-                                            'igist-list-edit-description
+                                            #'igist-list-edit-description
                                             'help-echo
                                             description
                                             'gist
@@ -206,7 +206,7 @@
                                  (format "%s" comments)
                                  (list
                                   'action
-                                  'igist-load-comments
+                                  #'igist-load-comments
                                   'help-echo
                                   "Show comments"))))
     (files "Files" 0 t
@@ -319,6 +319,9 @@ only serves as documentation.")
 (defvar igist-gists-list-buffer-name "*igists*"
   "Buffer name for tabulated gists display.")
 
+(defvar igist-gists-response nil)
+(defvar igist-normalized-gists nil)
+
 (defvar igist-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") #'igist-save-current-gist-and-exit)
@@ -337,9 +340,34 @@ only serves as documentation.")
     map)
   "Keymap for posting and editing comments.")
 
-(defvar igist-gists-response nil)
-(defvar igist-normalized-gists nil)
-(defvar igist-loading nil)
+(defvar igist-list-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map tabulated-list-mode-map)
+    (define-key map (kbd "+") #'igist-list-add-file)
+    (define-key map (kbd "-") #'igist-delete-current-filename)
+    (define-key map (kbd "g") #'igist-list-gists)
+    (define-key map (kbd "c") #'igist-load-comments)
+    (define-key map (kbd "a") #'igist-add-comment)
+    (define-key map (kbd "f") #'igist-fork-gist)
+    (define-key map (kbd "e") #'igist-list-edit-description)
+    (define-key map (kbd "b") #'igist-browse-gist)
+    (define-key map (kbd "D") #'igist-delete-current-gist)
+    (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
+    (define-key map (kbd "C-j") #'igist-list-view-current)
+    (define-key map (kbd "v") #'igist-list-view-current)
+    map)
+  "Keymap used in tabulated gists views.")
+
+(defvar igist-comments-list-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "g") #'igist-load-comments)
+    (define-key map (kbd "D") #'igist-delete-comment-at-point)
+    (define-key map (kbd "e") #'igist-add-or-edit-comment)
+    (define-key map (kbd "+") #'igist-add-comment)
+    (define-key map (kbd "-") #'igist-delete-comment-at-point)
+    (define-key map (kbd "q") #'kill-current-buffer)
+    map)
+  "A keymap used for displaying comments.")
 
 ;; Macros
 (defmacro igist-or (&rest functions)
@@ -650,7 +678,7 @@ have the same meaning, as in `ghub-request'."
 (defun igist-visible-windows ()
   "Return a list of the visible, non-popup (dedicated) windows."
   (seq-filter (igist-or
-               (igist-rpartial 'window-parameter 'visible)
+               (igist-rpartial window-parameter 'visible)
                (igist-compose not window-dedicated-p))
               (window-list)))
 
@@ -665,11 +693,10 @@ have the same meaning, as in `ghub-request'."
   "Return visible and non-dedicated window BUFFER or nil."
   (seq-find
    (igist-compose
-    (apply-partially #'eq
-                     (if (stringp buffer)
-                         (get-buffer buffer)
-                       buffer))
-    'window-buffer)
+    (apply-partially #'eq (if (stringp buffer)
+                              (get-buffer buffer)
+                            buffer))
+    window-buffer)
    (igist-visible-windows)))
 
 (defun igist-alist-get (key alist)
@@ -1054,13 +1081,16 @@ If LOADING is non nil show spinner, otherwise hide."
 
 (defun igist-get-github-users ()
   "Return list of users in auth sources with host `api.github.com'."
-  (delq nil (mapcar (igist-rpartial plist-get :user)
-                    (auth-source-search
-                     :host "api.github.com"
-                     :require
-                     '(:user :secret)
-                     :max
-                     most-positive-fixnum))))
+  (let ((all-users (delq nil (mapcar (igist-rpartial plist-get :user)
+                                     (auth-source-search
+                                      :host "api.github.com"
+                                      :require
+                                      '(:user :secret)
+                                      :max
+                                      most-positive-fixnum))))
+        (suffix (regexp-quote (concat "^" (symbol-name igist-auth-marker)))))
+    (or (seq-filter (apply-partially #'string-match-p suffix) all-users)
+        all-users)))
 
 (defun igist-popup-minibuffer-select-window ()
   "Select minibuffer window if it is active."
@@ -1400,24 +1430,6 @@ MAX is length of most longest key."
     (let ((case-fold-search t))
       (string-join (split-string (buffer-name) "[^-a-z0-9.]" t) ""))))
 
-(defvar igist-list-mode-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map tabulated-list-mode-map)
-    (define-key map (kbd "+") #'igist-list-add-file)
-    (define-key map (kbd "-") #'igist-delete-current-filename)
-    (define-key map (kbd "g") #'igist-list-gists)
-    (define-key map (kbd "c") #'igist-load-comments)
-    (define-key map (kbd "a") #'igist-add-comment)
-    (define-key map (kbd "f") #'igist-fork-gist)
-    (define-key map (kbd "e") #'igist-list-edit-description)
-    (define-key map (kbd "b") #'igist-browse-gist)
-    (define-key map (kbd "D") #'igist-delete-current-gist)
-    (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
-    (define-key map (kbd "C-j") #'igist-list-view-current)
-    (define-key map (kbd "v") #'igist-list-view-current)
-    map)
-  "Keymap used in tabulated gists views.")
-
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
 \\<igist-list-mode-map>
@@ -1448,17 +1460,6 @@ MAX is length of most longest key."
                                                          args))))
         (when (eq 0 status)
           (buffer-string))))))
-
-(defvar igist-comments-list-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "g") #'igist-load-comments)
-    (define-key map (kbd "D") #'igist-delete-comment-at-point)
-    (define-key map (kbd "e") #'igist-add-or-edit-comment)
-    (define-key map (kbd "+") #'igist-add-comment)
-    (define-key map (kbd "-") #'igist-delete-comment-at-point)
-    (define-key map (kbd "q") #'kill-current-buffer)
-    map)
-  "A keymap used for displaying comments.")
 
 (defun igist-render-comment-to-md (gist-id comment-alist)
   "Render and comment COMMENT-ALIST for gist with GIST-ID in markdown format."
@@ -1573,7 +1574,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
   (if-let ((bounds (igist-get-comment-bounds)))
       (buffer-substring-no-properties (car bounds)
                                       (cdr bounds))
-    (error "Not on comment")))
+    (user-error "Not on gist comment")))
 
 (defun igist-overlay-prompt-region (beg end face fn &rest args)
   "Highlight region from BEG to END with FACE while invoking FN with ARGS."
@@ -1647,7 +1648,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                     (setq igist-comment-gist-id gist-id)
                                     (igist-load-comments))
                                   (igist-request-gists-async))))
-    (error "Not in gist comment")))
+    (user-error "Not in gist comment")))
 
 ;;;###autoload
 (defun igist-post-comment ()
@@ -1752,30 +1753,32 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
     (kill-buffer buff)))
 
 ;;;###autoload
-(defun igist-change-user (&rest _)
-  "Change user for retrieving gist."
+(defun igist-change-user (&optional prompt initial-input history)
+  "Read a user in minubuffer with PROMPT, INITIAL-INPUT and HISTORY."
   (interactive)
-  (when-let* ((users (igist-get-github-users))
-              (auth-marker (symbol-name igist-auth-marker))
-              (gist-user
-               (completing-read "User: " users nil nil
-                                (car
-                                 (seq-filter
-                                  (igist-compose
-                                   (apply-partially #'equal auth-marker)
-                                   car
-                                   last
-                                   (igist-rpartial split-string "[\\^]" t))
-                                  (mapcar
-                                   (apply-partially
-                                    #'format
-                                    "%s")
-                                   (igist-get-github-users))))))
-              (parts (split-string gist-user "\\^" t))
-              (auth (car (reverse parts)))
-              (user (string-join (nbutlast parts 1) "^")))
-    (setq igist-auth-marker (intern auth)
-          igist-current-user-name user)))
+  (let* ((alist (mapcar (lambda (it)
+                          (let ((parts (split-string it "[\\^]" t)))
+                            (cons (pop parts)
+                                  (pop parts) )))
+                        (igist-get-github-users)))
+         (annotf (lambda (str)
+                   (format "^%s" (cdr (assoc str alist)))))
+         (login-name (completing-read (or prompt "Github user name: ")
+                                      (lambda (str pred action)
+                                        (if (eq action 'metadata)
+                                            `(metadata
+                                              (annotation-function . ,annotf))
+                                          (complete-with-action action alist str
+                                                                pred)))
+                                      nil
+                                      nil
+                                      initial-input
+                                      history))
+         (marker (igist-alist-get login-name alist)))
+    (when-let ((marker (and marker (intern marker))))
+      (unless (eq marker igist-auth-marker)
+        (setq igist-auth-marker marker)))
+    (setq igist-current-user-name login-name)))
 
 ;;;###autoload
 (defun igist-list-other-user-gists (&optional prompt input history)
