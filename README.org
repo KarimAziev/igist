@@ -125,27 +125,34 @@ The simplest way is to invoke a transient popup with the list of available comma
 
 *** List gists
 
-There are two ways in which gists can be presented, as a table or as minibuffer completions.
+There are two ways in which gists can be presented - as a table or as minibuffer completions.
 
-- ~M-x igist-list-gists~ - to display your gists
-- ~M-x igist-list-other-user-gists~ - to display public gists of any user.
+**** table
 
-In ~igist~ tabulated list mode, such commands are available:
+- ~M-x igist-list-gists~ - to display gists of logged GitHub user.
+- ~M-x igist-list-other-user-gists~ - to display public gists of non-logged user.
+- ~M-x igist-explore-public-gists~ - list public gists sorted by most recently updated to least recently updated.
 
-| Key | Command       |
-|-----+---------------|
-| C-j | view gist     |
-| v   | view gist     |
-| RET | edit gist     |
-| -   | delete file   |
-| +   | add file      |
-| D   | delete gist   |
-| c   | load comments |
-| g   | refresh gists |
-| f   | fork gist     |
-| b   | browse gist   |
+This commands render and load gists with pagination. To stop or pause loading use command ~igist-list-cancel-load~ (default keybinding is ~K~).
+
+| Key | Command        |
+|-----+----------------|
+| C-j | view gist      |
+| v   | view gist      |
+| RET | edit gist      |
+| -   | delete file    |
+| +   | add file       |
+| D   | delete gist    |
+| c   | load comments  |
+| a   | add comment    |
+| g   | refresh gists  |
+| f   | fork gist      |
+| b   | browse gist    |
+| K   | cancel loading |
 
 To customize these keys, see the variable =igist-list-mode-map=.
+
+**** minibuffer completions
 
 - ~M-x igist-edit-list~ - to list gists in the minibuffer.
 

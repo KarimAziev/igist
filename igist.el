@@ -31,11 +31,16 @@
 
 ;;  `igist-dispatch' - to invoke transient popup with the list of available commands
 
-;; Display commands:
+;; Tabulated display:
 
 ;; M-x `igist-list-gists' - to display your gists as table.
 ;; M-x `igist-list-other-user-gists' - to display public gists of any user.
+;; M-x `igist-explore-public-gists' - List public gists sorted by most recently updated to least recently updated.
+
+;; Completions display:
+
 ;; M-x `igist-edit-list' - Read user gists in minibuffer and open it in edit buffer.
+
 
 ;;; Create commands:
 
@@ -122,42 +127,40 @@
 
 ;;; Customization
 
-;; `igist-auth-marker' - default valie is `igist'.
+;; `igist-auth-marker'
+;;      Suffix added to the username as USERNAME^MARKER in authsoures.
+;;      For example, if the value of the marker is `igist' (which is the default value),
+;;      you need to add such entry:
+;;      machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN.
 
-;;  The auth marker in Auth-Sources appended to username and divided with ^.
-
-;;  For example, if the value of marker is `igist',
-;;  you need to add such entry:
-
-;;  machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN.
 
 ;; `igist-per-page-limit'
-;;  The number of results per page (max 100).
+;;      The number of results per page (max 100).
 
 ;; `igist-ask-for-description'
-;;   When to prompt for description before posting new gists.
+;;      When to prompt for description before posting new gists.
 
 ;; `igist-mode-for-comments'
-;;  Major mode when editing and viewing comments.
-
-;;  Program `pandoc' should be installed for `org-mode' (currently not implemented).
+;;      Major mode when editing and viewing comments.
+;;      Program `pandoc' should be installed for `org-mode'.
 
 ;; `igist-list-format'
-;;    Format for gist list.
+;;      Format for gist list.
 
 ;;; Keymaps
 
-;; `igist-list-mode-map'
-;;   Keymap for display gists as table.
+;; `igist-comments-list-mode-map'
+;;      A keymap used for displaying comments.
 
-;; `igist-edit-mode-map'
-;;    Keymap for edit gist buffer.
+;; `igist-list-mode-map'
+;;      Keymap used in tabulated gists views.
 
 ;; `igist-comments-edit-mode-map'
 ;;      Keymap for posting and editing comments.
 
-;; `igist-comments-list-mode-map'
-;;      A keymap used for displaying comments.
+;; `igist-edit-mode-map'
+;;      Keymap used in edit gist buffers.
+
 
 ;;; Code:
 
@@ -229,7 +232,9 @@
   "The default format for tabulated gist display.")
 
 (defcustom igist-list-format igist-default-list-format
-  "Format for gist list."
+  "Alist of gist's props and value formatters.
+If formatter is a function it should accept two arguments - the value and
+the whole gist, and should return string."
   :type '(alist
           :key-type
           (choice
@@ -1710,7 +1715,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
 
 ;;;###autoload
 (defun igist-list-gists ()
-  "Load and render gists in tabulated list mode."
+  "Load and render gists for user specified in `igist-current-user-name'."
   (interactive)
   (unless igist-current-user-name
     (igist-change-user))

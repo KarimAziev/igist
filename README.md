@@ -77,14 +77,15 @@ Download the repository and it to your load path in your init file:
                ("C-j" . igist-list-view-current)
                ("RET" . igist-list-view-current)
                ("+" . igist-list-add-file)
-               ("-" . igist-delete-current-gist)
+               ("-" . igist-delete-current-filename)
                ("D" . igist-delete-current-gist)
                ("a" . igist-add-comment)
                ("c" . igist-load-comments)
                ("e" . igist-list-edit-description)
                ("f" . igist-fork-gist)
                ("g" . igist-list-gists)
-               ("v" . igist-list-view-current))
+               ("v" . igist-list-view-current)
+               ("b" . igist-browse-gist)
          (:map igist-comments-edit-mode-map
                ("M-o" . igist-dispatch)
                ("C-c C-c" . igist-post-comment)
@@ -127,30 +128,42 @@ available commands for the current buffer:
 
 ### List gists
 
-There are two ways in which gists can be presented, as a table or as
+There are two ways in which gists can be presented - as a table or as
 minibuffer completions.
 
-  - `M-x igist-list-gists` - to display your gists
-  - `M-x igist-list-other-user-gists` - to display public gists of any
-    user.
+1.  table
+    
+      - `M-x igist-list-gists` - to display gists of logged GitHub user.
+      - `M-x igist-list-other-user-gists` - to display public gists of
+        non-logged user.
+      - `M-x igist-explore-public-gists` - list public gists sorted by
+        most recently updated to least recently updated.
+    
+    This commands render and load gists with pagination. To stop or
+    pause loading use command `igist-list-cancel-load` (default
+    keybinding is `K`).
+    
+    | Key | Command        |
+    | --- | -------------- |
+    | C-j | view gist      |
+    | v   | view gist      |
+    | RET | edit gist      |
+    | \-  | delete file    |
+    | \+  | add file       |
+    | D   | delete gist    |
+    | c   | load comments  |
+    | a   | add comment    |
+    | g   | refresh gists  |
+    | f   | fork gist      |
+    | b   | browse gist    |
+    | K   | cancel loading |
+    
 
-In `igist` tabulated list mode, such commands are available:
+    To customize these keys, see the variable `igist-list-mode-map`.
 
-| Key | Command       |
-| --- | ------------- |
-| C-j | view gist     |
-| v   | view gist     |
-| RET | edit gist     |
-| \-  | delete file   |
-| \+  | add file      |
-| D   | delete gist   |
-| c   | load comments |
-| g   | refresh gists |
-| f   | fork gist     |
-
-To customize these keys, see the variable `igist-list-mode-map`.
-
-  - `M-x igist-edit-list` - to list gists in the minibuffer.
+2.  minibuffer completions
+    
+      - `M-x igist-edit-list` - to list gists in the minibuffer.
 
 ### Edit gist
 
