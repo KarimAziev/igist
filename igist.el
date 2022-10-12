@@ -1849,15 +1849,12 @@ REQ is a `ghub--req' struct, used for loading next page."
       (unless more (igist-sync-gists-lists value)))))
 
 ;;;###autoload
-(defun igist-explore-public-gists (&optional background callback callback-args)
+(defun igist-explore-public-gists ()
   "List public gists sorted by most recently updated to least recently updated.
 
 Render and load up to 3000 gists with pagination.
-Then execute CALLBACK with CALLBACK-ARGS.
 
-To stop or pause loading use command `igist-list-cancel-load'.
-
-If BACKGROUND is nil, don't show user's buffer."
+To stop or pause loading use command `igist-list-cancel-load'."
   (interactive)
   (let* ((buffer (get-buffer-create "*igist-explore*"))
          (query `((per_page . ,(igist-list-get-per-page-query
@@ -1868,8 +1865,7 @@ If BACKGROUND is nil, don't show user's buffer."
           (setq igist-list-cancelled t)
         (setq igist-list-loading t))
       (igist-spinner-show)
-      (unless background
-        (igist-ensure-buffer-visible buffer)))
+      (igist-ensure-buffer-visible buffer))
     (ghub-request "GET" "/gists/public"
                   nil
                   :auth (if igist-current-user-name
@@ -1891,8 +1887,8 @@ If BACKGROUND is nil, don't show user's buffer."
                     (igist-list-loaded-callback buffer
                                                 value
                                                 req
-                                                callback
-                                                callback-args)))))
+                                                nil
+                                                nil)))))
 
 (defun igist-load-logged-user-gists (&optional cb &rest args)
   "Load gists asynchronously with callback CB and ARGS."
