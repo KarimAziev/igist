@@ -1407,6 +1407,32 @@ MAX is length of most longest key."
     (let ((case-fold-search t))
       (string-join (split-string (buffer-name) "[^-a-z0-9.]" t) ""))))
 
+(defun igist-imenu-prev-index-position ()
+  "Move point to previous line in current buffer."
+  (unless (bobp)
+    (forward-line -1)))
+
+(defun igist-imenu-extract-index-name ()
+  "Return the name of entity at point for `imenu'."
+  (when-let* ((id (tabulated-list-get-id))
+              (gist (seq-find (igist-compose
+                               (apply-partially 'equal id)
+                               (apply-partially 'igist-alist-get 'id))
+                              igist-gists-response)))
+    (let ((description (igist-alist-get 'description gist))
+          (filename (if (= 1 (length (igist-alist-get 'files gist)))
+                        (igist-alist-get 'filename
+                                         (cdar
+                                          (igist-alist-get
+                                           'files
+                                           gist)))
+                      (igist-alist-get 'filename
+                                       (igist-tabulated-gist-file-at-point)))))
+      (concat id " " (string-join (delq nil (list
+                                             filename
+                                             description))
+                                  " ")))))
+
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
 \\<igist-list-mode-map>
@@ -1420,6 +1446,10 @@ MAX is length of most longest key."
         tabulated-list-padding 2
         tabulated-list-sort-key nil)
   (tabulated-list-init-header)
+  (setq-local imenu-prev-index-position-function
+              #'igist-imenu-prev-index-position)
+  (setq-local imenu-extract-index-name-function
+              #'igist-imenu-extract-index-name)
   (use-local-map igist-list-mode-map))
 
 (defun igist-pandoc-from-string (string input-type output-type &rest options)
