@@ -1414,8 +1414,8 @@ MAX is length of most longest key."
   "Return the name of entity at point for `imenu'."
   (when-let* ((id (tabulated-list-get-id))
               (gist (seq-find (igist-compose
-                               (apply-partially 'equal id)
-                               (apply-partially 'igist-alist-get 'id))
+                               (apply-partially #'equal id)
+                               (apply-partially #'igist-alist-get 'id))
                               igist-gists-response)))
     (let ((description (igist-alist-get 'description gist))
           (filename (if (= 1 (length (igist-alist-get 'files gist)))
@@ -1807,12 +1807,14 @@ insert it as initial content."
 (defvar-local igist-list-loading nil)
 (defvar-local igist-list-cancelled nil)
 
+;;;###autoload
 (defun igist-list-cancel-load ()
   "Cancel loading for current gists."
   (interactive)
   (setq igist-list-cancelled t)
   (igist-spinner-stop))
 
+;;;###autoload
 (defun igist-list-refresh ()
   "Refresh gists in the current `igist-list-mode' buffer."
   (interactive)
@@ -1846,6 +1848,7 @@ REQ is a `ghub--req' struct, used for loading next page."
           (igist-spinner-stop)))
       (unless more (igist-sync-gists-lists value)))))
 
+;;;###autoload
 (defun igist-explore-public-gists (&optional background callback callback-args)
   "List public gists sorted by most recently updated to least recently updated.
 
@@ -1945,6 +1948,7 @@ If BACKGROUND is nil, don't show user's buffer."
                                                 callback
                                                 callback-args)))))
 
+;;;###autoload
 (defun igist-list-other-user-gists (user)
   "List public gists for the specified USER."
   (interactive (read-string "User: "))
