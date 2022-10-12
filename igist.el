@@ -225,7 +225,8 @@
                             'face 'link
                             'gist gist)))
                  files
-                 "\n")))))))
+                 "\n"))))))
+  "Default format for tabulated gist display.")
 
 (defcustom igist-list-format igist-default-list-format
   "Format for gist list."
@@ -316,10 +317,10 @@ only serves as documentation.")
 (defvar-local igist-comment-id nil
   "Current comment id.")
 
-(defvar igist-gists-list-buffer-name "*igists*"
+(defvar igist-gists-list-buffer-name "igists-"
   "Buffer name for tabulated gists display.")
 
-(defvar igist-gists-response nil)
+(defvar-local igist-gists-response nil)
 (defvar igist-normalized-gists nil)
 
 (defvar igist-edit-mode-map
@@ -345,7 +346,7 @@ only serves as documentation.")
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map (kbd "+") #'igist-list-add-file)
     (define-key map (kbd "-") #'igist-delete-current-filename)
-    (define-key map (kbd "g") #'igist-list-gists)
+    (define-key map (kbd "g") #'igist-list-refresh)
     (define-key map (kbd "c") #'igist-load-comments)
     (define-key map (kbd "a") #'igist-add-comment)
     (define-key map (kbd "f") #'igist-fork-gist)
@@ -355,6 +356,7 @@ only serves as documentation.")
     (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
     (define-key map (kbd "C-j") #'igist-list-view-current)
     (define-key map (kbd "v") #'igist-list-view-current)
+    (define-key map (kbd "K") #'igist-list-cancel-load)
     map)
   "Keymap used in tabulated gists views.")
 
@@ -458,18 +460,44 @@ Result: \"JOHNjohn\"."
   "Expand BODY in buffer BUFFER-OR-NAME if it is exists and visible."
   (declare (indent 1)
            (debug t))
-  `(when (and (get-buffer ,buffer-or-name)
-              (buffer-live-p (get-buffer ,buffer-or-name)))
+  `(when (and
+          (get-buffer ,buffer-or-name)
+          (buffer-live-p (get-buffer ,buffer-or-name)))
      (with-current-buffer (get-buffer ,buffer-or-name)
        (progn ,@body))))
 
-(defmacro igist-with-gists-buffer (&rest body)
-  "Evaluate BODY in tabulated gists buffer."
+(defun igist-get-user-buffer-name (user)
+  "Return the name of buffer with USER's gists."
+  (when user (concat "*igist-" user "*")))
+
+(defun igist-get-user-buffer (user)
+  "Return buffer with USER's gists."
+  (when user
+    (get-buffer (igist-get-user-buffer-name user))))
+
+(defun igist-get-gist-buffer (id filename)
+  "Return gist's FILENAME buffer with ID."
+  (get-buffer (concat "*" id "-" filename "*")))
+
+(defun igist-ensure-gist-list-mode ()
+  "Turn on `igist-list-mode' if it is active in current buffer."
+  (unless (eq major-mode 'igist-list-mode)
+    (igist-list-mode)))
+
+(defun igist-edit-ensure-edit-mode ()
+  "Set `igist-edit-mode' if it is not enabled."
+  (unless (and (boundp 'igist-edit-mode)
+               (symbol-value 'igist-edit-mode))
+    (igist-edit-mode)))
+
+(defmacro igist-with-user-gists-buffer (user &rest body)
+  "Evaluate BODY in buffer with USER's gists.
+If buffer doesn't exists, create it and turn on `igist-list-mode'."
   (declare (indent 1)
            (debug t))
-  `(with-current-buffer (get-buffer-create igist-gists-list-buffer-name)
-     (unless (eq major-mode 'igist-list-mode)
-       (igist-list-mode))
+  `(with-current-buffer (get-buffer-create
+                         ,(igist-get-user-buffer-name user))
+     (igist-ensure-gist-list-mode)
      (progn ,@body)))
 
 ;; Request api
@@ -477,68 +505,62 @@ Result: \"JOHNjohn\"."
                                 headers silent unpaginate noerror reader auth
                                 username host forge callback errorback value
                                 buffer extra)
-  "Make make a METHOD request for RESOURCE with `ghub-request'.
+  "Make a METHOD request for RESOURCE with `ghub-request'.
 
 With argument BUFFER show spinner in those buffer.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
  meaning, as in `ghub-request'."
-  (if igist-current-user-name
-      (setq igist-auth-marker (or auth igist-auth-marker))
-    (igist-change-user))
-  (igist-list-set-loading t)
   (when buffer
-    (igist-with-exisiting-buffer buffer
-      (igist-spinner-show)))
-  (let ((req (ghub-request method
-                           resource
-                           params
-                           :username (or username igist-current-user-name)
-                           :query query
-                           :auth igist-auth-marker
-                           :forge (or forge 'github)
-                           :host (or host "api.github.com")
-                           :callback
-                           (lambda (value headers status req)
-                             (unless (ghub-continue req)
-                               (igist-set-loading nil)
-                               (when buffer
-                                 (igist-with-exisiting-buffer
-                                     buffer
-                                   (igist-spinner-stop)))
-                               (when callback
-                                 (funcall callback value headers status
-                                          req))))
-                           :payload payload
-                           :headers headers
-                           :silent silent
-                           :unpaginate unpaginate
-                           :noerror noerror
-                           :reader reader
-                           :errorback
-                           (lambda (&rest args)
-                             (when buffer
-                               (igist-with-exisiting-buffer
-                                   buffer
-                                 (igist-spinner-stop)))
-                             (igist-set-loading nil)
-                             (igist-show-request-error (car args))
-                             (when errorback
-                               (apply errorback args)))
-                           :value value
-                           :extra extra)))
-    req))
+    (igist-set-loading t buffer))
+  (ghub-request method
+                resource
+                params
+                :username (or username igist-current-user-name)
+                :query query
+                :auth (or auth
+                          (when igist-current-user-name
+                            igist-auth-marker)
+                          'none)
+                :forge (or forge 'github)
+                :host (or host "api.github.com")
+                :callback
+                (lambda (value headers status req)
+                  (unless (ghub-continue req)
+                    (when buffer
+                      (igist-set-loading nil buffer))
+                    (when callback
+                      (funcall callback value headers status
+                               req))))
+                :payload payload
+                :headers headers
+                :silent silent
+                :unpaginate unpaginate
+                :noerror noerror
+                :reader reader
+                :errorback
+                (lambda (&rest args)
+                  (when buffer
+                    (igist-set-loading nil buffer))
+                  (igist-show-request-error (car args))
+                  (when errorback
+                    (apply errorback args)))
+                :value value
+                :extra extra))
 
-(cl-defun igist-get (resource &optional params &key query payload headers silent
-                              unpaginate noerror reader username auth host
-                              callback errorback extra)
+(cl-defun igist-get (resource &optional params &key buffer query payload headers
+                              silent unpaginate noerror reader username auth
+                              host callback errorback extra)
   "Make a `GET' request for RESOURCE, with optional query PARAMS.
+
+With argument BUFFER show spinner in those buffer.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
  meaning, as in `ghub-request'."
   (igist-request "GET" resource params
+                 :buffer buffer
                  :query query
                  :payload payload
                  :headers headers
@@ -605,15 +627,18 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
                  :errorback errorback
                  :extra extra))
 
-(cl-defun igist-delete (resource &optional params &key query payload headers
-                                 silent unpaginate noerror reader username auth
-                                 host callback errorback extra)
+(cl-defun igist-delete (resource &optional params &key buffer query payload
+                                 headers silent unpaginate noerror reader
+                                 username auth host callback errorback extra)
   "Make a `DELETE' request for RESOURCE, with optional payload PARAMS.
+
+With argument BUFFER show spinner in those buffer.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA
 have the same meaning, as in `ghub-request'."
   (igist-request "DELETE" resource params
+                 :buffer buffer
                  :query query
                  :payload payload
                  :headers headers
@@ -627,45 +652,6 @@ have the same meaning, as in `ghub-request'."
                  :callback callback
                  :errorback errorback
                  :extra extra))
-
-(defun igist-request-gists-async (&optional cb &rest args)
-  "Load gists asynchronously with callback CB and ARGS."
-  (if igist-current-user-name
-      (setq igist-auth-marker igist-auth-marker)
-    (igist-change-user))
-  (let ((request-user-name
-         (let ((user igist-current-user-name))
-           (if (symbolp user)
-               (symbol-name user)
-             user))))
-    (igist-request "GET" (concat "/users/"
-                                 request-user-name
-                                 "/gists")
-                   nil
-                   :username igist-current-user-name
-                   :query `((per_page . ,(if (not igist-gists-response)
-                                             igist-per-page-limit
-                                           (if
-                                               (> (length igist-gists-response)
-                                                  100)
-                                               100
-                                             (length igist-gists-response)))))
-                   :auth igist-auth-marker
-                   :forge 'github
-                   :host "api.github.com"
-                   :callback (lambda (value &rest _)
-                               (unwind-protect
-                                   (progn
-                                     (igist-set-gists value)
-                                     (igist-with-exisiting-buffer
-                                         igist-gists-list-buffer-name
-                                       (unless (eq major-mode 'igist-list-mode)
-                                         (igist-list-mode))
-                                       (igist-list-render value))
-                                     (igist-sync-gists-lists value)
-                                     (when cb
-                                       (apply cb args)))
-                                 (igist-set-loading nil))))))
 
 ;; Common utils
 (defun igist-pick-from-alist (props alist)
@@ -682,11 +668,20 @@ have the same meaning, as in `ghub-request'."
                (igist-compose not window-dedicated-p))
               (window-list)))
 
-(defun igist-get-all-gists-buffers ()
-  "Return all gists buffer."
+(defun igist-get-all-edit-buffers ()
+  "Return all gists buffer with content of gists."
   (seq-filter
    (igist-and buffer-live-p
               (apply-partially #'buffer-local-value 'igist-current-gist))
+   (buffer-list)))
+
+(defun igist-get-all-list-buffers ()
+  "Return all buffers with `igist-list-mode'."
+  (seq-filter
+   (igist-and buffer-live-p
+              (igist-compose
+               (apply-partially #'eq 'igist-list-mode)
+               (apply-partially #'buffer-local-value 'major-mode)))
    (buffer-list)))
 
 (defun igist-buffer-window (buffer)
@@ -714,6 +709,9 @@ have the same meaning, as in `ghub-request'."
           (forward-char)
           (delete-region (point-min)
                          (point))
+          (decode-coding-region (point-min)
+                                (point-max)
+                                'dos)
           (buffer-string))
       (kill-buffer download-buffer))))
 
@@ -729,11 +727,6 @@ have the same meaning, as in `ghub-request'."
           ((and exceeds)
            str)
           (t (concat str (make-string (- width (length str)) ?\ ))))))
-
-(defun igist-set-gists (response)
-  "Put RESPONSE  to the variable `igist-gists-response'.
-Put normalized response to the variable `igist-normalized-gists'."
-  (setq igist-gists-response response))
 
 (defun igist-find-by-id-and-file (id filename response)
   "Return gists with ID and FILENAME in RESPONSE."
@@ -824,23 +817,23 @@ GIST should be raw GitHub item."
 (defun igist-list-edit-description (&rest _)
   "Edit description for current gist at point in tabulated list mode."
   (interactive)
-  (when-let* ((gist (igist-list-gist-to-fetch))
+  (when-let* ((gist (igist-tabulated-gist-at-point))
               (description (read-string "Description: " (igist-alist-get
                                                          'description gist))))
     (igist-patch (concat "/gists/" (igist-alist-get 'id gist))
                  nil
                  :payload `((description . ,description))
                  :callback (lambda (&rest _)
-                             (igist-request-gists-async)))))
+                             (igist-load-logged-user-gists)))))
 
 (defun igist-read-filename-new (gist)
   "Read new filename for GIST."
-  (let ((filenames (mapcar (apply-partially #'igist-alist-get 'filename)
-                           (igist-alist-get 'files gist)))
-        (file (read-string (concat "New file in " (or (igist-alist-get 'id gist)
-                                                      ""))))
-        (id (igist-alist-get 'id
-                             gist)))
+  (let* ((filenames (mapcar (apply-partially #'igist-alist-get 'filename)
+                            (igist-alist-get 'files gist)))
+         (id (igist-alist-get 'id
+                              gist))
+         (file
+          (read-string (concat "New file in " (if id (format "%s " id) "")))))
     (while (member file filenames)
       (setq file
             (read-string
@@ -922,21 +915,22 @@ GIST should be raw GitHub item."
   (when (fboundp 'spinner-stop)
     (spinner-stop)))
 
-(defun igist-list-set-loading (loading)
-  "Update LOADING status for gist list buffer if exists.
+(defun igist-set-loading (loading &optional buffer)
+  "Update LOADING status in BUFFER.
+IF BUFFER is nil use current buffer.
 If LOADING is non nil show spinner, otherwise hide."
-  (when-let ((gists-buff (get-buffer igist-gists-list-buffer-name)))
-    (when (buffer-live-p gists-buff)
-      (with-current-buffer gists-buff
-        (if loading
-            (igist-spinner-show)
-          (igist-spinner-stop)
-          (tabulated-list-revert))))))
-
-(defun igist-set-loading (loading)
-  "Update LOADING status in gists buffers if exists.
-If LOADING is non nil show spinner, otherwise hide."
-  (igist-list-set-loading loading))
+  (when-let ((fn
+              (when (or (not buffer)
+                        (and (bufferp buffer)
+                             (buffer-live-p buffer)))
+                (if loading
+                    #'igist-spinner-show
+                  #'igist-spinner-stop))))
+    (if (or
+         (not buffer)
+         (eq buffer (current-buffer)))
+        (funcall fn)
+      (with-current-buffer buffer (funcall fn)))))
 
 (defun igist-normalize-gist (gist)
   "Return alist of files in GIST where car is key and cdr is merged gist."
@@ -989,10 +983,6 @@ If LOADING is non nil show spinner, otherwise hide."
                        (car (reverse vals)))
                  "-")))
 
-(defun igist-get-gist-buffer (id filename)
-  "Return gist's FILENAME buffer with ID."
-  (get-buffer (concat "*" id "-" filename "*")))
-
 (defun igist-get-region-content ()
   "Return string without props with active region in current buffer or nil."
   (when (and
@@ -1020,7 +1010,7 @@ If LOADING is non nil show spinner, otherwise hide."
 
 (defun igist-sync-gists-lists (response)
   "Synchronize gists buffers with RESPONSE."
-  (let ((buffers (igist-get-all-gists-buffers)))
+  (let ((buffers (igist-get-all-edit-buffers)))
     (dolist (buff buffers)
       (with-current-buffer buff
         (when-let ((gist
@@ -1063,7 +1053,7 @@ If LOADING is non nil show spinner, otherwise hide."
                  :payload `((files (,(intern filename) .
                                     ((content . "")))))
                  :callback (lambda (&rest _)
-                             (igist-request-gists-async)))))
+                             (igist-load-logged-user-gists)))))
 
 (defun igist-delete-gists-buffers-by-id (id)
   "Delete all gist's buffer with ID."
@@ -1077,7 +1067,7 @@ If LOADING is non nil show spinner, otherwise hide."
   (igist-delete (concat "/gists/" id)
                 nil
                 :callback (lambda (&rest _)
-                            (igist-request-gists-async))))
+                            (igist-load-logged-user-gists))))
 
 (defun igist-get-github-users ()
   "Return list of users in auth sources with host `api.github.com'."
@@ -1120,25 +1110,18 @@ If LOADING is non nil show spinner, otherwise hide."
 (defun igist-fork-gist ()
   "Fork gist at point in `igist-list-mode' or currently opened."
   (interactive)
-  (let ((callback (lambda (&rest _)
+  (if-let ((id (or (igist-alist-get 'id igist-current-gist)
+                   (tabulated-list-get-id))))
+      (igist-post (concat "/gists/" id
+                          "/forks")
+                  nil
+                  :buffer (current-buffer)
+                  :callback
+                  (lambda (&rest _)
                     (when igist-current-user-name
-                      (igist-request-gists-async)))))
-    (cond ((and igist-current-gist)
-           (igist-set-loading t)
-           (let ((buff (current-buffer)))
-             (igist-post (concat "/gists/" (igist-alist-get
-                                            'id igist-current-gist)
-                                 "/forks")
-                         :buffer buff
-                         :callback
-                         callback)))
-          ((eq major-mode 'igist-list-mode)
-           (when-let ((id (tabulated-list-get-id))
-                      (buff (current-buffer)))
-             (igist-set-loading t)
-             (igist-post (concat "/gists/" id "/forks")
-                         nil
-                         :callback callback))))))
+                      (igist-load-logged-user-gists)
+                      (message "Gist forked"))))
+    (user-error "No gist for forking")))
 
 (defun igist-save-existing-gist (buffer &optional cb)
   "Save gist in BUFFER asynchronously with CB."
@@ -1183,7 +1166,7 @@ If LOADING is non nil show spinner, otherwise hide."
                              (igist-edit-mode))
                            (igist-setup-local-vars new-gist new-filename)
                            (set-buffer-modified-p nil)
-                           (igist-request-gists-async)
+                           (igist-load-logged-user-gists)
                            (when cb
                              (funcall cb))))
                      (message "Couldn't save gist."))))))
@@ -1243,7 +1226,7 @@ If callback is non nil, call it without args."
                   (igist-with-exisiting-buffer buffer
                     (when callback
                       (funcall callback)))
-                  (igist-request-gists-async
+                  (igist-load-logged-user-gists
                    #'igist-update-created-gist
                    file buffer value)))))
 
@@ -1271,12 +1254,6 @@ If callback is non nil, call it without args."
                                               'public
                                               gist))
                                        (yes-or-no-p "Public?")))))
-
-(defun igist-edit-ensure-edit-mode ()
-  "Set `igist-edit-mode' if it is not enabled."
-  (unless (and (boundp 'igist-edit-mode)
-               (symbol-value 'igist-edit-mode))
-    (igist-edit-mode)))
 
 (defun igist-get-owner (gist)
   "Return login name of owner in GIST."
@@ -1533,18 +1510,20 @@ GIST-ID is used to create comments buffer."
                igist-comment-gist-id
                (igist-alist-get 'id igist-current-gist)
                (when (eq major-mode 'igist-list-mode)
-                 (tabulated-list-get-id)))))
+                 (tabulated-list-get-id))))
+             (buff (current-buffer)))
     (igist-with-exisiting-buffer
-        (get-buffer-create
-         (concat "*" gist-id "-comments*"))
-      (igist-spinner-show))
+     (get-buffer-create
+      (concat "*" gist-id "-comments*"))
+     (igist-spinner-show))
     (igist-get (concat "/gists/" gist-id "/comments") nil
+               :buffer buff
                :callback
                (lambda (val &rest _)
                  (igist-render-comments val gist-id)
                  (igist-with-exisiting-buffer
-                     (concat "*" gist-id "-comments*")
-                   (igist-spinner-stop))))))
+                  (concat "*" gist-id "-comments*")
+                  (igist-spinner-stop))))))
 
 (defun igist-property-boundaries (prop &optional pos)
   "Return property boundaries for PROP at POS."
@@ -1647,7 +1626,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                               "-comments*")
                                     (setq igist-comment-gist-id gist-id)
                                     (igist-load-comments))
-                                  (igist-request-gists-async))))
+                                  (igist-load-logged-user-gists))))
     (user-error "Not in gist comment")))
 
 ;;;###autoload
@@ -1663,7 +1642,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
               (callback-fn (lambda (&rest _)
                              (when (buffer-live-p buffer)
                                (kill-buffer buffer))
-                             (igist-request-gists-async
+                             (igist-load-logged-user-gists
                               (lambda ()
                                 (igist-with-exisiting-buffer
                                     (concat "*" gist-id
@@ -1705,13 +1684,10 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
 (defun igist-list-gists ()
   "Load and render gists in tabulated list mode."
   (interactive)
-  (igist-request-gists-async
-   (lambda ()
-     (if-let ((buff (get-buffer igist-gists-list-buffer-name)))
-         (igist-ensure-buffer-visible buff)
-       (igist-with-gists-buffer
-           (igist-list-render igist-gists-response)
-         (igist-ensure-buffer-visible (current-buffer)))))))
+  (unless igist-current-user-name
+    (igist-change-user))
+  (igist-list-load-gists
+   igist-current-user-name nil))
 
 ;;;###autoload
 (defun igist-new-gist-from-buffer (&rest _ignore)
@@ -1749,7 +1725,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
 (defun igist-kill-all-gists-buffers ()
   "Delete all gists buffers."
   (interactive)
-  (dolist (buff (igist-get-all-gists-buffers))
+  (dolist (buff (igist-get-all-edit-buffers))
     (kill-buffer buff)))
 
 ;;;###autoload
@@ -1778,59 +1754,172 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
     (when-let ((marker (and marker (intern marker))))
       (unless (eq marker igist-auth-marker)
         (setq igist-auth-marker marker)))
-    (setq igist-current-user-name login-name)))
+    (setq igist-current-user-name login-name)
+    (if (string-empty-p login-name)
+        nil
+      login-name)))
 
-;;;###autoload
-(defun igist-list-other-user-gists (&optional prompt input history)
-  "Read owner of gists to load in minibuffer with PROMPT, INPUT and HISTORY."
+(defun igist-list-get-per-page-query (buffer)
+  "Return estimed gists count for BUFFER."
+  (let ((estimed-gists-count
+         (if-let ((prev-response (and (bufferp buffer)
+                                      (buffer-live-p buffer)
+                                      (buffer-local-value
+                                       'igist-gists-response
+                                       buffer))))
+             (length prev-response)
+           (or igist-per-page-limit 30))))
+    (funcall
+     (igist-compose number-to-string min)
+     estimed-gists-count
+     100)))
+
+(defvar-local igist-list-loading nil)
+(defvar-local igist-list-cancelled nil)
+
+(defun igist-list-cancel-load ()
+  "Cancel loading for current gists."
   (interactive)
-  (setq igist-other-username (read-string (or prompt "User: ") input history))
-  (when igist-other-username
-    (let* ((request-user-name
-            (let ((user igist-other-username))
-              (if (symbolp user)
-                  (symbol-name user)
-                user)))
-           (buffer (get-buffer-create (concat igist-gists-list-buffer-name "-"
-                                              igist-other-username))))
+  (setq igist-list-cancelled t)
+  (igist-spinner-stop))
+
+(defun igist-list-refresh ()
+  "Refresh current gist buffer in `igist-list-mode'."
+  (interactive)
+  (if (equal (buffer-name) "*igist-explore*")
+      (igist-load-public-gists)
+    (when-let ((owner (igist-get-owner
+                       (car igist-gists-response))))
+      (igist-list-load-gists owner))))
+
+(defun igist-list-loaded-callback (buffer value req callback callback-args)
+  "Render VALUE in existing BUFFER and REQ.
+REQ is a `ghub--req' struct, used for loading next page."
+  (if (and (bufferp buffer)
+           (buffer-live-p buffer)
+           (buffer-local-value 'igist-list-cancelled buffer))
+      (with-current-buffer buffer
+        (setq igist-list-cancelled nil)
+        (setq igist-list-loading nil))
+    (let ((more (ghub-continue req)))
       (igist-with-exisiting-buffer buffer
-        (igist-spinner-show)
-        (igist-ensure-buffer-visible buffer))
-      (ghub-request "GET" (concat "/users/"
-                                  request-user-name
-                                  "/gists")
-                    nil
-                    :username igist-current-user-name
-                    :query `((per_page .
-                                       ,(let ((resp
-                                               (buffer-local-value
-                                                'igist-gists-response buffer)))
-                                          (if (not resp)
-                                              igist-per-page-limit
-                                            (if
-                                                (> (length resp)
-                                                   100)
-                                                100
-                                              (length resp))))))
-                    :auth igist-auth-marker
-                    :forge 'github
-                    :host "api.github.com"
-                    :errorback
-                    (lambda (&rest args)
-                      (when buffer
-                        (igist-with-exisiting-buffer
-                            buffer
-                          (igist-spinner-stop)))
-                      (igist-show-request-error (car args)))
-                    :callback (lambda (value _headers _status req)
-                                (unless (ghub-continue req)
-                                  (igist-with-exisiting-buffer buffer
-                                    (setq-local igist-gists-response value)
-                                    (unless (eq major-mode 'igist-list-mode)
-                                      (igist-list-mode))
-                                    (igist-sync-gists-lists value)
-                                    (igist-list-render value)
-                                    (igist-spinner-stop)))))))
+        (when (or
+               (not more)
+               (>= (length value)
+                   (length igist-gists-response)))
+          (setq-local igist-gists-response value)
+          (igist-list-render value))
+        (unless more
+          (setq igist-list-loading nil)
+          (when callback callback-args
+                (apply callback callback-args))
+          (igist-spinner-stop)))
+      (unless more (igist-sync-gists-lists value)))))
+
+(defun igist-explore-public-gists (&optional background callback callback-args)
+  "List public gists sorted by most recently updated to least recently updated.
+
+Render and load up to 3000 gists with pagination.
+Then execute CALLBACK with CALLBACK-ARGS.
+
+To stop or pause loading use command `igist-list-cancel-load'.
+
+If BACKGROUND is nil, don't show user's buffer."
+  (interactive)
+  (let* ((buffer (get-buffer-create "*igist-explore*"))
+         (query `((per_page . ,(igist-list-get-per-page-query
+                                buffer)))))
+    (with-current-buffer buffer
+      (igist-ensure-gist-list-mode)
+      (if igist-list-loading
+          (setq igist-list-cancelled t)
+        (setq igist-list-loading t))
+      (igist-spinner-show)
+      (unless background
+        (igist-ensure-buffer-visible buffer)))
+    (ghub-request "GET" "/gists/public"
+                  nil
+                  :auth (if igist-current-user-name
+                            igist-auth-marker
+                          'none)
+                  :username igist-current-user-name
+                  :query query
+                  :forge 'github
+                  :host "api.github.com"
+                  :errorback
+                  (lambda (&rest args)
+                    (when buffer
+                      (igist-with-exisiting-buffer
+                          buffer
+                        (igist-spinner-stop)))
+                    (igist-show-request-error (car args)))
+                  :callback
+                  (lambda (value _headers _status req)
+                    (igist-list-loaded-callback buffer
+                                                value
+                                                req
+                                                callback
+                                                callback-args)))))
+
+(defun igist-load-logged-user-gists (&optional cb &rest args)
+  "Load gists asynchronously with callback CB and ARGS."
+  (unless igist-current-user-name
+    (igist-change-user))
+  (igist-list-load-gists igist-current-user-name
+                         t
+                         cb args))
+
+(defun igist-list-load-gists (user &optional background callback callback-args)
+  "Load and render gists for USER with CALLBACK and CALLBACK-ARGS.
+If BACKGROUND is nil, don't show user's buffer."
+  (let ((buffer (get-buffer-create
+                 (igist-get-user-buffer-name user))))
+    (with-current-buffer buffer
+      (igist-ensure-gist-list-mode)
+      (if igist-list-loading
+          (setq igist-list-cancelled t)
+        (setq igist-list-loading t))
+      (igist-spinner-show)
+      (unless background
+        (igist-ensure-buffer-visible buffer)))
+    (ghub-request "GET" (concat "/users/"
+                                user
+                                "/gists")
+                  nil
+                  :auth (if igist-current-user-name
+                            igist-auth-marker
+                          'none)
+                  :username igist-current-user-name
+                  :query `((per_page . ,(igist-list-get-per-page-query
+                                         buffer)))
+                  :forge 'github
+                  :host "api.github.com"
+                  :errorback
+                  (lambda (&rest args)
+                    (when buffer
+                      (igist-with-exisiting-buffer
+                          buffer
+                        (igist-spinner-stop)))
+                    (igist-show-request-error (car args)))
+                  :callback
+                  (lambda (value _headers _status req)
+                    (igist-list-loaded-callback buffer
+                                                value
+                                                req
+                                                callback
+                                                callback-args)))))
+
+(defun igist-list-other-user-gists (user)
+  "Load and render gists for USER."
+  (interactive (read-string "User: "))
+  (igist-list-load-gists user nil))
+
+(defun igist-list-change-other-user (&optional prompt input history)
+  "Read owner of gists to load in minibuffer with PROMPT, INPUT and HISTORY."
+  (setq igist-other-username (read-string (or prompt "User: ") input history))
+  (unless (string-empty-p igist-other-username)
+    (igist-list-other-user-gists
+     igist-other-username))
   igist-other-username)
 
 ;;;###autoload
@@ -2065,7 +2154,7 @@ See also `igist-before-save-hook'."
          map)))))
 
 ;;;###autoload
-(defun igist-completing-read-gists (prompt &optional action initial-input)
+(defun igist-completing-read-gists (&optional prompt action initial-input)
   "Read gist in minibuffer with PROMPT and INITIAL-INPUT.
 If ACTION is non nil, call it with gist."
   (interactive)
@@ -2095,7 +2184,7 @@ If ACTION is non nil, call it with gist."
     (cond ((and (eq completing-read-function
                     'ivy-completing-read)
                 (fboundp 'ivy-read))
-           (let ((key (ivy-read prompt collection-fn
+           (let ((key (ivy-read (or prompt "Gists: ") collection-fn
                                 :initial-input (or initial-input "")
                                 :preselect (funcall
                                             (igist-compose
@@ -2108,7 +2197,7 @@ If ACTION is non nil, call it with gist."
           (t
            (let ((key
                   (completing-read
-                   prompt
+                   (or prompt "Gists: ")
                    collection-fn
                    nil t
                    initial-input)))
@@ -2118,7 +2207,7 @@ If ACTION is non nil, call it with gist."
 (defun igist-edit-list ()
   "Read user gists in minibuffer and open it in edit buffer."
   (interactive)
-  (igist-request-gists-async #'igist-completing-read-gists
+  (igist-load-logged-user-gists #'igist-completing-read-gists
                              "Edit gist\s"
                              #'igist-edit-gist))
 
@@ -2150,7 +2239,7 @@ If ACTION is non nil, call it with gist."
   :description "Other user"
   :class 'transient-lisp-variable
   :shortarg "-o"
-  :reader #'igist-list-other-user-gists
+  :reader #'igist-list-change-other-user
   :variable 'igist-other-username
   :argument "--owner")
 
@@ -2180,15 +2269,26 @@ If ACTION is non nil, call it with gist."
 
 (defun igist-not-editable-p (&optional gist)
   "Check whether GIST cannot be edited by user `igist-current-user-name'."
-  (when-let ((owner (igist-get-owner (or
-                                      gist
-                                      (igist-tabulated-gist-at-point)
-                                      igist-current-gist))))
-    (not (equal igist-current-user-name owner))))
+  (if-let ((owner (igist-get-owner (or
+                                    gist
+                                    (igist-tabulated-gist-at-point)
+                                    igist-current-gist))))
+      (not (equal igist-current-user-name owner))
+    (not igist-current-user-name)))
 
 (defun igist-editable-p (&optional gist)
   "Check whether GIST can be edited by user `igist-current-user-name'."
   (not (igist-not-editable-p gist)))
+
+(defun igist-forkable (&optional gist)
+  "Return t if GIST can be forked by user `igist-current-user-name'."
+  (and
+   igist-current-user-name
+   (when-let ((owner (igist-get-owner (or
+                                       gist
+                                       (igist-tabulated-gist-at-point)
+                                       igist-current-gist))))
+     (not (equal igist-current-user-name owner)))))
 
 (transient-define-prefix igist-dispatch-transient ()
   "Invoke transient popup with available gists commands for current buffer."
@@ -2205,7 +2305,8 @@ If ACTION is non nil, call it with gist."
                 :inapt-if igist-not-editable-p)
                ("+" "Add file" igist-add-file-to-gist :inapt-if
                 igist-not-editable-p)
-               ("f" "Fork" igist-fork-gist :inapt-if igist-editable-p)
+               ("f" "Fork" igist-fork-gist :inapt-if-not
+                igist-forkable)
                ("RET" "Save" igist-save-current-gist
                 :inapt-if igist-not-editable-p)
                ("b r" "Browse" igist-browse-gist
@@ -2228,6 +2329,8 @@ If ACTION is non nil, call it with gist."
           ["User"
            ("u" igist-set-current-user)
            ("o" igist-transient-change-owner)]
+          ["Public"
+           ("E"  "Explore public gists" igist-explore-public-gists)]
           ["My gists"
            ("R" "Remove" igist-delete-other-gist-or-file)
            ("l" "Edit gist" igist-edit-list)
