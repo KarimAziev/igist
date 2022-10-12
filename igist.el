@@ -784,7 +784,7 @@ GIST should be raw GitHub item."
 (defun igist-list-gist-to-fetch ()
   "Get tabulated gist with file at point."
   (or (igist-tabulated-gist-file-at-point)
-      (when-let ((parent (get-text-property (point) 'gist)))
+      (when-let ((parent (igist-tabulated-gist-at-point)))
         (if (= 1 (length (igist-alist-get 'files parent)))
             (cdr (igist-normalize-gist-file parent
                                             (igist-alist-get 'filename
