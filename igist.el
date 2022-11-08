@@ -2078,7 +2078,7 @@ If BACKGROUND is non-nil, don't show buffer."
                   (lambda (value _headers _status req)
                     (condition-case nil
                         (igist-list-loaded-callback buffer value req nil nil)
-                      (setq igist-list-cancelled t)
+                      (setq igist-list-cancelled nil)
                       (setq igist-list-loading nil))))))
 
 (defun igist-load-logged-user-gists (&optional cb &rest args)
@@ -2137,7 +2137,7 @@ If BACKGROUND is nil, don't show user's buffer."
                     (condition-case nil
                         (igist-list-loaded-callback buffer value req callback
                                                     callback-args)
-                      (setq igist-list-cancelled t)
+                      (setq igist-list-cancelled nil)
                       (setq igist-list-loading nil))))))
 
 ;;;###autoload
