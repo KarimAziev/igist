@@ -845,9 +845,9 @@ have the same meaning, as in `ghub-request'."
                'filename
                (point))))))))
 
-(defun igist--get-time (gist key)
-  "Return timestamp from value of KEY in GIST."
-  (let* ((date (timezone-parse-date (igist-alist-get key gist)))
+(defun igist--get-time (value)
+  "Return timestamp from VALUE."
+  (let* ((date (timezone-parse-date value))
          (time (timezone-parse-time (aref date 3))))
     (encode-time (string-to-number (aref time 2))
                  (string-to-number (aref time 1))
@@ -983,7 +983,8 @@ GIST should be raw GitHub item."
              (pcase key
                ('id (igist-alist-get 'id gist))
                ('visibility (eq (igist-alist-get 'public gist) t))
-               ('updated_at (igist--get-time gist key))
+               ((or 'updated_at 'created_at) (igist--get-time
+                                              (igist-alist-get key gist)))
                ('description (or (igist-alist-get 'description
                                                   gist)
                                  ""))
@@ -1618,7 +1619,8 @@ MAX is length of most longest key."
         (comment-id (alist-get 'id comment-alist))
         (updated
          (format-time-string "%D %R"
-                             (igist--get-time comment-alist 'updated_at)))
+                             (igist--get-time (igist-alist-get 'updated_at
+                                                               comment-alist))))
         (author (alist-get 'login (alist-get 'user comment-alist))))
     (propertize (format "# Comment (%s at %s)\n%s" author updated comment)
                 'igist-comment-id comment-id
