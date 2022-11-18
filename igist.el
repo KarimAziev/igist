@@ -169,7 +169,6 @@
 (require 'transient)
 (require 'timezone)
 (require 'ghub)
-
 (eval-when-compile
   (require 'subr-x))
 
@@ -177,21 +176,22 @@
   "Default renderer of FILES of gist."
   (let* ((one-or-none (<= (length files)
                           1))
-         (mapper (lambda (file) (concat
-                            (if one-or-none
-                                ""
-                              (make-string 87 ?\ ) )
-                            (propertize
-                             file
-                             'filename file
-                             'face 'link)))))
+         (mapper (lambda (file)
+                   (concat
+                    (if one-or-none
+                        ""
+                      (make-string 87 ?\ ))
+                    (propertize
+                     file
+                     'filename file
+                     'face 'link)))))
     (concat
      (if one-or-none "" "\n")
      (mapconcat mapper files "\n"))))
 
 (defun igist-render-description (description)
   "Default renderer of DESCRIPTION of gist."
-  (propertize description 'help-echo description))
+  (propertize (or description "") 'help-echo "No description"))
 
 (defun igist-render-id (id)
   "Default renderer of ID column."
@@ -230,7 +230,8 @@
 (defvar igist-default-list-format
   '((id "Id" 10 nil igist-render-id)
     (description "Description" 30 t igist-render-description)
-    (visibility "Visibility" 10 t (lambda (public) (if public "public" "private")))
+    (visibility "Visibility" 10 t (lambda (public)
+                                    (if public "public" "private")))
     (updated_at "Updated" 20 t "%D %R")
     (comments "Comments" 10 t igist-render-comments)
     (files "Files" 0 t igist-render-files))
@@ -377,9 +378,7 @@ only serves as documentation.")
 (defvar-local igist-list-response nil)
 (defvar-local igist-list-loading nil)
 (defvar-local igist-list-cancelled nil)
-
 (defvar igist-normalized-gists nil)
-
 (defvar igist-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") #'igist-save-current-gist-and-exit)
@@ -494,7 +493,9 @@ Result: \"JOHNjohn\"."
 
 (defmacro igist-pipe (&rest functions)
   "Return left-to-right composition from FUNCTIONS."
-  (declare (debug t) (pure t) (side-effect-free t))
+  (declare (debug t)
+           (pure t)
+           (side-effect-free t))
   `(lambda (&rest args)
      ,@(let ((init-fn (pop functions)))
          (list
@@ -510,7 +511,9 @@ Result: \"JOHNjohn\"."
 
 (defmacro igist-compose (&rest functions)
   "Return right-to-left composition from FUNCTIONS."
-  (declare (debug t) (pure t) (side-effect-free t))
+  (declare (debug t)
+           (pure t)
+           (side-effect-free t))
   `(igist-pipe ,@(reverse functions)))
 
 (defmacro igist-with-exisiting-buffer (buffer-or-name &rest body)
@@ -983,8 +986,9 @@ GIST should be raw GitHub item."
              (pcase key
                ('id (igist-alist-get 'id gist))
                ('visibility (eq (igist-alist-get 'public gist) t))
-               ((or 'updated_at 'created_at) (igist--get-time
-                                              (igist-alist-get key gist)))
+               ((or 'updated_at 'created_at)
+                (igist--get-time
+                 (igist-alist-get key gist)))
                ('description (or (igist-alist-get 'description
                                                   gist)
                                  ""))
@@ -1024,7 +1028,7 @@ GIST should be raw GitHub item."
          (igist-gists-to-tabulated-entries gists))
         (pos (point)))
     (when (not (equal (length tabulated-list-entries) gists))
-      (setq mode-name (format "Gists[%d]" (length gists) )))
+      (setq mode-name (format "Gists[%d]" (length gists))))
     (setq tabulated-list-entries entries)
     (tabulated-list-print nil t)
     (when (> (point-max) pos)
@@ -1689,17 +1693,17 @@ GIST-ID is used to create comments buffer."
                  (tabulated-list-get-id))))
              (buff (current-buffer)))
     (igist-with-exisiting-buffer
-     (get-buffer-create
-      (concat "*" gist-id "-comments*"))
-     (igist-spinner-show))
+        (get-buffer-create
+         (concat "*" gist-id "-comments*"))
+      (igist-spinner-show))
     (igist-get (concat "/gists/" gist-id "/comments") nil
                :buffer buff
                :callback
                (lambda (val &rest _)
                  (igist-render-comments-list val gist-id)
                  (igist-with-exisiting-buffer
-                  (concat "*" gist-id "-comments*")
-                  (igist-spinner-stop))))))
+                     (concat "*" gist-id "-comments*")
+                   (igist-spinner-stop))))))
 
 (defun igist-property-boundaries (prop &optional pos)
   "Return property boundaries for PROP at POS."
@@ -1788,13 +1792,12 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
            (gist-id (or igist-comment-gist-id
                         (get-text-property
                          (point) 'igist-comment-gist-id))))
-      (when
-          (if-let ((bounds (igist-get-comment-bounds t)))
-              (igist-overlay-prompt-region (car bounds)
-                                           (cdr bounds)
-                                           'error
-                                           'yes-or-no-p "Delete comment?")
-            (yes-or-no-p "Delete comment?"))
+      (when (if-let ((bounds (igist-get-comment-bounds t)))
+                (igist-overlay-prompt-region (car bounds)
+                                             (cdr bounds)
+                                             'error
+                                             'yes-or-no-p "Delete comment?")
+              (yes-or-no-p "Delete comment?"))
         (igist-delete (format "/gists/%s/comments/%s" gist-id comment-id)
                       :callback (lambda (&rest _)
                                   (igist-with-exisiting-buffer
@@ -1913,7 +1916,7 @@ insert it as initial content."
   (let* ((alist (mapcar (lambda (it)
                           (let ((parts (split-string it "[\\^]" t)))
                             (cons (pop parts)
-                                  (pop parts) )))
+                                  (pop parts))))
                         (igist-get-github-users)))
          (annotf (lambda (str)
                    (format "^%s" (cdr (assoc str alist)))))
@@ -2019,7 +2022,7 @@ REQ is a `ghub--req' struct, used for loading next page."
                                            (igist-list-render
                                             igist-list-response))))
                                      buffer)))
-              (t (message "ignoring") )))
+              (t (message "ignoring"))))
       (unless more (igist-sync-gists-lists value)))))
 
 (defun igist-cancel-timers ()
@@ -2192,22 +2195,21 @@ If BACKGROUND is nil, don't show user's buffer."
                                      'igist-list-mode)
                                  (igist-tabulated-gist-file-at-point)
                                igist-current-gist)))
-                  (when
-                      (if-let ((bounds (igist-property-boundaries 'filename
-                                                                  (point))))
-                          (igist-overlay-prompt-region (car bounds)
-                                                       (cdr bounds) 'error
-                                                       'yes-or-no-p
-                                                       (format
-                                                        "Delete file %s from gist?"
-                                                        (igist-alist-get
-                                                         'filename
-                                                         file)))
-                        (yes-or-no-p (format
-                                      "Delete file %s from gist?"
-                                      (igist-alist-get
-                                       'filename
-                                       file))))
+                  (when (if-let ((bounds (igist-property-boundaries 'filename
+                                                                    (point))))
+                            (igist-overlay-prompt-region (car bounds)
+                                                         (cdr bounds) 'error
+                                                         'yes-or-no-p
+                                                         (format
+                                                          "Delete file %s from gist?"
+                                                          (igist-alist-get
+                                                           'filename
+                                                           file)))
+                          (yes-or-no-p (format
+                                        "Delete file %s from gist?"
+                                        (igist-alist-get
+                                         'filename
+                                         file))))
                     file)
                 (when-let ((parent (igist-tabulated-gist-at-point)))
                   (igist-read-gist-file "Delete file from gist: "
@@ -2365,7 +2367,7 @@ and `igist-edit-comment'.
                  igist-comments-edit-mode-map)))
        (set-keymap-parent map (current-local-map))
        map))))
-  
+
 ;;;###autoload
 (define-minor-mode igist-edit-mode
   "Minor mode for language major mode buffers generated by `igist'.
@@ -2508,12 +2510,12 @@ If ACTION is non nil, call it with gist."
   :argument "affirmative")
 
 (defun igist-not-editable-p (&optional gist)
-    "Return t if user `igist-current-user-name' cannot edit GIST."
+  "Return t if user `igist-current-user-name' cannot edit GIST."
   (if-let ((owner
-        (igist-get-owner
-         (or gist
-             (igist-tabulated-gist-at-point)
-             igist-current-gist))))
+            (igist-get-owner
+             (or gist
+                 (igist-tabulated-gist-at-point)
+                 igist-current-gist))))
       (not
        (equal igist-current-user-name owner))
     (not igist-current-user-name)))
@@ -2588,7 +2590,6 @@ If ACTION is non nil, call it with gist."
            ("b b" "New gist from buffer" igist-new-gist-from-buffer)
            ("B" "Kill all gists buffers" igist-kill-all-gists-buffers)
            ("q" "Quit" transient-quit-all)]])
-
 
 ;;;###autoload
 (defun igist-dispatch ()
