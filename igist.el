@@ -191,7 +191,7 @@
 
 (defun igist-render-description (description)
   "Default renderer of DESCRIPTION of gist."
-  (propertize (or description "") 'help-echo "No description"))
+  (propertize (or description "") 'help-echo (or description "No description")))
 
 (defun igist-render-id (id)
   "Default renderer of ID column."
