@@ -1561,24 +1561,8 @@ MAX is length of most longest key."
 
 (defun igist-imenu-extract-index-name ()
   "Return the name of entity at point for `imenu'."
-  (when-let* ((id (tabulated-list-get-id))
-              (gist (seq-find (igist-compose
-                               (apply-partially #'equal id)
-                               (apply-partially #'igist-alist-get 'id))
-                              igist-list-response)))
-    (let ((description (igist-alist-get 'description gist))
-          (filename (if (= 1 (length (igist-alist-get 'files gist)))
-                        (igist-alist-get 'filename
-                                         (cdar
-                                          (igist-alist-get
-                                           'files
-                                           gist)))
-                      (igist-alist-get 'filename
-                                       (igist-tabulated-gist-file-at-point)))))
-      (concat id " " (string-join (delq nil (list
-                                             filename
-                                             description))
-                                  " ")))))
+  (string-trim (buffer-substring (line-beginning-position)
+                                 (line-end-position))))
 
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
@@ -1974,6 +1958,7 @@ insert it as initial content."
 
 (defvar-local igist-render-timer nil)
 (defvar-local igist-load-timer nil)
+
 (defun igist-list-loaded-callback (buffer value req callback callback-args)
   "Render VALUE in existing BUFFER and REQ.
 REQ is a `ghub--req' struct, used for loading next page."
