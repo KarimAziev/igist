@@ -4,7 +4,7 @@
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
 ;; URL: https://github.com/KarimAziev/igist
-;; Version: 0.9.0
+;; Version: 0.9.1
 ;; Keywords: tools
 ;; Package-Requires: ((emacs "28.1") (ghub "3.5.1"))
 
