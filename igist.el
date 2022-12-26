@@ -2531,60 +2531,58 @@ If ACTION is non nil, call it with gist."
 
 (transient-define-prefix igist-dispatch-transient ()
   "Invoke transient popup with available gists commands for current buffer."
-  [:class transient-columns
-          [:if (lambda ()
-                 (or igist-current-gist
-                     (when (eq major-mode 'igist-list-mode)
-                       (tabulated-list-get-id))))
-               :description
-               (lambda ()
-                 (or
-                  (igist-alist-get 'id igist-current-gist)
-                  (tabulated-list-get-id)))
-               ("D" "Delete gist" igist-delete-current-gist
-                :inapt-if igist-not-editable-p)
-               ("-" "Delete file" igist-delete-current-filename
-                :inapt-if igist-not-editable-p)
-               ("+" "Add file" igist-add-file-to-gist
-                :inapt-if igist-not-editable-p)
-               ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
-               ("RET" "Save" igist-save-current-gist
-                :inapt-if igist-not-editable-p)
-               ("b r" "Browse" igist-browse-gist :inapt-if-not
-                (lambda ()
-                  (or
-                   (alist-get 'html_url igist-current-gist)
-                   (igist-alist-get 'html_url
-                                    (igist-tabulated-gist-at-point)))))
-               ("r" igist-set-current-filename-variable)
-               ("d" igist-set-current-description-variable)
-               ("p" igist-transient-toggle-public)]
-          ["Comments"
-           ("c l" "Load comments" igist-load-comments)
-           ("c a" "Add comment" igist-add-comment)
-           ("c e" "Edit comment" igist-add-or-edit-comment
-            :if (lambda ()
-                  (get-text-property
-                   (point)
-                   'igist-comment-id)))]
-          ["User"
-           ("u" igist-set-current-user)
-           ("o" igist-transient-change-owner)]
-          ["Public"
-           ("E" "Explore public gists" igist-explore-public-gists)]
-          ["My gists"
-           ("R" "Remove" igist-delete-other-gist-or-file)
-           ("l" "Edit gist" igist-edit-list)
-           ("L" "List gists" igist-list-gists)
-           ("n" "New" igist-create-new-gist)
-           ("a" "Add file to gist" igist-add-file-to-gist :if-not
-            (lambda ()
-              (or igist-current-gist
-                  (when (eq major-mode 'igist-list-mode)
-                    (tabulated-list-get-id)))))
-           ("b b" "New gist from buffer" igist-new-gist-from-buffer)
-           ("B" "Kill all gists buffers" igist-kill-all-gists-buffers)
-           ("q" "Quit" transient-quit-all)]])
+  [[:if (lambda ()
+          (or igist-current-gist
+              (when (eq major-mode 'igist-list-mode)
+                (tabulated-list-get-id))))
+        :description
+        (lambda ()
+          (or
+           (igist-alist-get 'id igist-current-gist)
+           (tabulated-list-get-id)))
+        ("D" "Delete gist" igist-delete-current-gist
+         :inapt-if igist-not-editable-p)
+        ("-" "Delete file" igist-delete-current-filename
+         :inapt-if igist-not-editable-p)
+        ("+" "Add file" igist-add-file-to-gist
+         :inapt-if igist-not-editable-p)
+        ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
+        ("RET" "Save" igist-save-current-gist
+         :inapt-if igist-not-editable-p)
+        ("b r" "Browse" igist-browse-gist :inapt-if-not
+         (lambda ()
+           (or
+            (alist-get 'html_url igist-current-gist)
+            (igist-alist-get 'html_url
+                             (igist-tabulated-gist-at-point)))))
+        ("r" igist-set-current-filename-variable)
+        ("d" igist-set-current-description-variable)
+        ("p" igist-transient-toggle-public)]
+   ["Gists"
+    ("R" "Remove" igist-delete-other-gist-or-file)
+    ("l" "Edit gist" igist-edit-list)
+    ("L" "List gists" igist-list-gists)
+    ("E" "Explore" igist-explore-public-gists)
+    ("n" "New" igist-create-new-gist)
+    ("b b" "New gist from buffer" igist-new-gist-from-buffer)
+    ("a" "Add file" igist-add-file-to-gist :if-not
+     (lambda ()
+       (or igist-current-gist
+           (when (eq major-mode 'igist-list-mode)
+             (tabulated-list-get-id)))))
+    ("B" "Kill all gists buffers" igist-kill-all-gists-buffers)]
+   ["Comments"
+    ("c l" "Load comments" igist-load-comments)
+    ("c a" "Add comment" igist-add-comment)
+    ("c e" "Edit comment" igist-add-or-edit-comment
+     :if (lambda ()
+           (get-text-property
+            (point)
+            'igist-comment-id)))]
+   ["User"
+    ("u" igist-set-current-user)
+    ("o" igist-transient-change-owner)
+    ("q" "Quit" transient-quit-all)]])
 
 ;;;###autoload
 (defun igist-dispatch ()
