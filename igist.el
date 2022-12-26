@@ -333,14 +333,16 @@ Program `pandoc' should be installed for `org-mode'."
   "The GitHub user to load public gists.")
 
 (defcustom igist-auth-marker 'igist
-  "Suffix added to the username as USERNAME^MARKER.
+  "Github OAuth token or suffix added to the USERNAME^MARKER in authsources.
 
 For example, if the value of the marker is `igist' (which is the default value),
 you need to add such entry:
 
 \"machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN\"."
   :group 'igist
-  :type 'symbol)
+  :type '(radio
+          (string :tag "OAuth Token")
+          (symbol :tag "Suffix" igist)))
 
 (defvar igist-github-token-scopes '(gist)
   "The required Github API scopes.
@@ -1897,32 +1899,39 @@ insert it as initial content."
 (defun igist-change-user (&optional prompt initial-input history)
   "Read a user in the minibuffer with PROMPT, INITIAL-INPUT, and HISTORY."
   (interactive)
-  (let* ((alist (mapcar (lambda (it)
-                          (let ((parts (split-string it "[\\^]" t)))
-                            (cons (pop parts)
-                                  (pop parts))))
-                        (igist-get-github-users)))
-         (annotf (lambda (str)
-                   (format "^%s" (cdr (assoc str alist)))))
-         (login-name (completing-read (or prompt "Github user name: ")
-                                      (lambda (str pred action)
-                                        (if (eq action 'metadata)
-                                            `(metadata
-                                              (annotation-function . ,annotf))
-                                          (complete-with-action action alist str
-                                                                pred)))
-                                      nil
-                                      nil
-                                      initial-input
-                                      history))
-         (marker (igist-alist-get login-name alist)))
-    (when-let ((marker (and marker (intern marker))))
-      (unless (eq marker igist-auth-marker)
-        (setq igist-auth-marker marker)))
-    (setq igist-current-user-name login-name)
-    (if (string-empty-p login-name)
+  (let ((user
+         (if (stringp igist-auth-marker)
+             (read-string (or prompt "User: ") initial-input history)
+           (let* ((alist (mapcar (lambda (it)
+                                   (let ((parts (split-string it "[\\^]" t)))
+                                     (cons (pop parts)
+                                           (pop parts))))
+                                 (igist-get-github-users)))
+                  (annotf (lambda (str)
+                            (format "^%s" (cdr (assoc str alist)))))
+                  (login-name (completing-read (or prompt
+                                                   "Github user name: ")
+                                               (lambda (str pred action)
+                                                 (if (eq action 'metadata)
+                                                     `(metadata
+                                                       (annotation-function
+                                                        . ,annotf))
+                                                   (complete-with-action
+                                                    action alist
+                                                    str
+                                                    pred)))
+                                               nil
+                                               nil
+                                               initial-input
+                                               history))
+                  (marker (igist-alist-get login-name alist)))
+             (when-let ((marker (and marker (intern marker))))
+               (unless (eq marker igist-auth-marker)
+                 (setq igist-auth-marker marker)))
+             login-name))))
+    (if (string-empty-p user)
         nil
-      login-name)))
+      user)))
 
 (defun igist-list-get-per-page-query (buffer)
   "Return estimed gists count for BUFFER."
@@ -2074,7 +2083,7 @@ If BACKGROUND is non-nil, don't show buffer."
 (defun igist-load-logged-user-gists (&optional cb &rest args)
   "Load gists asynchronously with callback CB and ARGS."
   (unless igist-current-user-name
-    (igist-change-user))
+    (setq igist-current-user-name (read-string "User: ")))
   (igist-list-load-gists igist-current-user-name
                          t
                          cb args))
