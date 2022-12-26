@@ -49,7 +49,7 @@ The Emacs everywhere goal continues. These are the main features of
 Download the repository and it to your load path in your init file:
 
 ``` elisp
-(add-to-list 'load-path "/path/to/igist)
+(add-to-list 'load-path "/path/to/igist")
 (require 'igist)
 ```
 
