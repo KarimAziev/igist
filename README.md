@@ -1,13 +1,9 @@
-# igist
-
-List, create, update and delete GitHub gists in Emacs.
-
-![](./igist-demo.gif)
-
-## Overview
+# About
 
 The Emacs everywhere goal continues. These are the main features of
 `igist` to help you never leave Emacs to manage your gists.
+
+![](./igist-demo.gif)
 
   - Edit a gist
   - List gists
@@ -18,15 +14,31 @@ The Emacs everywhere goal continues. These are the main features of
   - UI
       - transient api
       - tabulated/minibuffer display
-  - Use auth-sources
+  - auth-sources support
+
+# igist
+
+>   - [About](#about)
+>       - [Requirements](#requirements)
+>       - [Installation](#installation)
+>           - [Manually](#manually)
+>           - [With use-package and
+>             straight](#with-use-package-and-straight)
+>       - [Auth](#auth)
+>           - [Secure](#secure)
+>           - [Insecure](#insecure)
+>       - [Usage](#usage)
+>           - [General](#general)
+>           - [List gists](#list-gists)
+>           - [Edit gist](#edit-gist)
+>           - [List comments](#list-comments)
+>           - [Editing comment](#editing-comment)
 
 ## Requirements
 
   - Emacs \>= 28.1
   - ghub
   - transient
-  - timezone
-  - spinner (optional)
   - [Github API
     token](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
 
@@ -37,23 +49,19 @@ The Emacs everywhere goal continues. These are the main features of
 Download the repository and it to your load path in your init file:
 
 ``` elisp
-
 (add-to-list 'load-path "/path/to/igist)
-
 (require 'igist)
 ```
 
 ### With use-package and straight
 
 ``` elisp
-
 (use-package igist
   :straight (igist
              :repo "KarimAziev/igist"
              :type git
              :host github)
   :bind (("M-o" . igist-dispatch)))
-
 ```
 
 
@@ -102,20 +110,32 @@ Download the repository and it to your load path in your init file:
 ## Auth
 
 You need to ensure that you have [a GitHub API
-token](https://github.com/settings/tokens) with scope `gist`.
+token](https://github.com/settings/tokens) with scope `gist`. Then there
+are two options to feed it.
 
-For example, your GitHub username is `km`, and you have a token
-"012345abcdef…". Add such an entry in `auth-sources` (`M-x
-describe-variable` `RET` and type `auth-sources`, usually it is
-`~/.authinfo` or `~/.authinfo.gpg`).
+### Secure
+
+To use `auth-sources`, you need to add a such entry with a Github
+username and token, e.g.:
 
 ``` example
-machine api.github.com login km^igist password 012345abcdef
+machine api.github.com login MY_GITHUB_USERNAME^igist password MY_GITHUB_TOKEN
 ```
+
+Replace MY<sub>GITHUBUSERNAME</sub> with your actual GitHub username and
+MY<sub>GITHUBTOKEN</sub> with the token.
+
+To use other suffixes instead of `^igist` (`M-x customize-variable`
+`RET` and type `igist-auth-marker`).
 
 You can read more in
 [ghub](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
-manual as igist relies on the provided API.
+manual, as igist relies on the provided API.
+
+### Insecure
+
+If the value of the variable `igist-auth-marker` is a string, it will be
+used as a token.
 
 ## Usage
 
