@@ -2106,8 +2106,9 @@ If BACKGROUND is nil, don't show user's buffer."
                  (when (timerp igist-load-timer)
                    (cancel-timer igist-load-timer))
                  (setq igist-load-timer
-                       (run-at-time 0.5 nil
-                                    'igist-list-load-gists)))
+                       (run-with-timer 0.5 nil
+                                       'igist-list-load-gists
+                                       user)))
         (setq igist-list-loading t))
       (igist-spinner-show)
       (unless background
