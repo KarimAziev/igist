@@ -2048,7 +2048,7 @@ If BACKGROUND is non-nil, don't show buffer."
                    (cancel-timer igist-load-timer))
                  (setq igist-load-timer
                        (run-with-timer 0.5 nil
-                                       'igist-explore-public-gists t)))
+                                       #'igist-explore-public-gists t)))
         (setq igist-list-loading t))
       (igist-spinner-show)
       (unless background
@@ -2107,7 +2107,7 @@ If BACKGROUND is nil, don't show user's buffer."
                    (cancel-timer igist-load-timer))
                  (setq igist-load-timer
                        (run-with-timer 0.5 nil
-                                       'igist-list-load-gists
+                                       #'igist-list-load-gists
                                        user)))
         (setq igist-list-loading t))
       (igist-spinner-show)
