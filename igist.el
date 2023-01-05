@@ -896,6 +896,18 @@ GIST should be raw GitHub item."
                    (igist-alist-get 'files gist))))
     (cdr (igist-normalize-gist-file gist filename))))
 
+
+;;;###autoload
+(defun igist-copy-gist-url ()
+  "Copy url of gist at point or currently open."
+  (interactive)
+  (when-let ((gist-url
+              (igist-alist-get 'html_url
+                               (or (igist-tabulated-gist-at-point)
+                                   igist-current-gist))))
+    (kill-new gist-url)
+    (message "Copied %s" gist-url)))
+
 ;;;###autoload
 (defun igist-browse-gist ()
   "Browse gist at point or currently open."
