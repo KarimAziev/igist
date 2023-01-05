@@ -793,11 +793,13 @@ have the same meaning, as in `ghub-request'."
 
 (defun igist-set-major-mode (filename)
   "Guess major mode for FILENAME."
-  (let ((buffer-file-name (expand-file-name filename default-directory)))
-    (delay-mode-hooks
-      (ignore-errors
-        (set-auto-mode)
-        (font-lock-ensure)))))
+  (let ((buffer-file-name (or
+                           (if (file-name-absolute-p filename)
+                               filename
+                             (expand-file-name filename default-directory)))))
+    (ignore-errors
+      (set-auto-mode)
+      (font-lock-ensure))))
 
 (defun igist-list-jump-to-entry-start ()
   "Goto entry start."
