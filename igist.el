@@ -1886,6 +1886,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                              'yes-or-no-p "Delete comment?")
               (yes-or-no-p "Delete comment?"))
         (igist-delete (format "/gists/%s/comments/%s" gist-id comment-id)
+                      nil
                       :callback (lambda (&rest _)
                                   (igist-with-exisiting-buffer
                                       (concat "*" gist-id
