@@ -2206,16 +2206,8 @@ If BACKGROUND is nil, don't show user's buffer."
 ;;;###autoload
 (defun igist-list-other-user-gists (user)
   "List public gists of USER."
-  (interactive (read-string "User: "))
+  (interactive (list (read-string "User: ")))
   (igist-list-load-gists user nil))
-
-(defun igist-list-change-other-user (&optional prompt input history)
-  "Read owner of gists to load in minibuffer with PROMPT, INPUT and HISTORY."
-  (setq igist-other-username (read-string (or prompt "User: ") input history))
-  (unless (string-empty-p igist-other-username)
-    (igist-list-other-user-gists
-     igist-other-username))
-  igist-other-username)
 
 ;;;###autoload
 (defun igist-delete-other-gist-or-file (gist)
