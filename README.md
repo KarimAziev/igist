@@ -5,20 +5,32 @@ The Emacs everywhere goal continues. These are the main features of
 
 ![](./igist-demo.gif)
 
-  - Edit a gist
-  - List gists
-  - Create a gist
-  - Delete a gist
-  - Fork a gist
-  - Edit, view, list, and create comments
-  - UI
-      - transient api
-      - tabulated/minibuffer display
-  - auth-sources support
+## Features
+
+### Gists
+
+  - \[X\] create
+  - \[X\] edit
+  - \[X\] delete
+  - \[X\] star
+  - \[X\] unstar
+  - \[X\] fork
+  - \[X\] list
+  - \[X\] explore public gists
+
+### Comments
+
+  - \[X\] add
+  - \[X\] list
+  - \[X\] delete
+  - \[X\] edit
 
 # igist
 
 >   - [About](#about)
+>       - [Features](#features)
+>           - [Gists](#gists)
+>           - [Comments](#comments)
 >       - [Requirements](#requirements)
 >       - [Installation](#installation)
 >           - [Manually](#manually)
@@ -75,35 +87,40 @@ Download the repository and it to your load path in your init file:
              :type git
              :host github)
   :bind (("M-o" . igist-dispatch)
+         (:map igist-list-mode-map
+               ("C-j" . igist-list-view-current)
+               ("RET" . igist-list-edit-gist-at-point)
+               ("+" . igist-list-add-file)
+               ("-" . igist-delete-current-filename)
+               ("D" . igist-delete-current-gist)
+               ("K" . igist-list-cancel-load)
+               ("S" . igist-star-gist)
+               ("U" . igist-unstar-gist)
+               ("a" . igist-add-comment)
+               ("c" . igist-load-comments)
+               ("d" . igist-list-edit-description)
+               ("f" . igist-fork-gist)
+               ("g" . igist-list-refresh)
+               ("r" . igist-browse-gist)
+               ("v" . igist-list-view-current)
+               ("w" . igist-copy-gist-url))
          (:map igist-edit-mode-map
                ([remap save-buffer] . igist-save-current-gist)
                ("M-o" . igist-dispatch)
                ("C-c C-c" . igist-save-current-gist-and-exit)
                ("C-c C-k" . kill-current-buffer)
                ("C-c '" . igist-save-current-gist-and-exit))
-         (:map igist-list-mode-map
-               ("C-j" . igist-list-view-current)
-               ("RET" . igist-list-view-current)
-               ("+" . igist-list-add-file)
-               ("-" . igist-delete-current-filename)
-               ("D" . igist-delete-current-gist)
-               ("a" . igist-add-comment)
-               ("c" . igist-load-comments)
-               ("e" . igist-list-edit-description)
-               ("f" . igist-fork-gist)
-               ("g" . igist-list-gists)
-               ("v" . igist-list-view-current)
-               ("b" . igist-browse-gist)
-         (:map igist-comments-edit-mode-map
-               ("M-o" . igist-dispatch)
-               ("C-c C-c" . igist-post-comment)
-               ("C-c C-k" . kill-current-buffer))
          (:map igist-comments-list-mode-map
                ("+" . igist-add-comment)
                ("-" . igist-delete-comment-at-point)
                ("D" . igist-delete-comment-at-point)
                ("e" . igist-add-or-edit-comment)
-               ("g" . igist-load-comments))))
+               ("g" . igist-load-comments)
+               ("q" . kill-current-buffer))
+         (:map igist-comments-edit-mode-map
+               ("M-o" . igist-dispatch)
+               ("C-c C-c" . igist-post-comment)
+               ("C-c C-k" . kill-current-buffer))))
 ```
 </details>
 
@@ -163,20 +180,24 @@ minibuffer completions.
     pause loading use command `igist-list-cancel-load` (default
     keybinding is `K`).
     
-    | Key | Command        |
-    | --- | -------------- |
-    | C-j | view gist      |
-    | v   | view gist      |
-    | RET | edit gist      |
-    | \-  | delete file    |
-    | \+  | add file       |
-    | D   | delete gist    |
-    | c   | load comments  |
-    | a   | add comment    |
-    | g   | refresh gists  |
-    | f   | fork gist      |
-    | b   | browse gist    |
-    | K   | cancel loading |
+    | Key | Command                       |
+    | --- | ----------------------------- |
+    | C-j | igist-list-view-current       |
+    | RET | igist-list-edit-gist-at-point |
+    | \+  | igist-list-add-file           |
+    | \-  | igist-delete-current-filename |
+    | D   | igist-delete-current-gist     |
+    | K   | igist-list-cancel-load        |
+    | S   | igist-star-gist               |
+    | U   | igist-unstar-gist             |
+    | a   | igist-add-comment             |
+    | c   | igist-load-comments           |
+    | d   | igist-list-edit-description   |
+    | f   | igist-fork-gist               |
+    | g   | igist-list-refresh            |
+    | r   | igist-browse-gist             |
+    | v   | igist-list-view-current       |
+    | w   | igist-copy-gist-url           |
     
 
     To customize these keys, see the variable `igist-list-mode-map`.
