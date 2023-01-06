@@ -2561,7 +2561,8 @@ If ACTION is non nil, call it with gist."
   :reader #'igist-toggle-public
   :argument "affirmative")
 
-(transient-define-prefix igist-dispatch-transient ()
+;;;###autoload (autoload 'igist-dispatch "igist" nil t)
+(transient-define-prefix igist-dispatch ()
   "Transient menu for gists."
   :transient-non-suffix #'transient--do-stay
   [[:if-mode
@@ -2634,11 +2635,6 @@ If ACTION is non nil, call it with gist."
    ("o" igist-transient-change-owner)
    ("q" "Quit" transient-quit-all)])
 
-;;;###autoload
-(defun igist-dispatch ()
-  "Dispatch transient API with available gists commands for current buffer."
-  (interactive)
-  (funcall-interactively #'igist-dispatch-transient))
 
 (provide 'igist)
 ;;; igist.el ends here
