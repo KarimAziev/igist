@@ -2612,18 +2612,19 @@ If ACTION is non nil, call it with gist."
 
 (defun igist-not-editable-p (&optional gist)
   "Return t if user `igist-current-user-name' cannot edit GIST."
-  (if-let ((owner
-            (igist-get-owner
-             (or gist
-                 (igist-tabulated-gist-at-point)
-                 igist-current-gist))))
-      (not
-       (equal igist-current-user-name owner))
-    (not igist-current-user-name)))
+  (not (igist-editable-p gist)))
 
 (defun igist-editable-p (&optional gist)
   "Check whether user `igist-current-user-name' can edit GIST."
-  (not (igist-not-editable-p gist)))
+  (when-let* ((id (and igist-current-user-name
+                       (igist-alist-get 'id (or gist
+                                                (igist-tabulated-gist-at-point)
+                                                igist-current-gist))))
+              (buffer (igist-get-user-buffer igist-current-user-name)))
+    (igist-alist-find-by-prop 'id id
+                              (when (buffer-live-p buffer)
+                                (buffer-local-value
+                                 'igist-list-response buffer)))))
 
 (defun igist-forkable (&optional gist)
   "Return t if user `igist-current-user-name' can fork GIST."
