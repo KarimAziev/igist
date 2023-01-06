@@ -887,7 +887,6 @@ GIST should be raw GitHub item."
     (cdr (igist-normalize-gist-file gist filename))))
 
 
-;;;###autoload
 (defun igist-copy-gist-url ()
   "Copy url of gist at point or currently open."
   (interactive)
@@ -898,7 +897,6 @@ GIST should be raw GitHub item."
     (kill-new gist-url)
     (message "Copied %s" gist-url)))
 
-;;;###autoload
 (defun igist-browse-gist ()
   "Browse gist at point or currently open."
   (interactive)
@@ -921,7 +919,6 @@ GIST should be raw GitHub item."
                                                                parent)))))
           (igist-read-gist-file "Filename: " parent)))))
 
-;;;###autoload
 (defun igist-list-edit-gist-at-point (&optional _entry)
   "Switch to the buffer with the content of a gist entry at the point."
   (interactive)
@@ -929,8 +926,6 @@ GIST should be raw GitHub item."
     (let ((buff (igist-setup-edit-buffer gist)))
       (switch-to-buffer-other-window buff))))
 
-
-;;;###autoload
 (defun igist-list-view-current ()
   "Display content of a gist entry at the point without switching to buffer."
   (interactive)
@@ -940,7 +935,6 @@ GIST should be raw GitHub item."
       (let ((buff (igist-setup-edit-buffer gist)))
         (switch-to-buffer-other-window buff)))))
 
-;;;###autoload
 (defun igist-explore-load-other-user-gists (&rest _)
   "List public gists of owner gist entry at point."
   (interactive)
@@ -951,7 +945,6 @@ GIST should be raw GitHub item."
                       user))
       (igist-list-load-gists user))))
 
-;;;###autoload
 (defun igist-list-edit-description (&rest _)
   "Edit description for current gist."
   (interactive)
@@ -1280,7 +1273,6 @@ If LOADING is non nil show spinner, otherwise hide."
                        (if msg (concat ":\s" msg) "")))
     (igist-message "Igist: request error: %s" value)))
 
-;;;###autoload
 (defun igist-star-gist ()
   "Star currently viewing gist or gist at point."
   (interactive)
@@ -1295,7 +1287,6 @@ If LOADING is non nil show spinner, otherwise hide."
                        (igist-message "Gist starred")))
     (user-error "No gist")))
 
-;;;###autoload
 (defun igist-unstar-gist ()
   "Unstar currently viewing gist or gist at point."
   (interactive)
@@ -1310,8 +1301,6 @@ If LOADING is non nil show spinner, otherwise hide."
                        (igist-message "Gist unstarred")))
     (user-error "No gist")))
 
-
-;;;###autoload
 (defun igist-fork-gist ()
   "Fork the current gist."
   (interactive)
@@ -1738,7 +1727,6 @@ GIST-ID is used to create comments buffer."
         (setq igist-comment-gist-id gist-id)
         (pop-to-buffer (current-buffer))))))
 
-;;;###autoload
 (defun igist-load-comments (&rest _)
   "Load comments for gist at point or edit buffer."
   (interactive)
@@ -1801,7 +1789,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                (apply fn args))
       (delete-overlay overlay))))
 
-;;;###autoload
 (defun igist-add-comment ()
   "Add a new comment for the current gist."
   (interactive)
@@ -1819,7 +1806,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
    (get-text-property (point) 'igist-comment-gist-id)
    (igist-alist-get 'id igist-current-gist)))
 
-;;;###autoload
 (defun igist-add-or-edit-comment (&rest _)
   "Add or edit comment for gist at point or edit buffer."
   (interactive)
@@ -1837,7 +1823,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
       (pop-to-buffer-same-window (igist-setup-comment-buffer
                                   gist-id)))))
 
-;;;###autoload
 (defun igist-delete-comment-at-point (&rest _)
   "Add or edit a comment for gist at point or edit buffer."
   (interactive)
@@ -1866,7 +1851,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                   (igist-load-logged-user-gists))))
     (user-error "Not in gist comment")))
 
-;;;###autoload
 (defun igist-post-comment ()
   "Save the currently edited or created comment."
   (interactive)
@@ -1898,7 +1882,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                   :callback callback-fn
                   :payload `((body . ,content))))))
 
-;;;###autoload
 (defun igist-list-add-file ()
   "Add a new file name to current gist at the point."
   (interactive)
@@ -1919,50 +1902,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                           gist)))))
       (switch-to-buffer-other-window buff))))
 
-;;;###autoload
-(defun igist-list-gists ()
-  "Load and render gists for user specified in `igist-current-user-name'."
-  (interactive)
-  (unless igist-current-user-name
-    (igist-change-user))
-  (igist-list-load-gists
-   igist-current-user-name nil))
-
-;;;###autoload
-(defun igist-new-gist-from-buffer ()
-  "Create the editable gist buffer with the content of the current buffer."
-  (interactive)
-  (when-let ((content (or (igist-get-region-content)
-                          (buffer-substring-no-properties (point-min)
-                                                          (point-max)))))
-    (let ((filename (read-string "Filename: "
-                                 (when buffer-file-name
-                                   (if-let ((ext
-                                             (file-name-extension
-                                              buffer-file-name)))
-                                       (concat
-                                        (file-name-base
-                                         buffer-file-name)
-                                        "." ext))))))
-      (pop-to-buffer
-       (igist-setup-new-gist-buffer filename content)
-       nil
-       t))))
-
-;;;###autoload
-(defun igist-create-new-gist ()
-  "Set up and switch to the editable gist buffer.
-If Transient Mark mode is enabled and the mark is active,
-insert it as initial content."
-  (interactive)
-  (let ((region-content (igist-get-region-content)))
-    (let ((filename (read-string "Filename: "
-                                 (when region-content
-                                   (igist-suggest-filename)))))
-      (pop-to-buffer (igist-setup-new-gist-buffer filename
-                                                  (or region-content ""))))))
-
-;;;###autoload
 (defun igist-kill-all-gists-buffers ()
   "Delete all gists buffers."
   (interactive)
@@ -1971,44 +1910,6 @@ insert it as initial content."
       (with-current-buffer buff
         (set-buffer-modified-p nil))
       (kill-buffer buff))))
-
-;;;###autoload
-(defun igist-change-user (&optional prompt initial-input history)
-  "Read a user in the minibuffer with PROMPT, INITIAL-INPUT, and HISTORY."
-  (interactive)
-  (let ((user
-         (if (stringp igist-auth-marker)
-             (read-string (or prompt "User: ") initial-input history)
-           (let* ((alist (mapcar (lambda (it)
-                                   (let ((parts (split-string it "[\\^]" t)))
-                                     (cons (pop parts)
-                                           (pop parts))))
-                                 (igist-get-github-users)))
-                  (annotf (lambda (str)
-                            (format "^%s" (cdr (assoc str alist)))))
-                  (login-name (completing-read (or prompt
-                                                   "Github user name: ")
-                                               (lambda (str pred action)
-                                                 (if (eq action 'metadata)
-                                                     `(metadata
-                                                       (annotation-function
-                                                        . ,annotf))
-                                                   (complete-with-action
-                                                    action alist
-                                                    str
-                                                    pred)))
-                                               nil
-                                               nil
-                                               initial-input
-                                               history))
-                  (marker (igist-alist-get login-name alist)))
-             (when-let ((marker (and marker (intern marker))))
-               (unless (eq marker igist-auth-marker)
-                 (setq igist-auth-marker marker)))
-             login-name))))
-    (if (string-empty-p user)
-        nil
-      user)))
 
 (defun igist-list-get-per-page-query (buffer)
   "Return estimed gists count for BUFFER."
@@ -2025,14 +1926,12 @@ insert it as initial content."
      estimed-gists-count
      100)))
 
-;;;###autoload
 (defun igist-list-cancel-load ()
   "Cancel loading for current gists."
   (interactive)
   (setq igist-list-cancelled t)
   (igist-spinner-stop))
 
-;;;###autoload
 (defun igist-list-refresh ()
   "Refresh gists in the current `igist-list-mode' buffer."
   (interactive)
@@ -2103,18 +2002,15 @@ REQ is a `ghub--req' struct, used for loading next page."
     (cancel-timer igist-render-timer))
   (setq igist-render-timer nil))
 
-;;;###autoload
-(defun igist-explore-public-gists (&optional background)
-  "List public gists sorted by most recently updated to least recently updated.
+(defun igist-list-load-gists (user &optional background callback callback-args)
+  "List USER's gists sorted by most recently updated to least recently updated.
 
-Render and load up to 3000 gists with pagination.
-
+Then execute CALLBACK with CALLBACK-ARGS.
 To stop or pause loading use command `igist-list-cancel-load'.
 
-If BACKGROUND is non-nil, don't show buffer."
-  (interactive)
-  (igist-list-request "/gists/public" nil
-                      background))
+If BACKGROUND is nil, don't show user's buffer."
+  (igist-list-request
+   (concat "/users/" user "/gists") user background callback callback-args))
 
 (defun igist-load-logged-user-gists (&optional cb &rest args)
   "Load gists asynchronously with callback CB and ARGS."
@@ -2123,7 +2019,6 @@ If BACKGROUND is non-nil, don't show buffer."
   (igist-list-load-gists igist-current-user-name
                          t
                          cb args))
-
 
 (defun igist-list-request (url user &optional background callback callback-args)
   "Request URL to list USER's gists with pagination.
@@ -2178,35 +2073,6 @@ If BACKGROUND is nil, don't show user's buffer."
         (unless background
           (igist-ensure-buffer-visible buffer))))))
 
-;;;###autoload
-(defun igist-list-starred ()
-  "List the authenticated user's starred gists with pagination.
-
-Then execute CALLBACK with CALLBACK-ARGS.
-To stop or pause loading use command `igist-list-cancel-load'.
-
-If BACKGROUND is nil, don't show user's buffer."
-  (interactive)
-  (igist-list-request "/gists/starred"
-                      igist-current-user-name))
-
-(defun igist-list-load-gists (user &optional background callback callback-args)
-  "List USER's gists sorted by most recently updated to least recently updated.
-
-Then execute CALLBACK with CALLBACK-ARGS.
-To stop or pause loading use command `igist-list-cancel-load'.
-
-If BACKGROUND is nil, don't show user's buffer."
-  (igist-list-request
-   (concat "/users/" user "/gists") user background callback callback-args))
-
-;;;###autoload
-(defun igist-list-other-user-gists (user)
-  "List public gists of USER."
-  (interactive (list (read-string "User: ")))
-  (igist-list-load-gists user nil))
-
-;;;###autoload
 (defun igist-delete-other-gist-or-file (gist)
   "Delete GIST with id."
   (interactive
@@ -2234,7 +2100,7 @@ If BACKGROUND is nil, don't show user's buffer."
        (igist-delete-gists-buffers-by-id id)
        (igist-request-delete id)))))
 
-;;;###autoload
+
 (defun igist-delete-current-filename ()
   "Delete the current file from the gist."
   (interactive)
@@ -2264,7 +2130,7 @@ If BACKGROUND is nil, don't show user's buffer."
                                         parent)))))
     (igist-request-delete-filename confirmed-gist)))
 
-;;;###autoload
+
 (defun igist-delete-current-gist ()
   "Delete the current gist with all files."
   (interactive)
@@ -2286,13 +2152,13 @@ If BACKGROUND is nil, don't show user's buffer."
              (igist-delete-gists-buffers-by-id id)
              (igist-request-delete id))))))
 
-;;;###autoload
+
 (defun igist-toggle-public (&rest _)
   "Toggle value of variable `igist-current-public'."
   (interactive)
   (setq igist-current-public (not igist-current-public)))
 
-;;;###autoload
+
 (defun igist-add-file-to-gist ()
   "Add a new file to the existing gist."
   (interactive)
@@ -2324,7 +2190,6 @@ If BACKGROUND is nil, don't show user's buffer."
            (pop-to-buffer
             (igist-setup-edit-buffer data))))))
 
-;;;###autoload
 (defun igist-read-description (&rest _args)
   "Update description for current gist without saving."
   (interactive)
@@ -2340,7 +2205,6 @@ If BACKGROUND is nil, don't show user's buffer."
                                              igist-current-gist)))))
       (setq igist-current-description descr))))
 
-;;;###autoload
 (defun igist-read-filename (&rest _args)
   "Update the filename for the current gist without saving."
   (interactive)
@@ -2376,7 +2240,7 @@ With CALLBACK call it without args after success request."
     (when (igist-gist-modified-p buffer)
       (igist-save-existing-gist buffer callback))))
 
-;;;###autoload
+
 (defun igist-save-current-gist ()
   "Post the current gist and stay in the buffer."
   (interactive)
@@ -2384,7 +2248,7 @@ With CALLBACK call it without args after success request."
                           (lambda ()
                             (igist-message "Gist saved"))))
 
-;;;###autoload
+
 (defun igist-save-current-gist-and-exit ()
   "Post current gist and exit."
   (interactive)
@@ -2393,56 +2257,6 @@ With CALLBACK call it without args after success request."
                             (kill-buffer (buffer-name))
                             (igist-message "Gist created"))))
 
-;;;###autoload
-(define-minor-mode igist-comments-edit-mode
-  "Minor mode for editing and creating gists comments.
-
-This minor mode is turned on after commands `igist-add-comment'
-and `igist-edit-comment'.
-
-\\<igist-comments-edit-mode-map>
-\\{igist-comments-edit-mode-map}."
-  :lighter " Igist"
-  :keymap igist-comments-edit-mode-map
-  :global nil
-  (when igist-comments-edit-mode
-    (pcase igist-mode-for-comments
-      ('org-mode
-       (when (not (executable-find "pandoc"))
-         (error "You must install pandoc to use org-mode for gists")
-         (org-mode)))
-      ((pred functionp)
-       (funcall igist-mode-for-comments)))
-    (use-local-map
-     (let ((map (copy-keymap
-                 igist-comments-edit-mode-map)))
-       (set-keymap-parent map (current-local-map))
-       map))))
-
-;;;###autoload
-(define-minor-mode igist-edit-mode
-  "Minor mode for language major mode buffers generated by `igist'.
-
-This minor mode is turned on after command `igist-edit-gist'.
-
-\\<igist-edit-mode-map>
-\\{igist-edit-mode-map}
-
-See also `igist-before-save-hook'."
-  :lighter " Igist"
-  :keymap igist-edit-mode-map
-  :global nil
-  (when igist-edit-mode
-    (progn
-      (setq buffer-read-only nil)
-      (set-buffer-modified-p nil)
-      (use-local-map
-       (let ((map (copy-keymap
-                   igist-edit-mode-map)))
-         (set-keymap-parent map (current-local-map))
-         map)))))
-
-;;;###autoload
 (defun igist-completing-read-gists (&optional prompt action initial-input)
   "Read gist in minibuffer with PROMPT and INITIAL-INPUT.
 If ACTION is non nil, call it with gist."
@@ -2503,6 +2317,169 @@ If ACTION is non nil, call it with gist."
   (igist-load-logged-user-gists #'igist-completing-read-gists
                                 "Edit gist\s"
                                 #'igist-edit-gist))
+
+;;;###autoload
+(defun igist-explore-public-gists (&optional background)
+  "List public gists sorted by most recently updated to least recently updated.
+
+Render and load up to 3000 gists with pagination.
+
+To stop or pause loading use command `igist-list-cancel-load'.
+
+If BACKGROUND is non-nil, don't show buffer."
+  (interactive)
+  (igist-list-request "/gists/public" nil
+                      background))
+
+;;;###autoload
+(defun igist-list-starred ()
+  "List the authenticated user's starred gists with pagination.
+
+Then execute CALLBACK with CALLBACK-ARGS.
+To stop or pause loading use command `igist-list-cancel-load'.
+
+If BACKGROUND is nil, don't show user's buffer."
+  (interactive)
+  (igist-list-request "/gists/starred"
+                      igist-current-user-name))
+
+;;;###autoload
+(defun igist-list-other-user-gists (user)
+  "List public gists of USER."
+  (interactive (list (read-string "User: ")))
+  (igist-list-load-gists user nil))
+
+;;;###autoload
+(defun igist-list-gists ()
+  "Load and render gists for user specified in `igist-current-user-name'."
+  (interactive)
+  (unless igist-current-user-name
+    (igist-change-user))
+  (igist-list-load-gists
+   igist-current-user-name nil))
+
+;;;###autoload
+(defun igist-new-gist-from-buffer ()
+  "Create the editable gist buffer with the content of the current buffer."
+  (interactive)
+  (when-let ((content (or (igist-get-region-content)
+                          (buffer-substring-no-properties (point-min)
+                                                          (point-max)))))
+    (let ((filename (read-string "Filename: "
+                                 (when buffer-file-name
+                                   (if-let ((ext
+                                             (file-name-extension
+                                              buffer-file-name)))
+                                       (concat
+                                        (file-name-base
+                                         buffer-file-name)
+                                        "." ext))))))
+      (pop-to-buffer
+       (igist-setup-new-gist-buffer filename content)
+       nil
+       t))))
+
+;;;###autoload
+(defun igist-create-new-gist ()
+  "Set up and switch to the editable gist buffer.
+If Transient Mark mode is enabled and the mark is active,
+insert it as initial content."
+  (interactive)
+  (let ((region-content (igist-get-region-content)))
+    (let ((filename (read-string "Filename: "
+                                 (when region-content
+                                   (igist-suggest-filename)))))
+      (pop-to-buffer (igist-setup-new-gist-buffer filename
+                                                  (or region-content ""))))))
+
+;;;###autoload
+(defun igist-change-user (&optional prompt initial-input history)
+  "Read a user in the minibuffer with PROMPT, INITIAL-INPUT, and HISTORY."
+  (interactive)
+  (let ((user
+         (if (stringp igist-auth-marker)
+             (read-string (or prompt "User: ") initial-input history)
+           (let* ((alist (mapcar (lambda (it)
+                                   (let ((parts (split-string it "[\\^]" t)))
+                                     (cons (pop parts)
+                                           (pop parts))))
+                                 (igist-get-github-users)))
+                  (annotf (lambda (str)
+                            (format "^%s" (cdr (assoc str alist)))))
+                  (login-name (completing-read (or prompt
+                                                   "Github user name: ")
+                                               (lambda (str pred action)
+                                                 (if (eq action 'metadata)
+                                                     `(metadata
+                                                       (annotation-function
+                                                        . ,annotf))
+                                                   (complete-with-action
+                                                    action alist
+                                                    str
+                                                    pred)))
+                                               nil
+                                               nil
+                                               initial-input
+                                               history))
+                  (marker (igist-alist-get login-name alist)))
+             (when-let ((marker (and marker (intern marker))))
+               (unless (eq marker igist-auth-marker)
+                 (setq igist-auth-marker marker)))
+             login-name))))
+    (if (string-empty-p user)
+        nil
+      user)))
+
+
+;;;###autoload
+(define-minor-mode igist-comments-edit-mode
+  "Minor mode for editing and creating gists comments.
+
+This minor mode is turned on after commands `igist-add-comment'
+and `igist-edit-comment'.
+
+\\<igist-comments-edit-mode-map>
+\\{igist-comments-edit-mode-map}."
+  :lighter " Igist"
+  :keymap igist-comments-edit-mode-map
+  :global nil
+  (when igist-comments-edit-mode
+    (pcase igist-mode-for-comments
+      ('org-mode
+       (when (not (executable-find "pandoc"))
+         (error "You must install pandoc to use org-mode for gists")
+         (org-mode)))
+      ((pred functionp)
+       (funcall igist-mode-for-comments)))
+    (use-local-map
+     (let ((map (copy-keymap
+                 igist-comments-edit-mode-map)))
+       (set-keymap-parent map (current-local-map))
+       map))))
+
+;;;###autoload
+(define-minor-mode igist-edit-mode
+  "Minor mode for language major mode buffers generated by `igist'.
+
+This minor mode is turned on after command `igist-edit-gist'.
+
+\\<igist-edit-mode-map>
+\\{igist-edit-mode-map}
+
+See also `igist-before-save-hook'."
+  :lighter " Igist"
+  :keymap igist-edit-mode-map
+  :global nil
+  (when igist-edit-mode
+    (progn
+      (setq buffer-read-only nil)
+      (set-buffer-modified-p nil)
+      (use-local-map
+       (let ((map (copy-keymap
+                   igist-edit-mode-map)))
+         (set-keymap-parent map (current-local-map))
+         map)))))
+
 
 ;; Transient
 (transient-define-argument igist-set-current-filename-variable ()
