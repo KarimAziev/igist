@@ -2375,18 +2375,15 @@ If BACKGROUND is nil, don't show user's buffer."
                           (buffer-substring-no-properties (point-min)
                                                           (point-max)))))
     (let ((filename (read-string "Filename: "
-                                 (when buffer-file-name
-                                   (if-let ((ext
-                                             (file-name-extension
-                                              buffer-file-name)))
-                                       (concat
-                                        (file-name-base
-                                         buffer-file-name)
-                                        "." ext))))))
+                                 (if buffer-file-name
+                                     (file-name-nondirectory buffer-file-name)
+                                   (buffer-name)))))
       (pop-to-buffer
        (igist-setup-new-gist-buffer filename content)
        nil
        t))))
+
+
 
 ;;;###autoload
 (defun igist-create-new-gist ()
