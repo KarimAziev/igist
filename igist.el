@@ -567,15 +567,16 @@ Result: \"JOHNjohn\"."
 
 (defun igist-editable-p (&optional gist)
   "Check whether user `igist-current-user-name' can edit GIST."
-  (when-let* ((id (and igist-current-user-name
-                       (igist-alist-get 'id (or gist
-                                                (igist-tabulated-gist-at-point)
-                                                igist-current-gist))))
-              (buffer (igist-get-user-buffer igist-current-user-name)))
-    (igist-alist-find-by-prop 'id id
-                              (when (buffer-live-p buffer)
-                                (buffer-local-value
-                                 'igist-list-response buffer)))))
+  (and igist-current-user-name
+       (cond ((eq major-mode 'igist-list-mode)
+              (when-let ((owner (igist-get-owner
+                                 (or gist (igist-tabulated-gist-at-point)))))
+                (equal igist-current-user-name owner)))
+             ((igist-edit-mode-p)
+              (if-let ((owner (igist-get-owner
+                               (or gist igist-current-gist))))
+                  (equal igist-current-user-name owner)
+                t)))))
 
 (defun igist-not-editable-p (&optional gist)
   "Return t if user `igist-current-user-name' cannot edit GIST."
