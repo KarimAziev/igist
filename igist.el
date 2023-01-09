@@ -1954,9 +1954,10 @@ REQ is a `ghub--req' struct, used for loading next page."
       (with-current-buffer buffer
         (let ((fn (buffer-local-value 'igist-list-cancelled buffer)))
           (setq-local igist-list-response value)
+          (setq igist-list-loading nil)
           (setq igist-list-cancelled nil)
           (when (functionp fn)
-            (funcall igist-list-cancelled)))
+            (funcall fn)))
         (setq igist-list-loading nil)
         (when (timerp igist-render-timer)
           (cancel-timer igist-render-timer)
@@ -2070,8 +2071,8 @@ If BACKGROUND is nil, don't show user's buffer."
                             (igist-list-loaded-callback buffer value req
                                                         callback
                                                         callback-args)
-                          (setq igist-list-cancelled nil)
-                          (setq igist-list-loading nil))))
+                          (error (setq igist-list-cancelled nil)
+                                 (setq igist-list-loading nil)))))
         (unless background
           (igist-ensure-buffer-visible buffer))))))
 
