@@ -1383,7 +1383,7 @@ If LOADING is non nil show spinner, otherwise hide."
                                        '(t after-update))
                              (when-let ((url (igist-get-current-gist-url)))
                                (kill-new url)
-                               (igist-message "Copied %s" url)))
+                               (message "Copied %s" url)))
                            (when callback
                              (funcall callback))))
                      (igist-message "Couldn't save gist."))))))
@@ -2264,7 +2264,7 @@ With CALLBACK call it without args after success request."
   (igist-save-gist-buffer (current-buffer)
                           (lambda ()
                             (kill-buffer (buffer-name))
-                            (igist-message "Gist created"))))
+                            (igist-message "Gist saved"))))
 
 (defun igist-completing-read-gists (&optional prompt action initial-input)
   "Read gist in minibuffer with PROMPT and INITIAL-INPUT.
