@@ -330,7 +330,6 @@ Should accept the same arguments as `message'."
           (function :tag "Function"))
   :group 'igist)
 
-
 (defvar igist-before-save-hook '()
   "A list of hooks run before posting gist.")
 
@@ -2486,7 +2485,6 @@ See also `igist-before-save-hook'."
          (set-keymap-parent map (current-local-map))
          map)))))
 
-
 ;; Transient
 (transient-define-argument igist-set-current-filename-variable ()
   "Set a Lisp variable, `igist-current-filename'."
@@ -2505,10 +2503,9 @@ See also `igist-before-save-hook'."
   "Read user name and assign it in the variable `igist-current-user-name'."
   :description "Login Name"
   :class 'transient-lisp-variable
-  :shortarg "-u"
   :variable 'igist-current-user-name
-  :reader #'igist-change-user
-  :argument "--user=")
+  :argument "--user"
+  :reader #'igist-change-user)
 
 (transient-define-argument igist-set-current-description-variable ()
   "Read description and assign it in the variable `igist-current-description'."
@@ -2517,17 +2514,22 @@ See also `igist-before-save-hook'."
                   (or igist-current-filename
                       igist-current-gist))
   :class 'transient-lisp-variable
+  :always-read t
   :reader #'igist-read-description
-  :shortarg "-f"
-  :variable 'igist-current-description
-  :argument "--description=")
+  :argument "--description"
+  :variable 'igist-current-description)
 
 (transient-define-argument igist-transient-toggle-public ()
   "Toggle gist visibility and assign it in the variable `igist-current-public'."
   :description "Public"
-  :inapt-if #'igist-get-current-gist-id
+  :if-not #'igist-get-current-gist-id
+  :always-read t
   :class 'transient-lisp-variable
-  :shortarg "-p"
+  :init-value (lambda (ob)
+                (setf
+                 (slot-value ob 'value)
+                 igist-current-public))
+  :shortarg "-P"
   :variable 'igist-current-public
   :reader #'igist-toggle-public
   :argument "affirmative")
@@ -2538,79 +2540,79 @@ See also `igist-before-save-hook'."
   :transient-non-suffix #'transient--do-stay
   [[:if-mode
     igist-list-mode
-    "Actions"
-    ("RET" "edit" igist-list-edit-gist-at-point :inapt-if-not
+    "Gist at point"
+    ("RET" "Edit" igist-list-edit-gist-at-point :inapt-if-not
      tabulated-list-get-id)
-    ("v" "view" igist-list-view-current :inapt-if-not tabulated-list-get-id)
-    ("f" "fork" igist-fork-gist :inapt-if-not igist-forkable)
-    ("w" "copy url" igist-copy-gist-url :inapt-if-not tabulated-list-get-id)
-    ("r" "browse" igist-browse-gist :inapt-if-not tabulated-list-get-id)
-    ("S" "star" igist-star-gist :inapt-if-not tabulated-list-get-id)
-    ("U" "unstar" igist-unstar-gist :inapt-if-not tabulated-list-get-id)
+    ("v" "View" igist-list-view-current :inapt-if-not tabulated-list-get-id)
+    ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
+    ("w" "Copy Url" igist-copy-gist-url :inapt-if-not tabulated-list-get-id)
+    ("r" "Browse" igist-browse-gist :inapt-if-not tabulated-list-get-id)
+    ("S" "Star" igist-star-gist :inapt-if-not tabulated-list-get-id)
+    ("U" "Unstar" igist-unstar-gist :inapt-if-not tabulated-list-get-id)
     ("D" "Delete" igist-delete-current-gist :inapt-if-not igist-editable-p)
-    ("d" "description" igist-list-edit-description :inapt-if-not
-     igist-editable-p)]
+    ("d" "Description" igist-list-edit-description :inapt-if-not
+     tabulated-list-get-id)]
    [:if
     igist-edit-mode-p
     "Actions"
-    ("RET" "save" igist-save-current-gist :inapt-if-not igist-editable-p)
-    ("f" "fork" igist-fork-gist :inapt-if-not igist-forkable)
-    ("w" "copy url" igist-copy-gist-url :inapt-if-not igist-get-current-gist-url)
-    ("r" "browse" igist-browse-gist :inapt-if-not igist-get-current-gist-url)
-    ("S" "star" igist-star-gist :inapt-if-not igist-get-current-gist-id)
-    ("U" "unstar" igist-unstar-gist :inapt-if-not igist-get-current-gist-id)
+    ("RET" "Save" igist-save-current-gist :inapt-if-not igist-editable-p)
+    ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
+    ("w" "Copy url" igist-copy-gist-url :inapt-if-not igist-get-current-gist-url)
+    ("r" "Browse" igist-browse-gist :inapt-if-not igist-get-current-gist-url)
+    ("S" "Star" igist-star-gist :inapt-if-not igist-get-current-gist-id)
+    ("U" "Unstar" igist-unstar-gist :inapt-if-not igist-get-current-gist-id)
     ("D" "Delete" igist-delete-current-gist :inapt-if-not igist-editable-p)
-    ("R" igist-set-current-filename-variable)
     ("P" igist-transient-toggle-public)
+    ("R" igist-set-current-filename-variable)
     ("d" igist-set-current-description-variable)]
    ["List"
-    ("l" "my gists" igist-list-gists :inapt-if-nil igist-current-user-name)
-    ("m" "starred" igist-list-starred :inapt-if-nil igist-current-user-name)
+    ("l" "My gists" igist-list-gists :inapt-if-nil igist-current-user-name)
+    ("m" "Starred" igist-list-starred :inapt-if-nil igist-current-user-name)
     ("E" "Explore" igist-explore-public-gists :inapt-if
      igist-current-buffer-explore-p)
-    ("o" "other user" igist-list-other-user-gists)
-    ("g" "refresh" igist-list-refresh :inapt-if-not-derived igist-list-mode)
-    ("K" "cancel load" igist-list-cancel-load :inapt-if-not-derived
+    ("o" "Other user" igist-list-other-user-gists)
+    ("g" "Refresh" igist-list-refresh :inapt-if-not-derived igist-list-mode)
+    ("K" "Cancel load" igist-list-cancel-load :inapt-if-not-derived
      igist-list-mode)
-    ("X" "Kill buffers" igist-kill-all-gists-buffers)]]
+    ("X" "Kill buffers" igist-kill-all-gists-buffers)]
+   [:if-not-mode
+    igist-list-mode
+    "Create"
+    ("n" "New" igist-create-new-gist :inapt-if-nil igist-current-user-name)
+    ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-nil
+     igist-current-user-name)]]
   [:if-non-nil
    igist-current-gist
    ["Files"
-    ("-" "delete" igist-delete-current-filename :inapt-if-not
+    ("-" "Delete" igist-delete-current-filename :inapt-if-not
      igist-get-current-gist-url)
-    ("+" "add" igist-add-file-to-gist :inapt-if-not igist-get-current-gist-url)]
+    ("+" "Add" igist-add-file-to-gist :inapt-if-not igist-get-current-gist-url)]
    ["Comments"
-    ("a" "add" igist-add-comment  :inapt-if-not igist-get-current-gist-url)
-    ("c" "show" igist-load-comments  :inapt-if-not
+    ("a" "Add" igist-add-comment  :inapt-if-not igist-get-current-gist-url)
+    ("c" "Show" igist-load-comments  :inapt-if-not
      igist-get-current-gist-url)
-    ("e" "edit" igist-add-or-edit-comment :inapt-if-not
+    ("e" "Edit" igist-add-or-edit-comment :inapt-if-not
      igist-get-comment-id-at-point)]]
   [:if-mode
    igist-list-mode
    ["Create"
-    ("n" "new" igist-create-new-gist :inapt-if-nil igist-current-user-name)
-    ("b" "new from buffer" igist-new-gist-from-buffer :inapt-if-nil
+    ("n" "New" igist-create-new-gist :inapt-if-nil igist-current-user-name)
+    ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-nil
      igist-current-user-name)]
    ["Files"
-    ("+" "add" igist-list-add-file :inapt-if-not igist-editable-p)
-    ("-" "delete" igist-delete-current-filename :inapt-if-not igist-editable-p)]
+    ("+" "Add" igist-list-add-file :inapt-if-not igist-editable-p)
+    ("-" "Delete" igist-delete-current-filename :inapt-if-not igist-editable-p)]
    ["Comments"
-    ("a" "add" igist-add-comment :inapt-if-not tabulated-list-get-id)
-    ("c" "show" igist-load-comments :inapt-if-not tabulated-list-get-id)]]
+    ("a" "Add" igist-add-comment :inapt-if-not tabulated-list-get-id)
+    ("c" "Show" igist-load-comments :inapt-if-not tabulated-list-get-id)]]
   [:if igist-comments-list-mode-p
        ["Comments"
-        ("a" "add" igist-add-comment :inapt-if-nil igist-current-user-name)
-        ("g" "reload" igist-load-comments :inapt-if-nil igist-current-user-name)
-        ("e" "edit" igist-add-or-edit-comment :inapt-if-not
+        ("a" "Add" igist-add-comment :inapt-if-nil igist-current-user-name)
+        ("g" "Reload" igist-load-comments :inapt-if-nil igist-current-user-name)
+        ("e" "Edit" igist-add-or-edit-comment :inapt-if-not
          igist-get-comment-id-at-point)
         ("D" "Delete" igist-delete-comment-at-point :inapt-if-not
          igist-get-comment-id-at-point)]]
-  [:if-not-mode
-   igist-list-mode
-   "Create"
-   ("n" "new" igist-create-new-gist :inapt-if-nil igist-current-user-name)
-   ("b" "new from buffer" igist-new-gist-from-buffer :inapt-if-nil
-    igist-current-user-name)]
   ["User"
    ("u" igist-set-current-user)
    ("q" "Quit" transient-quit-all)])
