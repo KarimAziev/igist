@@ -1,6 +1,6 @@
 #+TITLE: Changelog
 
-* v1.0.0 (upcoming)
+* v1.0.0
 - Add commands for starring gists: ~igist-star-gist~, ~igist-unstar-gist~ and ~igist-list-starred~
 - Add custom variable ~igist-enable-copy-gist-url~ to control whether to copy gists URL after creating or editing
 - Update layout and keys for transient. Transient commands are now bound to single keys.
