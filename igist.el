@@ -1679,10 +1679,11 @@ MAX is length of most longest key."
                              (igist--get-time (igist-alist-get 'updated_at
                                                                comment-alist))))
         (author (alist-get 'login (alist-get 'user comment-alist))))
-    (propertize (format "# Comment (%s at %s)\n%s" author updated comment)
-                'igist-comment-id comment-id
-                'igist-comment-gist-id gist-id
-                'igist-gist-author author)))
+    (propertize
+     (format "## **%s** commented on %s\n\n%s" author updated comment)
+     'igist-comment-id comment-id
+     'igist-comment-gist-id gist-id
+     'igist-gist-author author)))
 
 ;;;###autoload
 (define-minor-mode igist-comments-list-mode
