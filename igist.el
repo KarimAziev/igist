@@ -958,14 +958,19 @@ GIST should be raw GitHub item."
 (defun igist-list-edit-description (&rest _)
   "Edit description for current gist."
   (interactive)
-  (when-let* ((gist (igist-tabulated-gist-at-point))
-              (description (read-string "Description: " (igist-alist-get
-                                                         'description gist))))
-    (igist-patch (concat "/gists/" (igist-alist-get 'id gist))
-                 nil
-                 :payload `((description . ,description))
-                 :callback (lambda (&rest _)
-                             (igist-load-logged-user-gists)))))
+  (if-let ((gist (igist-tabulated-gist-at-point)))
+      (let ((description (igist-alist-get
+                          'description gist)))
+        (if (igist-editable-p gist)
+            (igist-patch (concat "/gists/" (igist-alist-get 'id gist))
+                         nil
+                         :payload `((description . ,(read-string "Description: "
+                                                                 description)))
+                         :callback (lambda (&rest _)
+                                     (igist-load-logged-user-gists)))
+          (message (or description
+                       "No description"))))
+    (user-error "No gist at point")))
 
 (defun igist-read-filename-new (gist)
   "Read a filename that doesn't exist in GIST."
