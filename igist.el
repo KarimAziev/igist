@@ -257,6 +257,15 @@ the whole gist, and should return string."
             (function :tag "Formatter"))))
   :group 'igist)
 
+(defcustom igist-enable-copy-gist-url-p 'after-new
+  "Whether and when to add new or updated gist's url to kill ring."
+  :group 'igist
+  :type '(radio
+          (const :tag "After creating new and saving existing gists" t)
+          (const :tag "After saving existing gists" after-update)
+          (const :tag "After creating new gist" after-new)
+          (const :tag "Never" nil)))
+
 (defcustom igist-list-format '((id "Id" 10 nil igist-render-id)
                                (description "Description" 30 t
                                             igist-render-description)
@@ -1365,33 +1374,14 @@ If LOADING is non nil show spinner, otherwise hide."
                            (igist-setup-local-vars new-gist new-filename)
                            (set-buffer-modified-p nil)
                            (igist-load-logged-user-gists)
+                           (when (memq igist-enable-copy-gist-url-p
+                                       '(t after-update))
+                             (when-let ((url (igist-get-current-gist-url)))
+                               (kill-new url)
+                               (igist-message "Copied %s" url)))
                            (when callback
                              (funcall callback))))
                      (igist-message "Couldn't save gist."))))))
-
-(defun igist-update-created-gist (filename buffer response)
-  "Update BUFFER with RESPONSE data for freshly created gist with FILENAME.
-If callback is non nil, call it without args."
-  (igist-with-exisiting-buffer buffer
-    (let* ((new-gist (igist-normalize-gist-file response
-                                                filename))
-           (content (igist-alist-get
-                     'content
-                     (igist-alist-get
-                      (intern
-                       filename)
-                      (igist-alist-get
-                       'files
-                       response)))))
-      (rename-buffer
-       (concat
-        (igist-alist-get 'id response) "-" filename))
-      (igist-setup-local-vars
-       new-gist filename)
-      (replace-region-contents (point-min)
-                               (point-max)
-                               (lambda () content))
-      (set-buffer-modified-p nil))))
 
 (defun igist-save-new-gist (buffer &optional callback)
   "Save new gist in BUFFER, refresh gists and execute CALLBACK without args."
@@ -1421,13 +1411,24 @@ If callback is non nil, call it without args."
                 :buffer buffer
                 :callback
                 (lambda (value &rest _)
-                  (igist-with-exisiting-buffer buffer
-                    (set-buffer-modified-p nil)
-                    (when callback
-                      (funcall callback)))
-                  (igist-load-logged-user-gists
-                   #'igist-update-created-gist
-                   file buffer value)))))
+                  (when value
+                    (igist-with-exisiting-buffer buffer
+                      (set-buffer-modified-p nil)
+                      (let ((new-gist (igist-normalize-gist-file value
+                                                                 file)))
+                        (rename-buffer
+                         (concat
+                          (igist-alist-get 'id value) "-" file))
+                        (igist-setup-local-vars
+                         new-gist file))
+                      (when (memq igist-enable-copy-gist-url-p
+                                  '(t after-new))
+                        (when-let ((url (igist-get-current-gist-url)))
+                          (kill-new url)
+                          (igist-message "Copied %s" url)))
+                      (when callback
+                        (funcall callback)))
+                    (igist-load-logged-user-gists))))))
 
 (defun igist-setup-local-vars (gist filename)
   "Setup local variables for GIST with FILENAME."
