@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;; Edit, create and view your github gists.
+;; Edit, create and view your GitHub gists.
 
 ;; Usage
 
@@ -39,7 +39,7 @@
 
 ;; Completions display:
 
-;; M-x `igist-edit-list' - Read user gists in minibuffer and open it in edit buffer.
+;; M-x `igist-edit-list' - Read user gists in mini-buffer and open it in edit buffer.
 
 
 ;;; Create commands:
@@ -258,7 +258,7 @@ the whole gist, and should return string."
   :group 'igist)
 
 (defcustom igist-enable-copy-gist-url-p 'after-new
-  "Whether and when to add new or updated gist's url to kill ring."
+  "Whether and when to add new or updated gist's URL to kill ring."
   :group 'igist
   :type '(radio
           (const :tag "After creating new and saving existing gists" t)
@@ -337,7 +337,7 @@ Should accept the same arguments as `message'."
   "The GitHub user to make authorized requests.")
 
 (defcustom igist-auth-marker 'igist
-  "Github OAuth token or suffix added to the USERNAME^MARKER in authsources.
+  "GitHub OAuth token or suffix added to the USERNAME^MARKER in auth sources.
 
 For example, if the value of the marker is `igist' (which is the default value),
 you need to add such entry:
@@ -349,7 +349,7 @@ you need to add such entry:
           (symbol :tag "Suffix" igist)))
 
 (defvar igist-github-token-scopes '(gist)
-  "The required Github API scopes.
+  "The required GitHub API scopes.
 
 You need the gist OAuth scope and a token.
 
@@ -601,7 +601,7 @@ Result: \"JOHNjohn\"."
      (not (equal igist-current-user-name owner)))))
 
 (defun igist-get-current-gist-url ()
-  "Return html url from `igist-current-gist'."
+  "Return HTML URL from `igist-current-gist'."
   (igist-alist-get 'html_url igist-current-gist))
 
 (defun igist-get-current-gist-id ()
@@ -623,7 +623,8 @@ Result: \"JOHNjohn\"."
                                 buffer extra)
   "Make a METHOD request for RESOURCE with `ghub-request'.
 
-If BUFFER is non-nil, it should be a buffer to show the spinner in the modeline.
+If BUFFER is non-nil, it should be a buffer to show the spinner in the
+mode line.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
@@ -696,7 +697,8 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
                                auth host callback errorback extra)
   "Make a `POST' request for RESOURCE, with optional payload PARAMS.
 
-If BUFFER is non-nil, it should be a buffer to show the spinner in the modeline.
+If BUFFER is non-nil, it should be a buffer to show the spinner in the
+mode line.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
@@ -722,7 +724,8 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
                                 username auth host callback errorback extra)
   "Make a `PATCH' request for RESOURCE, with optional payload PARAMS.
 
-If BUFFER is non-nil, it should be a buffer to show the spinner in the modeline.
+If BUFFER is non-nil, it should be a buffer to show the spinner in the mode
+ line.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
@@ -748,7 +751,8 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
                                  username auth host callback errorback extra)
   "Make a `DELETE' request for RESOURCE, with optional payload PARAMS.
 
-If BUFFER is non-nil, it should be a buffer to show the spinner in the modeline.
+If BUFFER is non-nil, it should be a buffer to show the spinner in
+the mode line.
 
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA
@@ -806,7 +810,7 @@ have the same meaning, as in `ghub-request'."
   (cdr (assoc key alist)))
 
 (defun igist-download-url (url)
-  "Download URL and return stirng."
+  "Download URL and return string."
   (let ((download-buffer (url-retrieve-synchronously url)))
     (prog1
         (with-current-buffer download-buffer
@@ -888,7 +892,7 @@ have the same meaning, as in `ghub-request'."
     (cdr (igist-normalize-gist-file parent filename))))
 
 (defun igist-read-gist-file (prompt gist)
-  "Read file in GIST with PROMPT in minibuffer.
+  "Read file in GIST with PROMPT in mini-buffer.
 GIST should be raw GitHub item."
   (let ((filename (completing-read
                    prompt
@@ -897,7 +901,7 @@ GIST should be raw GitHub item."
 
 
 (defun igist-copy-gist-url ()
-  "Copy url of gist at point or currently open."
+  "Copy URL of gist at point or currently open."
   (interactive)
   (when-let ((gist-url
               (igist-alist-get 'html_url
@@ -1264,7 +1268,7 @@ If LOADING is non nil show spinner, otherwise hide."
         all-users)))
 
 (defun igist-popup-minibuffer-select-window ()
-  "Select minibuffer window if it is active."
+  "Select mini buffer window if it is active."
   (when-let ((wind (active-minibuffer-window)))
     (select-window wind)))
 
@@ -1589,7 +1593,7 @@ If SETUP-FN is a non nil, it will be called without args."
     (cdr gist-cell)))
 
 (defun igist-annotate-transformer (gist-key &optional max)
-  "A function for annotating GIST-KEY in minibuffer completions.
+  "A function for annotating GIST-KEY in mini buffer completions.
 MAX is length of most longest key."
   (let* ((cell (cdr (assoc gist-key igist-normalized-gists)))
          (extra (format "(%s/%s)" (1+ (igist-alist-get 'idx cell))
@@ -2320,7 +2324,7 @@ If ACTION is non nil, call it with gist."
 
 ;;;###autoload
 (defun igist-edit-list ()
-  "Read user gists in the minibuffer and open it in the edit buffer."
+  "Read user gists in the mini-buffer and open it in the edit buffer."
   (interactive)
   (igist-load-logged-user-gists #'igist-completing-read-gists
                                 "Edit gist\s"
@@ -2557,7 +2561,8 @@ See also `igist-before-save-hook'."
     "Actions"
     ("RET" "Save" igist-save-current-gist :inapt-if-not igist-editable-p)
     ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
-    ("w" "Copy url" igist-copy-gist-url :inapt-if-not igist-get-current-gist-url)
+    ("w" "Copy URL" igist-copy-gist-url
+     :inapt-if-not igist-get-current-gist-url)
     ("r" "Browse" igist-browse-gist :inapt-if-not igist-get-current-gist-url)
     ("S" "Star" igist-star-gist :inapt-if-not igist-get-current-gist-id)
     ("U" "Unstar" igist-unstar-gist :inapt-if-not igist-get-current-gist-id)
