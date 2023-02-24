@@ -171,6 +171,7 @@
 (eval-when-compile
   (require 'subr-x))
 
+(defvar-local igist-list-render-files-length nil)
 (defun igist-render-files (files)
   "Default renderer of FILES of gist."
   (let* ((one-or-none (<= (length files)
@@ -179,7 +180,8 @@
                    (concat
                     (if one-or-none
                         ""
-                      (make-string 87 ?\ ))
+                      (make-string (or igist-list-render-files-length
+                                       (igist-list-calc-files-length)) ?\ ))
                     (propertize
                      file
                      'filename file
@@ -257,6 +259,7 @@ the whole gist, and should return string."
             (function :tag "Formatter"))))
   :group 'igist)
 
+
 (defcustom igist-enable-copy-gist-url-p 'after-new
   "Whether and when to add new or updated gist's URL to kill ring."
   :group 'igist
@@ -299,6 +302,19 @@ the whole gist, and should return string."
             (string :tag "Format")
             (function :tag "Formatter"))))
   :group 'igist)
+
+(defun igist-list-calc-files-length ()
+  "Calculate available length for files."
+  (seq-reduce (lambda (acc it)
+                (if-let ((width (seq-find #'numberp it)))
+                    (+ acc (if (> width 0)
+                               (1+ width)
+                             width))
+                  acc))
+              (or (when tabulated-list-format
+                    (append tabulated-list-format nil))
+                  igist-list-format)
+              (or tabulated-list-padding 2)))
 
 (defcustom igist-mode-for-comments 'markdown-mode
   "Major mode when editing and viewing comments.
@@ -435,7 +451,7 @@ only serves as documentation.")
     map)
   "A keymap used for displaying comments.")
 
-
+(defvar-local igist-render-timer nil)
 ;; Macros
 (defmacro igist-or (&rest functions)
   "Return an unary function which invoke FUNCTIONS until first non-nil result."
@@ -1041,15 +1057,17 @@ GIST should be raw GitHub item."
 
 (defun igist-list-render-all (gists)
   "Render list of GISTS."
+  (setq igist-list-render-files-length (igist-list-calc-files-length))
   (let ((entries
          (igist-gists-to-tabulated-entries gists))
         (pos (point)))
     (when (not (equal (length tabulated-list-entries) gists))
       (setq-local mode-name (format "Gists[%d]" (length gists))))
     (setq tabulated-list-entries entries)
-    (tabulated-list-print nil t)
+    (tabulated-list-print nil)
     (when (> (point-max) pos)
       (goto-char pos))))
+
 
 (defun igist-list-render (gists)
   "Render list of GISTS."
@@ -1065,10 +1083,34 @@ GIST should be raw GitHub item."
          (pos (point)))
     (when (not (equal (length tabulated-list-entries) gists))
       (setq-local mode-name (format "Gists[%d]" (length gists))))
+    (setq igist-list-render-files-length (igist-list-calc-files-length))
     (setq tabulated-list-entries (nconc tabulated-list-entries entries))
-    (tabulated-list-print nil t)
+    (tabulated-list-print)
     (when (> (point-max) pos)
       (goto-char pos))))
+
+(defun igist-tabulated-list-format-watcher (_symbol _newval _operation buffer)
+  "Rerender tabulated entries in BUFFER."
+  (with-current-buffer buffer
+    (igist-cancel-timers)
+    (setq igist-render-timer
+          (run-with-timer
+           0.5 nil
+           (lambda (buff)
+             (if
+                 (eq buff
+                     (current-buffer))
+                 (progn
+                   (igist-list-render-all
+                  igist-list-response))
+               (igist-with-exisiting-buffer
+                   buff
+                 (igist-list-render-all
+                  igist-list-response))))
+           (current-buffer)))))
+
+(add-variable-watcher 'tabulated-list-format
+                      'igist-tabulated-list-format-watcher)
 
 (defun igist-ensure-buffer-visible (buffer &optional select)
   "Select BUFFER window. If SELECT is non-nil select window."
@@ -1952,7 +1994,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                        (car igist-list-response))))
       (igist-list-load-gists owner))))
 
-(defvar-local igist-render-timer nil)
+
 
 (defun igist-list-loaded-callback (buffer value req callback callback-args)
   "Render VALUE in existing BUFFER and REQ.
