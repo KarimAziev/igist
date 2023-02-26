@@ -1092,22 +1092,23 @@ GIST should be raw GitHub item."
 (defun igist-tabulated-list-format-watcher (_symbol _newval _operation buffer)
   "Rerender tabulated entries in BUFFER."
   (with-current-buffer buffer
-    (igist-cancel-timers)
-    (setq igist-render-timer
-          (run-with-timer
-           0.5 nil
-           (lambda (buff)
-             (if
-                 (eq buff
-                     (current-buffer))
-                 (progn
+    (when (derived-mode-p 'igist-list-mode)
+      (igist-cancel-timers)
+      (setq igist-render-timer
+            (run-with-timer
+             0.5 nil
+             (lambda (buff)
+               (if
+                   (eq buff
+                       (current-buffer))
+                   (progn
+                     (igist-list-render-all
+                      igist-list-response))
+                 (igist-with-exisiting-buffer
+                     buff
                    (igist-list-render-all
-                  igist-list-response))
-               (igist-with-exisiting-buffer
-                   buff
-                 (igist-list-render-all
-                  igist-list-response))))
-           (current-buffer)))))
+                    igist-list-response))))
+             (current-buffer))))))
 
 (add-variable-watcher 'tabulated-list-format
                       'igist-tabulated-list-format-watcher)
