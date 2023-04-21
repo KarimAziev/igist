@@ -924,7 +924,7 @@ GIST should be raw GitHub item."
                                (or (igist-tabulated-gist-at-point)
                                    igist-current-gist))))
     (kill-new gist-url)
-    (message "Copied %s" gist-url)))
+    (igist-message "Copied %s" gist-url)))
 
 (defun igist-browse-gist ()
   "Browse gist at point or currently open."
@@ -1409,29 +1409,29 @@ If LOADING is non nil show spinner, otherwise hide."
                  (lambda (val &rest _ignored)
                    (if (igist-alist-get 'id val)
                        (igist-with-exisiting-buffer
-                           buffer
-                         (let ((new-gist
-                                (igist-normalize-gist-file val
-                                                           new-filename)))
-                           (unless (equal orig-filename new-filename)
-                             (rename-buffer
-                              (concat id "-" new-filename))
-                             (setq buffer-file-name (concat
-                                                     (temporary-file-directory)
-                                                     (buffer-name)))
-                             (set-auto-mode)
-                             (font-lock-ensure)
-                             (igist-edit-mode))
-                           (igist-setup-local-vars new-gist new-filename)
-                           (set-buffer-modified-p nil)
-                           (igist-load-logged-user-gists)
-                           (when (memq igist-enable-copy-gist-url-p
-                                       '(t after-update))
-                             (when-let ((url (igist-get-current-gist-url)))
-                               (kill-new url)
-                               (message "Copied %s" url)))
-                           (when callback
-                             (funcall callback))))
+                        buffer
+                        (let ((new-gist
+                               (igist-normalize-gist-file val
+                                                          new-filename)))
+                          (unless (equal orig-filename new-filename)
+                            (rename-buffer
+                             (concat id "-" new-filename))
+                            (setq buffer-file-name (concat
+                                                    (temporary-file-directory)
+                                                    (buffer-name)))
+                            (set-auto-mode)
+                            (font-lock-ensure)
+                            (igist-edit-mode))
+                          (igist-setup-local-vars new-gist new-filename)
+                          (set-buffer-modified-p nil)
+                          (igist-load-logged-user-gists)
+                          (when (memq igist-enable-copy-gist-url-p
+                                      '(t after-update))
+                            (when-let ((url (igist-get-current-gist-url)))
+                              (kill-new url)
+                              (igist-message "Copied %s" url)))
+                          (when callback
+                            (funcall callback))))
                      (igist-message "Couldn't save gist."))))))
 
 (defun igist-save-new-gist (buffer &optional callback)
