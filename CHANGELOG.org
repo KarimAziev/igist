@@ -1,12 +1,18 @@
 #+TITLE: Changelog
 
-* v1.0.0
+* v1.1.0 2023-04-21
+- Allow sorting gists by modification date.
+- Add variable watcher for ~tabulated-list-format~ to rerender gists, so ~tabulated-list-narrow-current-column~ and ~tabulated-list-widen-current-column~ correctly recalculate indent for files column.
+- Use ~igist-message~ instead of message, which uses custom variable ~igist-message-function~.
+- Update package requirements.
+
+* v1.0.0 2023-01-09
 - Add commands for starring gists: ~igist-star-gist~, ~igist-unstar-gist~ and ~igist-list-starred~
 - Add custom variable ~igist-enable-copy-gist-url~ to control whether to copy gists URL after creating or editing
 - Update layout and keys for transient. Transient commands are now bound to single keys.
 - Change keybinding for ~igist-browse-gist~ from =b= to =r=
-- Remove separate variable for another user name as it can be accessed from ~igist-list-other-user-gists~ history
-- Setup temporarly ~buffer-file-name~ for gists in edit buffers.
+- Remove a separate variable for another user name as users can access it from ~igist-list-other-user-gists~ history
+- Setup temporarily ~buffer-file-name~ for gists in edit buffers.
 - Allow major mode hooks in edit mode.
 - Run ~before-save-hook~ before posting gists
 - Speedup ~igist-explore-public-gists~
