@@ -269,6 +269,30 @@ the whole gist, and should return string."
           (const :tag "After creating new gist" after-new)
           (const :tag "Never" nil)))
 
+(defvar-local igist-list-response nil)
+
+(defun igist-date-sorter (entry-a entry-b)
+  "Sort predicate for tabulated ENTRY-A and ENTRY-B."
+  (when-let ((val-a
+              (igist-alist-get
+               'updated_at
+               (igist-alist-find-by-prop
+                'id (car
+                     entry-a)
+                igist-list-response)))
+             (val-b
+              (igist-alist-get
+               'updated_at
+               (igist-alist-find-by-prop
+                'id (car
+                     entry-b)
+                igist-list-response))))
+    (time-less-p (igist--get-time
+                  val-a)
+                 (igist--get-time
+                  val-b))))
+
+
 (defcustom igist-list-format '((id "Id" 10 nil igist-render-id)
                                (description "Description" 30 t
                                             igist-render-description)
@@ -277,7 +301,8 @@ the whole gist, and should return string."
                                              (if public
                                                  "public"
                                                "private")))
-                               (updated_at "Updated" 20 t "%D %R")
+                               (updated_at "Updated" 20 igist-date-sorter
+                                           "%D %R")
                                (comments "Comments" 10 t igist-render-comments)
                                (files "Files" 0 t igist-render-files))
   "Alist of gist's props and value formatters.
@@ -397,12 +422,12 @@ only serves as documentation.")
 (defvar igist-explore-buffer-name "*igist-explore*"
   "Buffer name for tabulated gists display of multiple owners.")
 
-(defvar-local igist-list-response nil)
+
 (defvar-local igist-list-loading nil)
 (defvar-local igist-list-page 0)
 (defvar-local igist-list-cancelled nil)
-(defvar igist-normalized-gists nil)
 
+(defvar igist-normalized-gists nil)
 (defvar igist-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") #'igist-save-current-gist-and-exit)
