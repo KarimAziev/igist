@@ -1,6 +1,6 @@
 #+AUTHOR: Karim Aziiev
 #+EMAIL: karim.aziiev@gmail.com
-#+OPTIONS: tags:nil
+#+OPTIONS: ^:nil tags:nil
 
 * About
 The Emacs everywhere goal continues. These are the main features of
@@ -47,7 +47,7 @@ The Emacs everywhere goal continues. These are the main features of
 
 ** Requirements
 
-+ Emacs >= 28.1
++ Emacs >= 27.1
 + ghub
 + transient
 + [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][Github API token]]
