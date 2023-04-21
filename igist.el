@@ -355,6 +355,9 @@ Should accept the same arguments as `message'."
 (defcustom igist-auth-marker 'igist
   "GitHub OAuth token or suffix added to the USERNAME^MARKER in auth sources.
 
+If the value is a string, it will be used as a token.
+If the value is a symbol, lookup token in the `auth-sources'.
+
 For example, if the value of the marker is `igist' (which is the default value),
 you need to add such entry:
 
