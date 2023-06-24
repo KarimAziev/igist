@@ -167,6 +167,113 @@
 (require 'transient)
 (require 'timezone)
 (require 'ghub)
+(defvar-local igist-list-response nil)
+(defvar-local igist-list-loading nil)
+(defvar-local igist-list-page 0)
+(defvar-local igist-list-cancelled nil)
+
+(defcustom igist-indicator-expanded ?v
+  "Indicator for columns sorted in descending order, for GUI frames.
+See `km-tabulated-list-tty-indicator-collapsed' for the indicator used on
+`text-mode' frames."
+  :type 'character
+  :group 'igist
+  :version "27.1")
+
+(defcustom igist-indicator-collapsed ?>
+  "Indicator for columns sorted in ascending order, for GUI frames.
+See `km-tabulated-list-tty-sort-expanded' for the indicator used on
+`text-mode' frames."
+  :type 'character
+  :group 'igist
+  :version "27.1")
+
+(defcustom igist-hierarchy-indicator-expanded ?v
+  "Indicator for columns sorted in descending order, for GUI frames.
+See `igist-tabulated-list-tty-indicator-collapsed' for the indicator used on
+`text-mode' frames."
+  :type 'character
+  :group 'igist-hierarchy
+  :version "27.1")
+
+(defcustom igist-hierarchy-indicator-collapsed ?>
+  "Indicator for columns sorted in ascending order, for GUI frames.
+See `km-tabulated-list-tty-sort-expanded' for the indicator used on
+`text-mode' frames."
+  :type 'character
+  :group 'igist-hierarchy
+  :version "27.1")
+
+(defvar igist-indicator-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") 'igist-hierarchy-tree-expand)
+    (define-key map (kbd "TAB") 'igist-hierarchy-tree-expand)
+    (define-key map (kbd "<backtab>") 'igist-hierarchy-expand-all)
+    map))
+(defvar-local igist-open-ids nil)
+
+(defun igist--pad-right (str limit)
+  "Pad STR with spaces on the right to increase the length to LIMIT."
+  (let ((width (string-width str)))
+    (if (<= width limit)
+        str
+      (truncate-string-to-width str limit nil nil t t))))
+
+(defun igist-render-indicator (length)
+  "Return propertized string for displaying LENGTH indicator."
+  (propertize (format "%d files"
+                      length)
+              'keymap igist-indicator-map))
+
+
+(defun igist-column-at-point ()
+  "Render row ITEM."
+  (get-text-property (point) 'field-name))
+
+
+(defun igist-region-property-boundaries (prop &optional pos)
+  "Return property boundaries for PROP at POS."
+  (unless pos (setq pos (point)))
+  (when-let* ((value (get-text-property pos prop))
+              (end (save-excursion
+                     (text-property-search-forward prop value t)
+                     (point)))
+              (beg (save-excursion
+                     (goto-char end)
+                     (text-property-search-backward prop value t)
+                     (point))))
+    (cons beg end)))
+
+(defun igist-hierarchy-tree-expand ()
+  "Expand node at point."
+  (interactive)
+  (when-let* ((bounds (igist-region-property-boundaries
+                       'tabulated-list-id))
+              (id (get-text-property (car bounds) 'tabulated-list-id))
+              (gist (igist-alist-find-by-prop 'id id igist-list-response))
+              (inhibit-read-only t))
+    (let ((opened
+           (when (car (member id igist-open-ids)) t)))
+      (replace-region-contents (car bounds)
+                               (cdr bounds)
+                               (lambda ()
+                                 (let ((igist-open-ids igist-open-ids))
+                                   (with-temp-buffer
+                                     (setq igist-list-response
+                                           igist-list-response)
+                                     (setq igist-open-ids
+                                           (unless opened
+                                             (list id)))
+                                     (igist-render-row gist)
+                                     (insert "\n")
+                                     (add-text-properties (point-min)
+                                                          (point-max)
+                                                          `(tabulated-list-id
+                                                            ,id))
+                                     (buffer-string)))))
+      (if opened
+          (setq igist-open-ids (delete id igist-open-ids))
+        (setq igist-open-ids (push id igist-open-ids))))))
 
 (eval-when-compile
   (require 'subr-x))
@@ -218,16 +325,9 @@
   "Default renderer for OWNER column."
   (let ((user (igist-alist-get
                'login owner)))
-    (cons
-     user
-     (list
-      'action
-      #'igist-explore-load-other-user-gists
-      'help-echo
-      (format
-       "Load other %s gists"
-       user)))))
-
+    (igist-buttonize (seq-copy user)
+                     #'igist-explore-load-other-user-gists
+                     user (format "Show other gists of %s" user))))
 
 (defcustom igist-explore-format '((id "Id" 10 nil igist-render-id)
                                   (description "Description" 30 t
@@ -269,30 +369,6 @@ the whole gist, and should return string."
           (const :tag "After creating new gist" after-new)
           (const :tag "Never" nil)))
 
-(defvar-local igist-list-response nil)
-
-(defun igist-date-sorter (entry-a entry-b)
-  "Sort predicate for tabulated ENTRY-A and ENTRY-B."
-  (when-let ((val-a
-              (igist-alist-get
-               'updated_at
-               (igist-alist-find-by-prop
-                'id (car
-                     entry-a)
-                igist-list-response)))
-             (val-b
-              (igist-alist-get
-               'updated_at
-               (igist-alist-find-by-prop
-                'id (car
-                     entry-b)
-                igist-list-response))))
-    (time-less-p (igist--get-time
-                  val-a)
-                 (igist--get-time
-                  val-b))))
-
-
 (defcustom igist-list-format '((id "Id" 10 nil igist-render-id)
                                (description "Description" 30 t
                                             igist-render-description)
@@ -301,8 +377,7 @@ the whole gist, and should return string."
                                              (if public
                                                  "public"
                                                "private")))
-                               (updated_at "Updated" 20 igist-date-sorter
-                                           "%D %R")
+                               (updated_at "Updated" 20 t "%D %R")
                                (comments "Comments" 10 t igist-render-comments)
                                (files "Files" 0 t igist-render-files))
   "Alist of gist's props and value formatters.
@@ -328,6 +403,7 @@ the whole gist, and should return string."
             (function :tag "Formatter"))))
   :group 'igist)
 
+
 (defun igist-list-calc-files-length ()
   "Calculate available length for files."
   (seq-reduce (lambda (acc it)
@@ -339,7 +415,7 @@ the whole gist, and should return string."
               (or (when tabulated-list-format
                     (append tabulated-list-format nil))
                   igist-list-format)
-              (or tabulated-list-padding 2)))
+              2))
 
 (defcustom igist-mode-for-comments 'markdown-mode
   "Major mode when editing and viewing comments.
@@ -379,9 +455,6 @@ Should accept the same arguments as `message'."
 
 (defcustom igist-auth-marker 'igist
   "GitHub OAuth token or suffix added to the USERNAME^MARKER in auth sources.
-
-If the value is a string, it will be used as a token.
-If the value is a symbol, lookup token in the `auth-sources'.
 
 For example, if the value of the marker is `igist' (which is the default value),
 you need to add such entry:
@@ -423,11 +496,8 @@ only serves as documentation.")
   "Buffer name for tabulated gists display of multiple owners.")
 
 
-(defvar-local igist-list-loading nil)
-(defvar-local igist-list-page 0)
-(defvar-local igist-list-cancelled nil)
-
 (defvar igist-normalized-gists nil)
+
 (defvar igist-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") #'igist-save-current-gist-and-exit)
@@ -944,6 +1014,7 @@ GIST should be raw GitHub item."
     (cdr (igist-normalize-gist-file gist filename))))
 
 
+;;;###autoload
 (defun igist-copy-gist-url ()
   "Copy URL of gist at point or currently open."
   (interactive)
@@ -952,8 +1023,9 @@ GIST should be raw GitHub item."
                                (or (igist-tabulated-gist-at-point)
                                    igist-current-gist))))
     (kill-new gist-url)
-    (igist-message "Copied %s" gist-url)))
+    (message "Copied %s" gist-url)))
 
+;;;###autoload
 (defun igist-browse-gist ()
   "Browse gist at point or currently open."
   (interactive)
@@ -976,6 +1048,7 @@ GIST should be raw GitHub item."
                                                                parent)))))
           (igist-read-gist-file "Filename: " parent)))))
 
+;;;###autoload
 (defun igist-list-edit-gist-at-point (&optional _entry)
   "Switch to the buffer with the content of a gist entry at the point."
   (interactive)
@@ -983,6 +1056,7 @@ GIST should be raw GitHub item."
     (let ((buff (igist-setup-edit-buffer gist)))
       (switch-to-buffer-other-window buff))))
 
+;;;###autoload
 (defun igist-list-view-current ()
   "Display content of a gist entry at the point without switching to buffer."
   (interactive)
@@ -992,6 +1066,7 @@ GIST should be raw GitHub item."
       (let ((buff (igist-setup-edit-buffer gist)))
         (switch-to-buffer-other-window buff)))))
 
+;;;###autoload
 (defun igist-explore-load-other-user-gists (&rest _)
   "List public gists of owner gist entry at point."
   (interactive)
@@ -1002,6 +1077,7 @@ GIST should be raw GitHub item."
                       user))
       (igist-list-load-gists user))))
 
+;;;###autoload
 (defun igist-list-edit-description (&rest _)
   "Edit description for current gist."
   (interactive)
@@ -1083,63 +1159,473 @@ GIST should be raw GitHub item."
     (list id (apply #'vector data))))
 
 
+
+(defvar igist-hierarchy-indicator-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") #'igist-hierarchy-tree-expand)
+    (define-key map (kbd "TAB") #'igist-hierarchy-tree-expand)
+    (define-key map (kbd "<backtab>") #'igist-hierarchy-expand-all)
+    map))
+
+(defun igist-buttonize (label action &optional action-data help-echo)
+  "Make LABEL into a button and return it.
+When clicked, ACTION will be called with the ACTION-DATA as the
+function argument.  If DATA isn't present (or is nil), the button
+itself will be used instead as the function argument.
+
+If HELP-ECHO, use that as the `help-echo' property.
+
+Also see `buttonize-region'."
+  (let ((label
+         (apply #'propertize label
+                (button--properties action action-data help-echo))))
+    ;; Add the face to the end so that it can be overridden.
+    (add-face-text-property 0 (length label) 'button t label)
+    label))
+
+
+
+(defvar-local igist--hierarchy-timer nil)
+(defvar-local igist-hierarchy-pages nil)
+(defvar-local igist-hierarchy-format
+    '((id "Id" 10 nil igist-render-id)
+      (description "Description" 30 t
+                   igist-render-description)
+      (public "Visibility" 10 t
+              (lambda (public)
+                (if public
+                    "public"
+                  "private")))
+      (owner "User" 10 t igist-render-user)
+      (updated_at "Updated" 20 t "%D %R")
+      (comments "Comments" 10 t
+                igist-render-comments)
+      (files "Files" 10 t
+             :children
+             (lambda (items)
+               (mapcar (lambda (it)
+                         (igist-alist-get 'filename
+                                          (cdr it)))
+                       items)))))
+
+(defun igist-get-column-width (name)
+  "Return width of the column NAME."
+  (when-let ((cell (assq name igist-hierarchy-format)))
+    (seq-find 'numberp cell)))
+
+;;;###autoload
+(defun igist-hierarchy-expand-all ()
+  "Expand all list items."
+  (interactive)
+  (setq igist-open-ids (unless igist-open-ids
+                         (mapcar (apply-partially #'igist-alist-get 'id)
+                                 igist-list-response)))
+  (igist-hierarchy-render-all
+   igist-list-response))
+
+
+(defvar-local igist-hierarchy-timer nil)
+
+(defun igist-next-column ()
+  "Goto the next column."
+  (interactive)
+  (when-let ((next (next-single-property-change (point) 'field-name)))
+    (goto-char next)))
+
+(defun igist-prev-column ()
+  "Goto the previous column."
+  (interactive)
+  (when-let ((prev (previous-single-property-change (point) 'field-name)))
+    (goto-char prev)))
+
+(defvar igist-hierarchy-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") 'igist-list-edit-gist-at-point)
+    (define-key map (kbd "TAB") 'igist-hierarchy-tree-expand)
+    (define-key map (kbd "<backtab>") 'igist-hierarchy-expand-all)
+    (define-key map (kbd "n") 'next-line)
+    (define-key map (kbd "p") 'previous-line)
+    (define-key map (kbd "g") 'igist-list-refresh)
+    (define-key map (kbd "C-c C-n") 'igist-hierarchy-next-entry)
+    (define-key map (kbd "C-c C-p") 'igist-hierarchy-prev-entry)
+    (define-key map (kbd "K") 'igist-list-cancel-load)
+    (define-key map (kbd "C-M-f") 'igist-next-column)
+    (define-key map (kbd "C-M-b") 'igist-prev-column)
+    (define-key map (kbd "{") 'igist-narrow-column)
+    (define-key map (kbd "}") 'igist-widen-column)
+    map))
+
+
+(defun igist-resize-column (step)
+  "Update size of the column at point by STEP."
+  (when-let* ((field (igist-column-at-point))
+              (cell
+               (unless (eq field 'filename)
+                 (assq field (butlast igist-hierarchy-format 1))))
+              (width
+               (seq-find 'numberp cell))
+              (pos (seq-position cell width)))
+    (when (>= (+ step width) 0)
+      (setf (nth pos cell)
+            (+ step width))
+      (let ((inhibit-read-only t))
+        (pcase-let ((pos (point))
+                    (`(,beg . ,end)
+                     (igist-property-boundaries 'tabulated-list-id))
+                    (gist (igist-tabulated-gist-at-point)))
+          (delete-region beg end)
+          (igist-render-row gist)
+          (goto-char (+ step pos)))))))
+
+(defun igist-update-rows ()
+  "Update size of the column at point by STEP."
+  (save-excursion
+    (goto-char (point-min))
+    (while
+        (let ((inhibit-read-only t))
+          (pcase-let ((`(,beg . ,end)
+                       (igist-property-boundaries 'tabulated-list-id))
+                      (gist (igist-tabulated-gist-at-point)))
+            (delete-region beg end)
+            (igist-render-row gist)
+            (text-property-search-forward 'tabulated-list-id))))))
+
+(defvar-local igist-resize-timer nil)
+
+(defun igist-resize-rerender (buffer)
+  "Rerender gists in BUFFER."
+  (with-current-buffer buffer (igist-list-render-all
+                               igist-list-response)))
+
+(defun igist-widen-column ()
+  "Increase size of the column at point."
+  (interactive)
+  (igist-resize-column 1))
+
+(defun igist-narrow-column ()
+  "Increase size of the column at point."
+  (interactive)
+  (igist-resize-column -1))
+
+(require 'text-property-search)
+
+;;;###autoload
+(defun igist-hierarchy-next-entry ()
+  "Jump to next entry."
+  (interactive)
+  (text-property-search-forward 'tabulated-list-id))
+
+;;;###autoload
+(defun igist-hierarchy-prev-entry ()
+  "Jump to previous entry."
+  (interactive)
+  (text-property-search-backward 'tabulated-list-id))
+
+(defun igist-count-rendered-items ()
+  "Return amount of rendered items before point."
+  (let ((count 0))
+    (save-excursion
+      (goto-char (window-start))
+      (forward-line (window-body-height))
+      (while (text-property-search-backward 'tabulated-list-id)
+        (setq count (1+ count))))
+    count))
+
+(defun igist-hierarchy--pad-right (str limit)
+  "Pad STR with spaces on the right to increase the length to LIMIT."
+  (let ((width (string-width str)))
+    (if (<= width limit)
+        str
+      (truncate-string-to-width str limit nil nil t t))))
+(defun igist-hierarchy-render-indicator (open)
+  "Return propertized string for displaying OPEN indicator."
+  (propertize (format "%c "
+                      (if open
+                          igist-hierarchy-indicator-expanded
+                        igist-hierarchy-indicator-collapsed))
+              'keymap igist-hierarchy-indicator-map))
+
+(defun igist-render-row (item)
+  "Render row ITEM."
+  (let* ((inhibit-read-only t)
+         (total 100)
+         (id (igist-alist-get 'id item))
+         (open (member id igist-open-ids))
+         (col-len (length igist-hierarchy-format))
+         (row-beg (point))
+         (children)
+         (sizes)
+         (render-child))
+    (dotimes (idx (length igist-hierarchy-format))
+      (let ((spec (nth idx igist-hierarchy-format))
+            (is-last (= (1+ idx) col-len)))
+        (let ((field-name (car spec))
+              (value (igist-alist-get (car spec) item))
+              (width (if is-last
+                         total
+                       (nth 2 spec)))
+              (format-fn (car (last spec)))
+              (formatted-value)
+              (beg (point))
+              (label)
+              (child))
+          (setq total (- total width))
+          (setq child (memq :children spec))
+          (when child
+            (setq children value)
+            (setq render-child (car (seq-drop (memq :children spec) 1))))
+          (setq formatted-value
+                (cond ((and child)
+                       (concat (igist-render-indicator (length
+                                                        value))))
+                      ((and (stringp format-fn)
+                            (string-match-p "%D %R" format-fn))
+                       (format-time-string
+                        "%D %R"
+                        (igist--get-time
+                         value)))
+                      ((stringp format-fn)
+                       (format format-fn value))
+                      ((functionp format-fn)
+                       (funcall format-fn value))
+                      ((consp format-fn)
+                       format-fn)))
+          (setq label
+                (cond ((and child)
+                       formatted-value)
+                      ((stringp formatted-value)
+                       (igist-hierarchy--pad-right (string-trim
+                                                    formatted-value)
+                                                   width))
+                      ((numberp formatted-value)
+                       (igist-hierarchy--pad-right
+                        (string-trim (format "%s" formatted-value))
+                        formatted-value))
+                      ((stringp (car-safe formatted-value))
+                       (igist-hierarchy--pad-right (car formatted-value)
+                                                   width))
+                      (t "")))
+          (insert label)
+          (push (1+ width) sizes)
+          (unless is-last
+            (let ((space (- (1+ width)
+                            (string-width label))))
+              (insert (make-string (if (> space 0) space 1) ?\s))))
+          (add-text-properties beg (point)
+                               `(field-name ,field-name
+                                            tabulated-list-id
+                                            ,id)))))
+    (setq sizes (reverse sizes))
+    (when (and open children render-child)
+      (setq children
+            (when render-child
+              (funcall render-child children)))
+      (dolist (child children)
+        (newline)
+        (let ((beg (point)))
+          (when-let ((first-col-size (nth 0 sizes)))
+            (insert (make-string first-col-size ?\s) child))
+          (add-text-properties beg
+                               (point)
+                               (list 'tabulated-list-id id
+                                     'filename child
+                                     'field-name 'filename)))))
+    (add-text-properties row-beg (point)
+                         `(tabulated-list-id ,id))))
+
+(defun igist-hierarchy-render-page (buffer &optional page)
+  "Page.
+IN BUFFER
+Optional argument PAGE is ."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (timerp igist--hierarchy-timer)
+        (cancel-timer igist--hierarchy-timer)
+        (setq igist--hierarchy-timer nil))
+      (unless page (setq page 1))
+      (if (not igist-hierarchy-pages)
+          (progn (igist-spinner-stop)
+                 (setq mode-name (format "page[%s]"
+                                         (or page 1))))
+        (igist-spinner-show)
+        (setq mode-name (format "Rendering page[%s/%s]"
+                                (or page 1)
+                                (+ (length igist-hierarchy-pages) page)))
+        (save-excursion
+          (goto-char (point-max))
+          (igist-hierarchy-render-more (pop igist-hierarchy-pages)))
+        (setq igist--hierarchy-timer (run-with-timer 0.5 nil
+                                                 'igist-hierarchy-render-page
+                                                 buffer
+                                                 (1+ page)))))))
+
+(defun igist-hierarchy-render-chunks (items buff)
+  "Append ITEMS to existing in buffer BUFF.
+OPENED-IDS is a list of ids to expand."
+  (let* ((rendered (igist-count-rendered-items))
+         (first-part (if (and (> rendered 0)
+                              (>= (length items) rendered))
+                         (seq-take items rendered))))
+    (when first-part
+      (setq items (seq-drop items rendered)))
+    (let* ((count (round (sqrt (length items))))
+           (subitems (if (> count 1)
+                         (seq-split items count)
+                       (list items))))
+      (with-current-buffer buff
+        (igist-hierarchy-cancel-deffered-rendering)
+        (setq igist-hierarchy-pages subitems)
+        (let ((pos (point)))
+          (delete-region (point-min)
+                         (point-max))
+          (igist-hierarchy-render-more first-part)
+          (goto-char pos)
+          (setq igist-hierarchy-timer
+                (run-with-timer 0 nil #'igist-hierarchy-render-page
+                                (current-buffer))))))))
+
+(defun igist-hierarchy-render-all (items)
+  "Rerender ITEMS.
+OPENED-IDS is a list of ids to expand."
+  (let ((inhibit-read-only t))
+    (igist-hierarchy-cancel-deffered-rendering)
+    (set (make-local-variable 'igist-list-response) items)
+    (igist--tabulated-list-init-header)
+    (delete-region (point-min)
+                   (point-max))
+    (igist-hierarchy-render-more items)))
+
+
+(defun igist--tabulated-list-make-glyphless-char-display-table ()
+  "Make the `glyphless-char-display' table used for `text-mode' frames.
+This table is used for displaying the sorting indicators, see
+variables `tabulated-list-tty-sort-indicator-asc' and
+`tabulated-list-tty-sort-indicator-desc' for more information."
+  (let ((table (make-char-table 'glyphless-char-display nil)))
+    (set-char-table-parent table glyphless-char-display)
+    (aset table
+          igist-hierarchy-indicator-collapsed
+          (cons nil (char-to-string igist-hierarchy-indicator-expanded)))
+    (aset table
+          igist-hierarchy-indicator-expanded
+          (cons nil (char-to-string igist-hierarchy-indicator-collapsed)))
+    table))
+
+(defun igist-hierarchy-render-all-deffered (items)
+  "Rerender ITEMS.
+OPENED-IDS is a list of ids to expand."
+  (let ((inhibit-read-only t)
+        (buff (current-buffer)))
+    (igist-hierarchy-cancel-deffered-rendering)
+    (set (make-local-variable 'igist-list-response) items)
+    (igist--tabulated-list-init-header)
+    (igist-hierarchy-render-chunks items buff)))
+
+(defun igist-hierarchy-render-more (items)
+  "Append ITEMS to existing.
+OPENED-IDS is a list of ids to expand."
+  (let ((at-beg (bobp)))
+    (dolist (row items)
+      (let ((inhibit-read-only t))
+        (if at-beg
+            (setq at-beg nil)
+          (newline))
+        (igist-render-row row)))))
+
+(defun igist--tabulated-list-init-header ()
+  "Set up header line for the Tabulated List buffer."
+  (let* ((x (max 1 0))
+         (button-props `(help-echo "Click to sort by column"
+                                   mouse-face header-line-highlight
+                                   keymap ,tabulated-list-sort-button-map))
+         (len (length igist-hierarchy-format))
+         ;; Pre-compute width for available-space compution.
+         (cols nil))
+    (push (propertize " " 'display
+                      `(space :align-to (+ header-line-indent-width ,x)))
+          cols)
+    (dotimes (n len)
+      (let* ((col (nth n igist-hierarchy-format))
+             (not-last-col (< n (1- len)))
+             (label (seq-find #'stringp col))
+             (lablen (length label))
+             (pname label)
+             (width (seq-find #'integerp col))
+             (pad-right 0)
+             (right-align 0)
+             (next-x (+ x pad-right width))
+             (available-space
+              (and not-last-col
+                   (if right-align
+                       width
+                     (km-tabulated-list--available-space width n)))))
+        (when (and (>= lablen 3)
+                   not-last-col
+                   (> lablen available-space))
+          (setq label (truncate-string-to-width label available-space
+                                                nil nil t)))
+        (push
+         (cond ;; An unsortable column
+          (t (apply #'propertize label
+                    'tabulated-list-column-name pname
+                    button-props)))
+         cols)
+        (when right-align
+          (let ((shift (- width (string-width (car cols)))))
+            (when (> shift 0)
+              (setq cols
+                    (cons (car cols)
+                          (cons
+                           (propertize
+                            (make-string shift ?\s)
+                            'display
+                            `(space :align-to
+                                    (+ header-line-indent-width ,(+ x shift))))
+                           (cdr cols))))
+              (setq x (+ x shift)))))
+        (if (>= pad-right 0)
+            (push (propertize
+                   " "
+                   'display `(space :align-to
+                                    (+ header-line-indent-width ,next-x))
+                   'face 'fixed-pitch)
+                  cols))
+        (setq x next-x)))
+    (setq cols (apply #'concat (nreverse cols)))
+    (setq header-line-format (list "" 'header-line-indent cols))))
+
+;;;###autoload
+(defun igist-hierarchy-cancel-deffered-rendering ()
+  "Cancel deffered rendering."
+  (interactive)
+  (when (timerp igist-hierarchy-timer)
+    (cancel-timer igist-hierarchy-timer))
+  (setq igist-hierarchy-timer nil))
+
 (defun igist-list-render-all (gists)
   "Render list of GISTS."
-  (setq igist-list-render-files-length (igist-list-calc-files-length))
-  (let ((entries
-         (igist-gists-to-tabulated-entries gists))
+  (let ((inhibit-read-only t)
         (pos (point)))
-    (when (not (equal (length tabulated-list-entries) gists))
-      (setq-local mode-name (format "Gists[%d]" (length gists))))
-    (setq tabulated-list-entries entries)
-    (tabulated-list-print nil)
+    (igist-hierarchy-cancel-deffered-rendering)
+    (set (make-local-variable 'igist-list-response) gists)
+    (set (make-local-variable 'igist-open-ids)
+         igist-open-ids)
+    (igist--tabulated-list-init-header)
+    (delete-region (point-min)
+                   (point-max))
+    (igist-hierarchy-render-more gists)
     (when (> (point-max) pos)
       (goto-char pos))))
 
 
 (defun igist-list-render (gists)
   "Render list of GISTS."
+  (setq-local mode-name (format "Gists[%d]" (length gists)))
   (if (not (igist-explore-buffer-p (current-buffer)))
-      (igist-list-render-all gists))
-  (let* ((len (length gists))
-         (rendered-len (length tabulated-list-entries))
-         (diff (- len rendered-len))
-         (entries
-          (mapcar
-           (igist-rpartial igist-tabulated-entry igist-explore-format)
-           (seq-take (reverse gists) diff)))
-         (pos (point)))
-    (when (not (equal (length tabulated-list-entries) gists))
-      (setq-local mode-name (format "Gists[%d]" (length gists))))
-    (setq igist-list-render-files-length (igist-list-calc-files-length))
-    (setq tabulated-list-entries (nconc tabulated-list-entries entries))
-    (tabulated-list-print)
-    (when (> (point-max) pos)
-      (goto-char pos))))
+      (igist-hierarchy-render-all-deffered gists))
+  (igist-hierarchy-render-all-deffered gists))
 
-(defun igist-tabulated-list-format-watcher (_symbol _newval _operation buffer)
-  "Rerender tabulated entries in BUFFER."
-  (with-current-buffer buffer
-    (when (derived-mode-p 'igist-list-mode)
-      (igist-cancel-timers)
-      (setq igist-render-timer
-            (run-with-timer
-             0.5 nil
-             (lambda (buff)
-               (if
-                   (eq buff
-                       (current-buffer))
-                   (progn
-                     (igist-list-render-all
-                      igist-list-response))
-                 (igist-with-exisiting-buffer
-                     buff
-                   (igist-list-render-all
-                    igist-list-response))))
-             (current-buffer))))))
 
-(add-variable-watcher 'tabulated-list-format
-                      'igist-tabulated-list-format-watcher)
 
 (defun igist-ensure-buffer-visible (buffer &optional select)
   "Select BUFFER window. If SELECT is non-nil select window."
@@ -1362,6 +1848,7 @@ If LOADING is non nil show spinner, otherwise hide."
                        (if msg (concat ":\s" msg) "")))
     (igist-message "Igist: request error: %s" value)))
 
+;;;###autoload
 (defun igist-star-gist ()
   "Star currently viewing gist or gist at point."
   (interactive)
@@ -1376,6 +1863,7 @@ If LOADING is non nil show spinner, otherwise hide."
                        (igist-message "Gist starred")))
     (user-error "No gist")))
 
+;;;###autoload
 (defun igist-unstar-gist ()
   "Unstar currently viewing gist or gist at point."
   (interactive)
@@ -1390,6 +1878,7 @@ If LOADING is non nil show spinner, otherwise hide."
                        (igist-message "Gist unstarred")))
     (user-error "No gist")))
 
+;;;###autoload
 (defun igist-fork-gist ()
   "Fork the current gist."
   (interactive)
@@ -1437,29 +1926,29 @@ If LOADING is non nil show spinner, otherwise hide."
                  (lambda (val &rest _ignored)
                    (if (igist-alist-get 'id val)
                        (igist-with-exisiting-buffer
-                        buffer
-                        (let ((new-gist
-                               (igist-normalize-gist-file val
-                                                          new-filename)))
-                          (unless (equal orig-filename new-filename)
-                            (rename-buffer
-                             (concat id "-" new-filename))
-                            (setq buffer-file-name (concat
-                                                    (temporary-file-directory)
-                                                    (buffer-name)))
-                            (set-auto-mode)
-                            (font-lock-ensure)
-                            (igist-edit-mode))
-                          (igist-setup-local-vars new-gist new-filename)
-                          (set-buffer-modified-p nil)
-                          (igist-load-logged-user-gists)
-                          (when (memq igist-enable-copy-gist-url-p
-                                      '(t after-update))
-                            (when-let ((url (igist-get-current-gist-url)))
-                              (kill-new url)
-                              (igist-message "Copied %s" url)))
-                          (when callback
-                            (funcall callback))))
+                           buffer
+                         (let ((new-gist
+                                (igist-normalize-gist-file val
+                                                           new-filename)))
+                           (unless (equal orig-filename new-filename)
+                             (rename-buffer
+                              (concat id "-" new-filename))
+                             (setq buffer-file-name (concat
+                                                     (temporary-file-directory)
+                                                     (buffer-name)))
+                             (set-auto-mode)
+                             (font-lock-ensure)
+                             (igist-edit-mode))
+                           (igist-setup-local-vars new-gist new-filename)
+                           (set-buffer-modified-p nil)
+                           (igist-load-logged-user-gists)
+                           (when (memq igist-enable-copy-gist-url-p
+                                       '(t after-update))
+                             (when-let ((url (igist-get-current-gist-url)))
+                               (kill-new url)
+                               (message "Copied %s" url)))
+                           (when callback
+                             (funcall callback))))
                      (igist-message "Couldn't save gist."))))))
 
 (defun igist-save-new-gist (buffer &optional callback)
@@ -1707,26 +2196,26 @@ MAX is length of most longest key."
   (string-trim (buffer-substring (line-beginning-position)
                                  (line-end-position))))
 
-(define-derived-mode igist-list-mode tabulated-list-mode "Gists"
+(define-derived-mode igist-list-mode special-mode "Gists"
   "Major mode for browsing gists.
 \\<igist-list-mode-map>
 \\{igist-list-mode-map}"
-  (setq tabulated-list-format
-        (apply #'vector
-               (mapcar
-                (igist-compose (igist-rpartial seq-take 3)
-                               (igist-rpartial seq-drop 1))
-                (if (igist-explore-buffer-p (current-buffer))
-                    igist-explore-format
-                  igist-list-format)))
-        tabulated-list-padding 2
-        tabulated-list-sort-key nil)
-  (tabulated-list-init-header)
+  (setq-local truncate-lines t)
+  (setq-local buffer-undo-list t)
+  (setq-local revert-buffer-function #'igist-list-refresh)
+  (setq-local text-scale-remap-header-line t)
+  (setq-local glyphless-char-display
+              (igist--tabulated-list-make-glyphless-char-display-table))
+  (setq bidi-paragraph-direction 'left-to-right)
+  (use-local-map igist-list-mode-map)
+  (header-line-indent-mode)
+  (use-local-map igist-hierarchy-map)
   (setq-local imenu-prev-index-position-function
               #'igist-imenu-prev-index-position)
   (setq-local imenu-extract-index-name-function
               #'igist-imenu-extract-index-name)
-  (use-local-map igist-list-mode-map))
+  ;; (use-local-map igist-list-mode-map)
+  )
 
 (defun igist-pandoc-from-string (string input-type output-type &rest options)
   "Execute `pandoc' on STRING in INPUT-TYPE to OUTPUT-TYPE additional OPTIONS."
@@ -1809,6 +2298,7 @@ GIST-ID is used to create comments buffer."
         (setq igist-comment-gist-id gist-id)
         (pop-to-buffer (current-buffer))))))
 
+;;;###autoload
 (defun igist-load-comments (&rest _)
   "Load comments for gist at point or edit buffer."
   (interactive)
@@ -1837,10 +2327,23 @@ GIST-ID is used to create comments buffer."
   "Return property boundaries for PROP at POS."
   (unless pos (setq pos (point)))
   (goto-char pos)
-  (when (get-text-property (point) prop)
-    (let ((beg (previous-single-char-property-change (point) prop))
-          (end (next-single-char-property-change (point) prop)))
-      (cons beg end))))
+  (let ((value (get-text-property pos prop))
+        (left
+         (when (> pos (point-min))
+           (get-text-property (1- pos) prop)))
+        (right
+         (when (< pos (point-max))
+           (get-text-property (1+ pos) prop))))
+    (when value
+      (let ((beg (if (equal left value)
+                     (previous-single-char-property-change
+                      pos
+                      prop)
+                   pos))
+            (end (if (equal right value)
+                     (next-single-char-property-change pos prop)
+                   pos)))
+        (cons beg end)))))
 
 (defun igist-get-comment-bounds (&optional with-heading)
   "Return substring with comment at point.
@@ -1871,6 +2374,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                (apply fn args))
       (delete-overlay overlay))))
 
+;;;###autoload
 (defun igist-add-comment ()
   "Add a new comment for the current gist."
   (interactive)
@@ -1888,6 +2392,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
    (get-text-property (point) 'igist-comment-gist-id)
    (igist-alist-get 'id igist-current-gist)))
 
+;;;###autoload
 (defun igist-add-or-edit-comment (&rest _)
   "Add or edit comment for gist at point or edit buffer."
   (interactive)
@@ -1905,6 +2410,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
       (pop-to-buffer-same-window (igist-setup-comment-buffer
                                   gist-id)))))
 
+;;;###autoload
 (defun igist-delete-comment-at-point (&rest _)
   "Add or edit a comment for gist at point or edit buffer."
   (interactive)
@@ -1933,6 +2439,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                                   (igist-load-logged-user-gists))))
     (user-error "Not in gist comment")))
 
+;;;###autoload
 (defun igist-post-comment ()
   "Save the currently edited or created comment."
   (interactive)
@@ -1964,6 +2471,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                   :callback callback-fn
                   :payload `((body . ,content))))))
 
+;;;###autoload
 (defun igist-list-add-file ()
   "Add a new file name to current gist at the point."
   (interactive)
@@ -1984,6 +2492,7 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
                           gist)))))
       (switch-to-buffer-other-window buff))))
 
+;;;###autoload
 (defun igist-kill-all-gists-buffers ()
   "Delete all gists buffers."
   (interactive)
@@ -2008,12 +2517,14 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
      estimed-gists-count
      100)))
 
+;;;###autoload
 (defun igist-list-cancel-load ()
   "Cancel loading for current gists."
   (interactive)
   (setq igist-list-cancelled t)
   (igist-spinner-stop))
 
+;;;###autoload
 (defun igist-list-refresh ()
   "Refresh gists in the current `igist-list-mode' buffer."
   (interactive)
@@ -2156,6 +2667,7 @@ If BACKGROUND is nil, don't show user's buffer."
         (unless background
           (igist-ensure-buffer-visible buffer))))))
 
+;;;###autoload
 (defun igist-delete-other-gist-or-file (gist)
   "Delete GIST with id."
   (interactive
@@ -2184,6 +2696,7 @@ If BACKGROUND is nil, don't show user's buffer."
        (igist-request-delete id)))))
 
 
+;;;###autoload
 (defun igist-delete-current-filename ()
   "Delete the current file from the gist."
   (interactive)
@@ -2214,6 +2727,7 @@ If BACKGROUND is nil, don't show user's buffer."
     (igist-request-delete-filename confirmed-gist)))
 
 
+;;;###autoload
 (defun igist-delete-current-gist ()
   "Delete the current gist with all files."
   (interactive)
@@ -2236,12 +2750,14 @@ If BACKGROUND is nil, don't show user's buffer."
              (igist-request-delete id))))))
 
 
+;;;###autoload
 (defun igist-toggle-public (&rest _)
   "Toggle value of variable `igist-current-public'."
   (interactive)
   (setq igist-current-public (not igist-current-public)))
 
 
+;;;###autoload
 (defun igist-add-file-to-gist ()
   "Add a new file to the existing gist."
   (interactive)
@@ -2273,6 +2789,7 @@ If BACKGROUND is nil, don't show user's buffer."
            (pop-to-buffer
             (igist-setup-edit-buffer data))))))
 
+;;;###autoload
 (defun igist-read-description (&rest _args)
   "Update description for current gist without saving."
   (interactive)
@@ -2288,6 +2805,7 @@ If BACKGROUND is nil, don't show user's buffer."
                                              igist-current-gist)))))
       (setq igist-current-description descr))))
 
+;;;###autoload
 (defun igist-read-filename (&rest _args)
   "Update the filename for the current gist without saving."
   (interactive)
@@ -2324,6 +2842,7 @@ With CALLBACK call it without args after success request."
       (igist-save-existing-gist buffer callback))))
 
 
+;;;###autoload
 (defun igist-save-current-gist ()
   "Post the current gist and stay in the buffer."
   (interactive)
@@ -2332,6 +2851,7 @@ With CALLBACK call it without args after success request."
                             (igist-message "Gist saved"))))
 
 
+;;;###autoload
 (defun igist-save-current-gist-and-exit ()
   "Post current gist and exit."
   (interactive)
@@ -2340,6 +2860,7 @@ With CALLBACK call it without args after success request."
                             (kill-buffer (buffer-name))
                             (igist-message "Gist saved"))))
 
+;;;###autoload
 (defun igist-completing-read-gists (&optional prompt action initial-input)
   "Read gist in minibuffer with PROMPT and INITIAL-INPUT.
 If ACTION is non nil, call it with gist."
