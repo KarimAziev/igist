@@ -2593,6 +2593,124 @@ With CALLBACK call it without args after success request."
                             (kill-buffer (buffer-name))
                             (igist-message "Gist saved"))))
 
+(defun igist-ivy-read-gists (url)
+  "Asynchronously read gists at URL.
+Argument URL is the api url of the gists to retrieve."
+  (when (and (fboundp 'ivy-update-candidates)
+             (fboundp 'ivy--reset-state)
+             (fboundp 'ivy--exhibit)
+             (boundp 'ivy-text)
+             (boundp 'ivy-last)
+             (boundp 'ivy--all-candidates)
+             (boundp 'cl-struct-ivy-state-tags)
+             (boundp 'ivy--index)
+             (fboundp 'ivy-read)
+             (fboundp 'ivy-recompute-index-swiper-async)
+             (fboundp 'ivy-configure))
+    (let ((caller this-command))
+      (ivy-configure caller
+        :index-fn #'ivy-recompute-index-swiper-async)
+      (let* ((gists-alist)
+             (gists-keys)
+             (buff (current-buffer))
+             (output-buffer
+              (ghub-get url nil
+                        :query `((per_page . 30))
+                        :auth (if igist-current-user-name
+                                  igist-auth-marker
+                                'none)
+                        :callback
+                        (lambda (value _headers _status req)
+                          (when (and (active-minibuffer-window)
+                                     (buffer-live-p buff))
+                            (with-current-buffer buff
+                              (setq gists-alist
+                                    (igist-normalize-gists value))
+                              (setq gists-keys
+                                    (mapcar #'car gists-alist)))
+                            (ivy-update-candidates
+                             gists-keys)
+                            (let ((input ivy-text)
+                                  (pos
+                                   (when-let ((wind
+                                               (active-minibuffer-window)))
+                                     (with-selected-window
+                                         wind
+                                       (point)))))
+                              (when (active-minibuffer-window)
+                                (with-selected-window (active-minibuffer-window)
+                                  (delete-minibuffer-contents)))
+                              (progn
+                                (or
+                                 (progn
+                                   (and
+                                    (memq
+                                     (type-of ivy-last)
+                                     cl-struct-ivy-state-tags)
+                                    t))
+                                 (signal 'wrong-type-argument
+                                         (list 'ivy-state ivy-last)))
+                                (let* ((v ivy-last))
+                                  (aset v 2 ivy--all-candidates)))
+                              (when (fboundp 'ivy-state-preselect)
+                                (progn
+                                  (or
+                                   (progn
+                                     (and
+                                      (memq
+                                       (type-of ivy-last)
+                                       cl-struct-ivy-state-tags)
+                                      t))
+                                   (signal 'wrong-type-argument
+                                           (list 'ivy-state ivy-last)))
+                                  (let* ((v ivy-last))
+                                    (aset v 7 ivy--index))))
+                              (ivy--reset-state
+                               ivy-last)
+                              (when-let ((wind
+                                          (active-minibuffer-window)))
+                                (with-selected-window
+                                    wind
+                                  (insert input)
+                                  (goto-char
+                                   (when pos
+                                     (if (> pos
+                                            (point-max))
+                                         (point-max)
+                                       pos)))
+                                  (ivy--exhibit)))
+                              (ghub-continue req)))))))
+        (unwind-protect
+            (ivy-read "Gist" gists-keys
+                      :action (lambda (gist)
+                                (with-current-buffer buff
+                                  (igist-edit-buffer
+                                   (cdr (assoc gist gists-alist)))))
+                      :caller caller)
+          (when (buffer-live-p output-buffer)
+            (let ((message-log-max nil))
+              (with-temp-message (or (current-message) "")
+                (kill-buffer output-buffer)))))))))
+
+(defun igist-ivy-read-user-gists (user)
+  "Read and display gists for a specific USER.
+Argument USER is the username of the user whose gists will be displayed."
+  (interactive (read-string "User: "))
+  (igist-ivy-read-gists (concat "/users/" user "/gists")))
+
+(defun igist-ivy-read-user-logged-gists ()
+  "Read and display gists for a specific USER.
+Argument USER is the username of the user whose gists will be displayed."
+  (interactive)
+  (while (not igist-current-user-name)
+    (setq igist-current-user-name (igist-change-user)))
+  (igist-ivy-read-gists (concat "/users/" igist-current-user-name "/gists")))
+
+(defun igist-ivy-read-public-gists ()
+  "Use Ivy to read and display public gists."
+  (interactive)
+  (igist-ivy-read-gists "/gists/public"))
+
 (defun igist-completing-read-gists (&optional prompt action initial-input)
   "Read gist in minibuffer with PROMPT and INITIAL-INPUT.
 If ACTION is non nil, call it with gist."
