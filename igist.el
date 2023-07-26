@@ -330,16 +330,21 @@ the whole gist, and should return string."
 
 (defun igist-list-calc-files-length ()
   "Calculate available length for files."
-  (seq-reduce (lambda (acc it)
-                (if-let ((width (seq-find #'numberp it)))
-                    (+ acc (if (> width 0)
-                               (1+ width)
-                             width))
-                  acc))
-              (or (when tabulated-list-format
-                    (append tabulated-list-format nil))
-                  igist-list-format)
-              (or tabulated-list-padding 2)))
+  (let ((l
+         (or
+          (when tabulated-list-format
+            (append tabulated-list-format nil))
+          (if (igist-explore-buffer-p (current-buffer))
+              igist-explore-format
+            igist-list-format))))
+    (seq-reduce (lambda (acc it)
+                  (if-let ((width (seq-find #'numberp it)))
+                      (+ acc (if (> width 0)
+                                 (1+ width)
+                               width))
+                    acc))
+                l
+                (or tabulated-list-padding 2))))
 
 (defcustom igist-mode-for-comments 'markdown-mode
   "Major mode when editing and viewing comments.
@@ -464,6 +469,9 @@ only serves as documentation.")
     (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
     (define-key map (kbd "C-j") #'igist-list-view-current)
     (define-key map (kbd "v") #'igist-list-view-current)
+    (define-key map (kbd "s") #'igist-tabulated-list-sort)
+    (define-key map (kbd "}") #'igist-tabulated-list-widen-current-column)
+    (define-key map (kbd "{") #'igist-tabulated-list-narrow-current-column)
     (define-key map (kbd "K") #'igist-list-cancel-load)
     map)
   "Keymap used in tabulated gists views.")
@@ -1067,14 +1075,148 @@ GIST should be raw GitHub item."
          (funcall format-val value))))
    format-spec))
 
-(defun igist-gists-to-tabulated-entries (gists)
+(defvar-local igist-tabulated-format-fn nil)
+(defvar tabulated-list--near-rows)
+(defun igist-nth (n list-or-vector)
+  "Return the N element from list or vector LIST-OR-VECTOR."
+  (when (> (length list-or-vector) n)
+    (pcase list-or-vector
+      ((pred vectorp)
+       (aref list-or-vector n))
+      ((pred proper-list-p)
+       (nth n list-or-vector)))))
+
+(defun igist-list--get-sorter ()
+  "Return a sorting predicate for the current tabulated-list.
+Return nil if `tabulated-list-sort-key' specifies an unsortable
+column.  Negate the predicate that would be returned if
+`tabulated-list-sort-key' has a non-nil cdr."
+  (when (and tabulated-list-sort-key
+             (car tabulated-list-sort-key))
+    (let* ((sort-column (car tabulated-list-sort-key))
+           (n (tabulated-list--column-number sort-column))
+           (sorter (nth 2 (aref tabulated-list-format n))))
+      (when (eq sorter t)        ; Default sorter checks column N:
+        (setq sorter (lambda (A B)
+                       (setq A (funcall igist-tabulated-format-fn A))
+                       (setq B (funcall igist-tabulated-format-fn B))
+                       (let ((a (aref (cadr A) n))
+                             (b (aref (cadr B) n)))
+                         (string< (if (stringp a) a (car a))
+                                  (if (stringp b) b (car b)))))))
+                                  ;; Reversed order.
+      (if (cdr tabulated-list-sort-key)
+          (lambda (a b)
+            (funcall sorter b a))
+        sorter))))
+
+(defun igist-tabulated-list-print (&optional remember-pos update)
+  "Populate the current Tabulated List mode buffer.
+This sorts the `tabulated-list-entries' list if sorting is
+specified by `tabulated-list-sort-key'.  It then erases the
+buffer and inserts the entries with `tabulated-list-printer'.
+
+Optional argument REMEMBER-POS, if non-nil, means to move point
+to the entry with the same ID element as the current line.
+
+Non-nil UPDATE argument means to use an alternative printing
+method which is faster if most entries haven't changed since the
+last print.  The only difference in outcome is that tags will not
+be removed from entries that haven't changed (see
+`tabulated-list-put-tag').  Don't use this immediately after
+changing `tabulated-list-sort-key'."
+  (setq igist-list-render-files-length (igist-list-calc-files-length))
+  (let ((inhibit-read-only t)
+        (entries (if (functionp tabulated-list-entries)
+                     (funcall tabulated-list-entries)
+                   tabulated-list-entries))
+        (sorter (igist-list--get-sorter))
+        entry-id saved-pt saved-col)
+    (and remember-pos
+         (setq entry-id (tabulated-list-get-id))
+         (setq saved-col (current-column)))
+         ;; Sort the entries, if necessary.
+    (when sorter
+      (setq entries (sort entries sorter)))
+    (unless (functionp tabulated-list-entries)
+      (setq tabulated-list-entries entries))
+      ;; Without a sorter, we have no way to just update.
+    (when (and update (not sorter))
+      (setq update nil))
+    (if update
+        (goto-char (point-min))
+      (erase-buffer)
+      (unless tabulated-list-use-header-line
+        (tabulated-list-print-fake-header)))
+    (unless igist-tabulated-format-fn
+      (setq igist-tabulated-format-fn
+            (igist-gists-get-tabulated-entry-formatter)))
+    (while entries
+      (let* ((elt (funcall igist-tabulated-format-fn (car entries)))
+             (tabulated-list--near-rows
+              (list
+               (or (tabulated-list-get-entry (pos-bol 0))
+                   (cadr elt))
+               (cadr elt)
+               (or (cadr (cadr entries))
+                   (cadr elt))))
+             (id (car elt)))
+        (and entry-id
+             (equal entry-id id)
+             (setq entry-id nil
+                   saved-pt (point)))
+                   ;; If the buffer is empty, simply print each elt.
+        (if (or (not update)
+                (eobp))
+            (apply tabulated-list-printer elt)
+          (while
+              (let ((local-id (tabulated-list-get-id)))
+              ;; If we find id, then nothing to update.
+                (cond ((equal id local-id)
+                       (forward-line 1)
+                       nil)
+                       ;; If this entry sorts after id (or it's the
+                       ;; end), then just insert id and move on.
+                      ((or (not local-id)
+                           (funcall sorter elt
+                           ;; FIXME: Might be faster if
+                           ;; don't construct this list.
+                                    (list local-id (tabulated-list-get-entry))))
+                       (apply tabulated-list-printer elt)
+                       nil)
+                       ;; We find an entry that sorts before id,
+                       ;; it needs to be deleted.
+                      (t t)))
+            (let ((old (point)))
+              (forward-line 1)
+              (delete-region old (point))))))
+      (setq entries (cdr entries)))
+    (when update
+      (delete-region (point)
+                     (point-max)))
+    (set-buffer-modified-p nil)
+    ;; If REMEMBER-POS was specified, move to the "old" location.
+    (if saved-pt
+        (progn (goto-char saved-pt)
+               (move-to-column saved-col))
+      (goto-char (point-min)))))
+
+(defun igist-tabulated-format-user-gist (gist)
+  "Format user gists for tabulated list display.
+Argument GIST is the user's gists."
+  (igist-tabulated-entry gist igist-list-format))
+
+(defun igist-tabulated-format-public-gist (gist)
+  "Format a public GIST for display in a tabulated list.
+Argument GIST is the gist to be formatted."
+  (igist-tabulated-entry gist
+                         igist-explore-format))
+
+(defun igist-gists-get-tabulated-entry-formatter ()
   "Render list of GISTS to tabulated  entries."
-  (let ((formatter (if (igist-explore-buffer-p (current-buffer))
-                       igist-explore-format
-                     igist-list-format)))
-    (mapcar
-     (igist-rpartial igist-tabulated-entry formatter)
-     gists)))
+  (if (igist-explore-buffer-p (current-buffer))
+      #'igist-tabulated-format-public-gist
+    #'igist-tabulated-format-user-gist))
 
 (defun igist-tabulated-entry (gist formatter)
   "Return a list with id and GIST props as vector according to FORMATTER."
@@ -1083,16 +1225,112 @@ GIST should be raw GitHub item."
     (list id (apply #'vector data))))
 
 
+(defun igist-tabulated-list-sort (&optional n)
+  "Sort Tabulated List entries by the column at point.
+With a numeric prefix argument N, sort the Nth column.
+
+If the numeric prefix is -1, restore order the list was
+originally displayed in."
+  (interactive "P")
+  (when (and n
+             (or (>= n (length tabulated-list-format))
+                 (< n -1)))
+    (user-error "Invalid column number"))
+  (if (equal n -1)
+      ;; Restore original order.
+      (progn
+        (unless tabulated-list--original-order
+          (error "Order is already in original order"))
+        (setq tabulated-list-entries
+              (sort tabulated-list-entries
+                    (lambda (e1 e2)
+                      (< (gethash e1 tabulated-list--original-order)
+                         (gethash e2 tabulated-list--original-order)))))
+        (setq tabulated-list-sort-key nil)
+        (tabulated-list-init-header)
+        (igist-tabulated-list-print t))
+    ;; Sort based on a column name.
+    (let ((name (if n
+        (car (aref tabulated-list-format n))
+      (get-text-property (point)
+             'tabulated-list-column-name))))
+      (if (nth 2 (assoc name (append tabulated-list-format nil)))
+          (igist-tabulated-list--sort-by-column-name name)
+        (user-error "Cannot sort by %s" name)))))
+
+
+(defun igist-tabulated-list--sort-by-column-name (name)
+  "Sort the tabulated list by the specified column NAME.
+Argument NAME is the name of the column to sort by."
+  (when (and name (derived-mode-p 'tabulated-list-mode))
+    (unless tabulated-list--original-order
+    ;; Store the original order so that we can restore it later.
+      (setq tabulated-list--original-order (make-hash-table))
+      (cl-loop for elem in tabulated-list-entries
+               for i from 0
+               do (setf (gethash elem tabulated-list--original-order) i)))
+               ;; Flip the sort order on a second click.
+    (if (equal name (car tabulated-list-sort-key))
+        (setcdr tabulated-list-sort-key
+                (not (cdr tabulated-list-sort-key)))
+      (setq tabulated-list-sort-key (cons name nil)))
+    (tabulated-list-init-header)
+    (igist-tabulated-list-print t)))
+
+(defun igist-tabulated-list-widen-current-column (&optional n)
+  "Widen the current tabulated-list column by N chars.
+Interactively, N is the prefix numeric argument, and defaults to
+1."
+  (interactive "p")
+  (let ((start (current-column))
+        (entry (tabulated-list-get-entry))
+        (nb-cols (length tabulated-list-format))
+        (col-nb 0)
+        (total-width 0)
+        (found nil)
+        col-width)
+    (while (and (not found)
+                (< col-nb nb-cols))
+      (if (>= start
+              (setq total-width
+                    (+ total-width
+                       (max (setq col-width
+                                  (cadr (aref tabulated-list-format
+                                              col-nb)))
+                            (let ((desc (aref entry col-nb)))
+                              (string-width (if (stringp desc)
+                                                desc
+                                              (car desc)))))
+                       (or (plist-get (nthcdr 3 (aref tabulated-list-format
+                                                      col-nb))
+                                      :pad-right)
+                           1))))
+          (setq col-nb (1+ col-nb))
+        (setq found t)
+        (setq tabulated-list-format (copy-tree tabulated-list-format t))
+        (setf (cadr (aref tabulated-list-format col-nb))
+              (max 1 (+ col-width n)))))
+    (if (and (> (length tabulated-list-entries) 400)
+             (memq last-command '(igist-tabulated-list-widen-current-column
+                                  igist-tabulated-list-narrow-current-column)))
+        (igist-tabulated-list-schedule-revert)
+      (igist-debounce-revert))))
+
+(defun igist-tabulated-list-narrow-current-column (&optional n)
+  "Narrow the current tabulated list column by N chars.
+Interactively, N is the prefix numeric argument, and defaults to
+1."
+  (interactive "p")
+  (igist-tabulated-list-widen-current-column (- n)))
+
+
 (defun igist-list-render-all (gists)
   "Render list of GISTS."
-  (setq igist-list-render-files-length (igist-list-calc-files-length))
-  (let ((entries
-         (igist-gists-to-tabulated-entries gists))
-        (pos (point)))
+  (let ((pos (point)))
     (when (not (equal (length tabulated-list-entries) gists))
       (setq-local mode-name (format "Gists[%d]" (length gists))))
-    (setq tabulated-list-entries entries)
-    (tabulated-list-print nil)
+    (setq tabulated-list-entries gists)
+    (igist-tabulated-list-print nil)
     (when (> (point-max) pos)
       (goto-char pos))))
 
@@ -1105,41 +1343,46 @@ GIST should be raw GitHub item."
          (rendered-len (length tabulated-list-entries))
          (diff (- len rendered-len))
          (entries
-          (mapcar
-           (igist-rpartial igist-tabulated-entry igist-explore-format)
-           (seq-take (reverse gists) diff)))
+          (seq-take (reverse gists) diff))
          (pos (point)))
     (when (not (equal (length tabulated-list-entries) gists))
       (setq-local mode-name (format "Gists[%d]" (length gists))))
-    (setq igist-list-render-files-length (igist-list-calc-files-length))
     (setq tabulated-list-entries (nconc tabulated-list-entries entries))
-    (tabulated-list-print)
+    (igist-tabulated-list-print)
     (when (> (point-max) pos)
       (goto-char pos))))
 
-(defun igist-tabulated-list-format-watcher (_symbol _newval _operation buffer)
-  "Rerender tabulated entries in BUFFER."
-  (with-current-buffer buffer
-    (when (derived-mode-p 'igist-list-mode)
-      (igist-cancel-timers)
-      (setq igist-render-timer
-            (run-with-timer
-             0.5 nil
-             (lambda (buff)
-               (if
-                   (eq buff
-                       (current-buffer))
-                   (progn
-                     (igist-list-render-all
-                      igist-list-response))
-                 (igist-with-exisiting-buffer
-                     buff
-                   (igist-list-render-all
-                    igist-list-response))))
-             (current-buffer))))))
+(defun igist--run-in-buffer (buffer fn &rest args)
+  "Apply FN with ARGS in BUFFER if it is live."
+  (when (and buffer (buffer-live-p buffer))
+    (with-current-buffer buffer
+      (apply fn args))))
 
-(add-variable-watcher 'tabulated-list-format
-                      'igist-tabulated-list-format-watcher)
+(defun igist-debounce (timer-sym delay fn &rest args)
+  "Debounce execution FN with ARGS for DELAY.
+TIMER-SYM is a symbol to use as a timer."
+  (when-let ((timer-value (symbol-value timer-sym)))
+    (when (timerp timer-value)
+      (cancel-timer timer-value))
+    (set timer-sym nil))
+  (set timer-sym (apply #'run-with-timer delay
+                        nil
+                        #'igist--run-in-buffer
+                        (current-buffer)
+                        fn
+                        args)))
+
+(defun igist-debounce-revert ()
+  "Update tabulated entries in the current buffer and reschedule update timer."
+  (igist-tabulated-list-print t)
+  (tabulated-list-init-header))
+
+(defvar igist-revert-timer nil)
+(defun igist-tabulated-list-schedule-revert ()
+  "Schedule updating tabulated entries in the current buffer."
+  (igist-debounce 'igist-revert-timer 0.2
+                  #'igist-debounce-revert))
+
 
 (defun igist-ensure-buffer-visible (buffer &optional select)
   "Select BUFFER window. If SELECT is non-nil select window."
@@ -1707,10 +1950,20 @@ MAX is length of most longest key."
   (string-trim (buffer-substring (line-beginning-position)
                                  (line-end-position))))
 
+(defun igist-tabulated-list-revert (&rest _ignored)
+  "The `revert-buffer-function' for `tabulated-list-mode'.
+It runs `tabulated-list-revert-hook', then calls `igist-tabulated-list-print'."
+  (interactive)
+  (unless (derived-mode-p 'igist-list-mode)
+    (error "The current buffer is not in Igist-list-mode"))
+  (run-hooks 'tabulated-list-revert-hook)
+  (igist-tabulated-list-print t))
+
 (define-derived-mode igist-list-mode tabulated-list-mode "Gists"
   "Major mode for browsing gists.
 \\<igist-list-mode-map>
 \\{igist-list-mode-map}"
+  (setq igist-tabulated-format-fn (igist-gists-get-tabulated-entry-formatter))
   (setq tabulated-list-format
         (apply #'vector
                (mapcar
