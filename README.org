@@ -10,10 +10,30 @@ The Emacs everywhere goal continues. These are the main features of
 
 [[./igist-demo.gif]]
 
+** Features
+*** Gists
+- [X] create
+- [X] edit
+- [X] delete
+- [X] star
+- [X] unstar
+- [X] fork
+- [X] list
+- [X] explore public gists
+*** Comments
+- [X] add
+- [X] list
+- [X] delete
+- [X] edit
+
+
 
 * igist                                                            :TOC_3_gh:QUOTE:
 #+BEGIN_QUOTE
 - [[#about][About]]
+  - [[#features][Features]]
+    - [[#gists][Gists]]
+    - [[#comments][Comments]]
   - [[#requirements][Requirements]]
   - [[#installation][Installation]]
     - [[#melpa][MELPA]]
@@ -59,7 +79,7 @@ To fetch the list of packages you can do
 <M-x> package-refresh-contents
 #+end_example
 
-And after that **lua-mode** can be installed with
+And after that ~igist~ can be installed with
 
 #+begin_example
 <M-x> package-install "igist"
@@ -94,7 +114,7 @@ Or if you use ~straight.el~:
 #+begin_export html
 
 <details>
-  <summary>Example configuration with default keybindings</summary>
+  <summary>Example configuration with keymaps</summary>
 
 ```elisp
 (use-package igist
