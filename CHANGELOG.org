@@ -1,5 +1,11 @@
 #+TITLE: Changelog
 
+* v1.2.0    2023-08-06
+- Speed up the listing of gists by using our own rendering engine.
+- Allow for expanding and collapsing of gist files.
+- Allow for more customization settings for rendering, sorting, and formatting.
+- Add commands to read gists using Ivy.
+
 * v1.1.0 2023-04-21
 - Allow sorting gists by modification date.
 - Add variable watcher for ~tabulated-list-format~ to rerender gists, so ~tabulated-list-narrow-current-column~ and ~tabulated-list-widen-current-column~ correctly recalculate indent for files column.
