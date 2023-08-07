@@ -74,29 +74,29 @@ To get started, enable installing packages from MELPA:
 
 #+end_src
 
-To fetch the list of packages you can do
+To fetch the list of packages you can do:
 #+begin_example
 <M-x> package-refresh-contents
 #+end_example
 
-And after that ~igist~ can be installed with
+And after that ~igist~ can be installed with:
 
 #+begin_example
-<M-x> package-install "igist"
+<M-x> package-install igist
 #+end_example
 
 *** Manually
 
 Download the repository and it to your load path in your init file:
 
-#+begin_src elisp :eval no
+#+begin_src emacs-lisp :eval no
 (add-to-list 'load-path "/path/to/igist")
 (require 'igist)
 #+end_src
 
 *** With ~use-package~
 
-#+begin_src elisp :eval no
+#+begin_src emacs-lisp :eval no
 (use-package igist
   :bind (("M-o" . igist-dispatch)))
 #+end_src
@@ -104,7 +104,7 @@ Download the repository and it to your load path in your init file:
 Or if you use ~straight.el~:
 #+begin_src emacs-lisp
 (use-package igist
-:bind (("M-o" . igist-dispatch))
+  :bind (("M-o" . igist-dispatch))
   :straight (igist
              :repo "KarimAziev/igist"
              :type git
@@ -125,7 +125,6 @@ Or if you use ~straight.el~:
                ("+" . igist-list-add-file)
                ("-" . igist-delete-current-filename)
                ("D" . igist-delete-current-gist)
-               ("K" . igist-list-cancel-load)
                ("S" . igist-star-gist)
                ("U" . igist-unstar-gist)
                ("a" . igist-add-comment)
@@ -134,8 +133,15 @@ Or if you use ~straight.el~:
                ("f" . igist-fork-gist)
                ("g" . igist-list-refresh)
                ("r" . igist-browse-gist)
+               ("s" . igist-tabulated-list-sort)
                ("v" . igist-list-view-current)
-               ("w" . igist-copy-gist-url))
+               ("w" . igist-copy-gist-url)
+               ("K" . igist-list-cancel-load)
+               ("{" . igist-tabulated-list-narrow-current-column)
+               ("}" . igist-tabulated-list-widen-current-column)
+               ("<tab>" . igist-toggle-row-children-at-point)
+               ("<backtab>" . igist-toggle-all-children)
+               ("C" . igist-table-menu))
          (:map igist-edit-mode-map
                ([remap save-buffer] . igist-save-current-gist)
                ("M-o" . igist-dispatch)

@@ -259,7 +259,7 @@ Argument ID is the identifier that will be checked for membership in the list
   (not (member id igist-list-hidden-ids)))
 
 (defun igist-toggle-children-row (&optional subentries)
-  "Toggle visibility of children row in igist mode.
+  "Toggle visibility of row's children in igist mode.
 
 Argument SUBENTRIES is an optional argument that specifies the subentries to be
 expanded when toggling the children row."
@@ -286,7 +286,7 @@ expanded when toggling the children row."
 (defun igist-format-time-diff (time)
   "Format TIME difference in seconds, minutes, hours, or days.
 
-Argument TIME is a variable representing a specific time in Emacs Lisp."
+Argument TIME is a variable representing a specific time."
   (let* ((now (current-time))
          (diff-seconds (- (float-time now)
                           (float-time time)))

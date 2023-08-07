@@ -11,52 +11,52 @@ The Emacs everywhere goal continues. These are the main features of
 
 ### Gists
 
-  - \[X\] create
-  - \[X\] edit
-  - \[X\] delete
-  - \[X\] star
-  - \[X\] unstar
-  - \[X\] fork
-  - \[X\] list
-  - \[X\] explore public gists
+- \[X\] create
+- \[X\] edit
+- \[X\] delete
+- \[X\] star
+- \[X\] unstar
+- \[X\] fork
+- \[X\] list
+- \[X\] explore public gists
 
 ### Comments
 
-  - \[X\] add
-  - \[X\] list
-  - \[X\] delete
-  - \[X\] edit
+- \[X\] add
+- \[X\] list
+- \[X\] delete
+- \[X\] edit
 
 # igist
 
->   - [About](#about)
->       - [Features](#features)
->           - [Gists](#gists)
->           - [Comments](#comments)
->       - [Requirements](#requirements)
->       - [Installation](#installation)
->           - [MELPA](#melpa)
->           - [Manually](#manually)
->           - [With `use-package`](#with-use-package)
->       - [Auth](#auth)
->           - [Secure](#secure)
->           - [Insecure](#insecure)
->       - [Usage](#usage)
->           - [General](#general)
->           - [List gists](#list-gists)
->           - [Configure table view](#configure-table-view)
->           - [Minibuffer Completions](#minibuffer-completions)
->           - [Edit gist](#edit-gist)
->           - [List comments](#list-comments)
->           - [Editing comment](#editing-comment)
+> - [About](#about)
+>   - [Features](#features)
+>     - [Gists](#gists)
+>     - [Comments](#comments)
+>   - [Requirements](#requirements)
+>   - [Installation](#installation)
+>     - [MELPA](#melpa)
+>     - [Manually](#manually)
+>     - [With `use-package`](#with-use-package)
+>   - [Auth](#auth)
+>     - [Secure](#secure)
+>     - [Insecure](#insecure)
+>   - [Usage](#usage)
+>     - [General](#general)
+>     - [List gists](#list-gists)
+>     - [Configure table view](#configure-table-view)
+>     - [Minibuffer Completions](#minibuffer-completions)
+>     - [Edit gist](#edit-gist)
+>     - [List comments](#list-comments)
+>     - [Editing comment](#editing-comment)
 
 ## Requirements
 
-  - Emacs \>= 27.1
-  - ghub
-  - transient
-  - [Github API
-    token](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
+- Emacs \>= 27.1
+- ghub
+- transient
+- [Github API
+  token](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
 
 ## Installation
 
@@ -66,52 +66,51 @@ The Emacs everywhere goal continues. These are the main features of
 
 To get started, enable installing packages from MELPA:
 
-``` commonlisp
+```elisp
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
 
 ```
 
-To fetch the list of packages you can do
+To fetch the list of packages you can do:
 
-``` example
+```example
 <M-x> package-refresh-contents
 ```
 
-And after that `igist` can be installed with
+And after that `igist` can be installed with:
 
-``` example
-<M-x> package-install "igist"
+```example
+<M-x> package-install igist
 ```
 
 ### Manually
 
 Download the repository and it to your load path in your init file:
 
-``` elisp
+```elisp
 (add-to-list 'load-path "/path/to/igist")
 (require 'igist)
 ```
 
 ### With `use-package`
 
-``` elisp
+```elisp
 (use-package igist
   :bind (("M-o" . igist-dispatch)))
 ```
 
 Or if you use `straight.el`:
 
-``` commonlisp
+```elisp
 (use-package igist
-:bind (("M-o" . igist-dispatch))
+  :bind (("M-o" . igist-dispatch))
   :straight (igist
              :repo "KarimAziev/igist"
              :type git
              :host github))
 ```
-
 
 <details>
   <summary>Example configuration with keymaps</summary>
@@ -125,7 +124,6 @@ Or if you use `straight.el`:
                ("+" . igist-list-add-file)
                ("-" . igist-delete-current-filename)
                ("D" . igist-delete-current-gist)
-               ("K" . igist-list-cancel-load)
                ("S" . igist-star-gist)
                ("U" . igist-unstar-gist)
                ("a" . igist-add-comment)
@@ -134,8 +132,15 @@ Or if you use `straight.el`:
                ("f" . igist-fork-gist)
                ("g" . igist-list-refresh)
                ("r" . igist-browse-gist)
+               ("s" . igist-tabulated-list-sort)
                ("v" . igist-list-view-current)
-               ("w" . igist-copy-gist-url))
+               ("w" . igist-copy-gist-url)
+               ("K" . igist-list-cancel-load)
+               ("{" . igist-tabulated-list-narrow-current-column)
+               ("}" . igist-tabulated-list-widen-current-column)
+               ("<tab>" . igist-toggle-row-children-at-point)
+               ("<backtab>" . igist-toggle-all-children)
+               ("C" . igist-table-menu))
          (:map igist-edit-mode-map
                ([remap save-buffer] . igist-save-current-gist)
                ("M-o" . igist-dispatch)
@@ -154,6 +159,7 @@ Or if you use `straight.el`:
                ("C-c C-c" . igist-post-comment)
                ("C-c C-k" . kill-current-buffer))))
 ```
+
 </details>
 
 ## Auth
@@ -167,12 +173,12 @@ are two options to feed it.
 To use `auth-sources`, you need to add a such entry with a Github
 username and token, e.g.:
 
-``` example
+```example
 machine api.github.com login MY_GITHUB_USERNAME^igist password MY_GITHUB_TOKEN
 ```
 
-Replace MY\_GITHUB\_USERNAME with your actual GitHub username and
-MY\_GITHUB\_TOKEN with the token.
+Replace MY_GITHUB_USERNAME with your actual GitHub username and
+MY_GITHUB_TOKEN with the token.
 
 To use other suffixes instead of `^igist` (`M-x customize-variable`
 `RET` and type `igist-auth-marker`).
@@ -185,7 +191,6 @@ manual, as igist relies on the provided API.
 
 If the value of the variable `igist-auth-marker` is a string, it will be
 used as a token.
-
 
 <details>
   <summary>Show example</summary>
@@ -209,6 +214,7 @@ used as a token.
                            igist-auth-marker)))
         (error (message "Igist-current-user-name cannot setted"))))))
 ```
+
 </details>
 
 ## Usage
@@ -218,7 +224,7 @@ used as a token.
 The simplest way is to invoke a transient popup with the list of
 available commands for the current buffer:
 
-  - `M-x igist-dispatch` - in `igists` buffers it is bound to `M-o`.
+- `M-x igist-dispatch` - in `igists` buffers it is bound to `M-o`.
 
 ### List gists
 
@@ -226,20 +232,20 @@ There are two ways in which gists can be presented - as a table or as
 minibuffer completions.
 
 1.  Table
-    
-      - `M-x igist-list-gists` - to display gists of logged GitHub user.
-    
-      - `M-x igist-explore-public-gists` - list public gists sorted by
-        most recently updated to least recently updated.
-        [![](./igist-explore-demo.png)](./igist-explore-demo.png)
-    
-      - `M-x igist-list-other-user-gists` - to display public gists of
-        non-logged user.
-    
+
+    - `M-x igist-list-gists` - to display gists of logged GitHub user.
+
+    - `M-x igist-explore-public-gists` - list public gists sorted by
+      most recently updated to least recently updated.
+      [![](./igist-explore-demo.png)](./igist-explore-demo.png)
+
+    - `M-x igist-list-other-user-gists` - to display public gists of
+      non-logged user.
+
     This commands render and load gists with pagination. To stop or
     pause loading use command `igist-list-cancel-load` (default
     keybinding is `K`).
-    
+
     | Key         | Command                                  |
     | ----------- | ---------------------------------------- |
     | `RET`       | edit gist                                |
@@ -264,7 +270,6 @@ minibuffer completions.
     | `<tab>`     | toggle visibility of gist files at point |
     | `<backtab>` | toggle visibility of all files           |
     | `C`         | configure and save view settings         |
-    
 
     To customize these keys, see the variable `igist-list-mode-map`.
 
@@ -281,7 +286,7 @@ variable `igist-explore-format` and for explore buffers -
 
 ### Minibuffer Completions
 
-  - `M-x igist-edit-list` - to select Gist to edit from the minibuffer.
+- `M-x igist-edit-list` - to select Gist to edit from the minibuffer.
 
 ### Edit gist
 
