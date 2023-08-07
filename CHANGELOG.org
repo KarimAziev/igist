@@ -1,5 +1,7 @@
 #+TITLE: Changelog
 
+* v1.2.1    UNRELEASED
+
 * v1.2.0    2023-08-06
 - Speed up the listing of gists by using our own rendering engine.
 - Allow for expanding and collapsing of gist files.
