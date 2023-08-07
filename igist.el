@@ -688,9 +688,16 @@ only serves as documentation.")
     (define-key map (kbd "K") #'igist-list-cancel-load)
     (define-key map (kbd "<backtab>") #'igist-toggle-all-children)
     (define-key map (kbd "<tab>") #'igist-toggle-row-children-at-point)
-    (define-key map (kbd "C") "Configure view" #'igist-table-menu)
+    (define-key map (kbd "C") #'igist-table-menu)
+    (when (fboundp 'tabulated-list-widen-current-column)
+      (define-key map [remap tabulated-list-widen-current-column]
+                  #'igist-tabulated-list-widen-current-column))
+    (when (fboundp 'tabulated-list-narrow-current-column)
+      (define-key map [remap tabulated-list-narrow-current-column]
+                  #'igist-tabulated-list-narrow-current-column))
     map)
   "Keymap used in tabulated gists views.")
+
 
 (defvar igist-comments-list-mode-map
   (let ((map (make-sparse-keymap)))
