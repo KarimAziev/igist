@@ -276,7 +276,7 @@ To customize these keys, see the variable `igist-list-mode-map`.
 You can configure and save width of each column interactivelly with
 transient menu - `igist-table-menu`.
 
-[![](./igist-demo-view.gif)](./igist-demo-view.gif).
+[![](./igist-demo-view.gif)](./igist-demo-view.gif)
 
 To configure which columns to display in user's buffer customize
 variable `igist-explore-format` and for explore buffers -
