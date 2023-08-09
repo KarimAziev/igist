@@ -1,6 +1,6 @@
 #+AUTHOR: Karim Aziiev
 #+EMAIL: karim.aziiev@gmail.com
-#+OPTIONS: ^:nil tags:nil
+#+OPTIONS: ^:nil tags:nil num:nil
 
 [[https://melpa.org/#/igist][file:https://melpa.org/packages/igist-badge.svg]]
 
@@ -45,7 +45,7 @@ The Emacs everywhere goal continues. These are the main features of
   - [[#usage][Usage]]
     - [[#general][General]]
     - [[#list-gists][List gists]]
-    - [[#configure-table-view][Configure table view]]
+    - [[#table][Table]]
     - [[#minibuffer-completions][Minibuffer Completions]]
     - [[#edit-gist][Edit gist]]
     - [[#list-comments][List comments]]
@@ -223,7 +223,7 @@ The simplest way is to invoke a transient popup with the list of available comma
 
 There are two ways in which gists can be presented - as a table or as minibuffer completions.
 
-**** Table
+*** Table
 
 - ~M-x igist-list-gists~ - to display gists of logged GitHub user.
   
@@ -261,7 +261,6 @@ This commands render and load gists with pagination. To stop or pause loading us
 
 To customize these keys, see the variable =igist-list-mode-map=.
 
-*** Configure table view
 You can configure and save width of each column interactivelly with transient menu - ~igist-table-menu~.
 
 [[./igist-demo-view.gif][./igist-demo-view.gif]].
@@ -271,21 +270,23 @@ To configure which columns to display in user's buffer customize variable ~igist
 
 *** Minibuffer Completions
 
-- ~M-x igist-edit-list~ - to select Gist to edit from the minibuffer.
+- ~M-x igist-edit-list~ - read Gist to edit from the minibuffer.
+
+Ivy users can also use ~igist-ivy-read-public-gists~ and ~igist-ivy-read-user-gists~.
 
 *** Edit gist
 
-You can view, edit and save gists in buffers with =igist-comments-edit-mode=.
-This minor mode is turned on after command ~igist-edit-gist~.
+You can view, edit and save gists in buffers with =igist-edit-mode=.
+This minor mode is turned on after command ~igist-edit-gist~ and ~igist-edit-list~.
 
-| Key     | Command              |
-|---------+----------------------|
-| M-o     | transient popup      |
-| C-c C-c | save and exit        |
-| C-c '   | save and exit        |
-| C-x C-s | save without exiting |
+| Key       | Command              |
+|-----------+----------------------|
+| =M-o=     | transient popup      |
+| =C-c C-c= | save and exit        |
+| =C-c '=   | save and exit        |
+| =C-x C-s= | save without exiting |
 
-To customize these keys see the variable =igist-comments-edit-mode-map=.
+To customize these keys see the variable =igist-edit-mode-map=.
 
 *** List comments
 
@@ -295,11 +296,11 @@ In comments list mode, such commands are available:
 
 | Key | Command                     |
 |-----+-----------------------------|
-| +   | add comment                 |
-| -   | delete the comment at point |
-| D   | delete the comment at point |
-| e   | add or edit                 |
-| g   | refresh comments            |
+| =+= | add comment                 |
+| =-= | delete the comment at point |
+| =D= | delete the comment at point |
+| =e= | add or edit                 |
+| =g= | refresh comments            |
 
 To customize these keybindings edit the variable =igist-comments-list-mode-map=.
 
@@ -308,8 +309,8 @@ To customize these keybindings edit the variable =igist-comments-list-mode-map=.
 This minor mode is turned on after commands ~igist-edit-comment~ and ~igist-add-comment~.
 Keymap for posting and editing comments:
 
-| Key     | Command      |
-|---------+--------------|
-| C-c C-c | post comment |
+| Key       | Command      |
+|-----------+--------------|
+| =C-c C-c= | post comment |
 
 To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
