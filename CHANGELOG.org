@@ -1,5 +1,11 @@
 #+TITLE: Changelog
 
+* v1.3.0    2023-08-09
+
+- Make =igist-current-user-name= customizable.
+- Improve doumentation.
+- Improve date format.
+
 * v1.2.1    2023-08-07
 - Fix incorrect keybinding for ~igist-table-menu~ in ~igist-list-mode-map~.
 - Remap ~tabulated-list-widen-current-column~ and ~tabulated-list-narrow-current-column~.
@@ -11,13 +17,13 @@
 - Allow for more customization settings for rendering, sorting, and formatting.
 - Add commands to read gists using Ivy.
 
-* v1.1.0 2023-04-21
+* v1.1.0    2023-04-21
 - Allow sorting gists by modification date.
 - Add variable watcher for ~tabulated-list-format~ to rerender gists, so ~tabulated-list-narrow-current-column~ and ~tabulated-list-widen-current-column~ correctly recalculate indent for files column.
 - Use ~igist-message~ instead of message, which uses custom variable ~igist-message-function~.
 - Update package requirements.
 
-* v1.0.0 2023-01-09
+* v1.0.0    2023-01-09
 - Add commands for starring gists: ~igist-star-gist~, ~igist-unstar-gist~ and ~igist-list-starred~
 - Add custom variable ~igist-enable-copy-gist-url~ to control whether to copy gists URL after creating or editing
 - Update layout and keys for transient. Transient commands are now bound to single keys.
