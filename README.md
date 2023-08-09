@@ -279,7 +279,7 @@ transient menu - `igist-table-menu`.
 [![](./igist-demo-view.gif)](./igist-demo-view.gif)
 
 To configure which columns to display in user's buffer customize
-variable `igist-explore-format` and for explore buffers -
+variable `igist-list-format` and for explore buffers -
 `igist-explore-format`.
 
 ### Minibuffer Completions
