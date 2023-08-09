@@ -3215,6 +3215,7 @@ Argument URL is the url of a GitHub gist."
               (with-temp-message (or (current-message) "")
                 (kill-buffer output-buffer)))))))))
 
+;;;###autoload
 (defun igist-ivy-read-user-gists (user)
   "Read and display gists for a specific USER.
 
@@ -3234,6 +3235,8 @@ in minibuffer."
                         (concat "/users/" igist-current-user-name
                                 "/gists")))
 
+
+;;;###autoload
 (defun igist-ivy-read-public-gists ()
   "Explore public gists in the minibuffer, using Ivy completions."
   (interactive)
