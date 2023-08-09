@@ -40,16 +40,17 @@ The Emacs everywhere goal continues. These are the main features of
     - [[#manually][Manually]]
     - [[#with-use-package][With ~use-package~]]
   - [[#auth][Auth]]
-    - [[#secure][Secure]]
-    - [[#insecure][Insecure]]
+    - [[#setting-up-token][Setting Up token]]
+    - [[#secure-way-using-auth-sources][Secure Way: Using auth-sources]]
+    - [[#insecure-way][Insecure way]]
   - [[#usage][Usage]]
-    - [[#general][General]]
     - [[#list-gists][List gists]]
     - [[#table][Table]]
     - [[#minibuffer-completions][Minibuffer Completions]]
     - [[#edit-gist][Edit gist]]
     - [[#list-comments][List comments]]
     - [[#editing-comment][Editing comment]]
+  - [[#customization][Customization]]
 #+END_QUOTE
 
 ** Requirements
@@ -163,38 +164,65 @@ Or if you use ~straight.el~:
 </details>
 #+end_export
 
-
 ** Auth
-You need to ensure that you have [[https://github.com/settings/tokens][a GitHub API token]] with scope ~gist~. Then there are two options to feed it.
 
-*** Secure
+=igist= manages authentication through two customizable variables:
 
-To use ~auth-sources~, you need to add a such entry with a Github username and token, e.g.:
+- =igist-current-user-name=: This variable should be set to a string containing your GitHub username.
+- =igist-auth-marker=: This variable can either be a string containing the OAuth token or a symbol indicating where to fetch the OAuth token.
 
-#+begin_example
-machine api.github.com login MY_GITHUB_USERNAME^igist password MY_GITHUB_TOKEN
-#+end_example
+*** Setting Up token
 
-Replace MY_GITHUB_USERNAME with your actual GitHub username and MY_GITHUB_TOKEN with the token.
+Firsly, you need to ensure that you have [[https://github.com/settings/tokens][a GitHub API token]] with scope ~gist~:
 
-To use other suffixes instead of =^igist= (~M-x customize-variable~ ~RET~ and type ~igist-auth-marker~).
+1. Log in to your GitHub account and navigate to settings.
+2. Select the Developer settings option on the bottom of the sidebar.
+3. Here you'll see a Personal access tokens section, click on it.
+4. Click on "Generate new token", give your token a descriptive name.
+5. Ensure the "gist" scope is checked, this will give igist the necessary permissions it needs to manage your gists.
+6. Click on Generate token at the bottom of the page. Be sure to copy your new personal access token now as you cannot see it again.
+
+After getting your token, you can supply it to =igist= in one of two ways.
+
+*** Secure Way: Using auth-sources
+
+Emacs =auth-sources= provide a secure way to store your GitHub username and OAuth token. To employ this method, set =igist-auth-marker= to the symbol =igist=:
+
+To employ this method, set =igist-auth-marker= to the symbol =igist=:
+
+#+begin_src elisp
+(setq igist-auth-marker 'igist)
+#+end_src
+
+Next, add an entry to your =auth-sources=:
+
+#+begin_src plaintext
+machine api.github.com login YOUR-GITHUB-USERNAME^igist password YOUR-GITHUB-TOKEN
+#+end_src
+
+You can add this entry to your =~/.authinfo.gpg= file (recommended for secure, encrypted storage) or =~/.authinfo= (see variable =auth-sources=).
 
 You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual, as igist relies on the provided API.
 
-*** Insecure
-If the value of the variable ~igist-auth-marker~ is a string, it will be used as a token.
+*** Insecure way
+
+While not recommended due to security issues, you can set =igist-auth-marker= and =igist-current-user-name= in your Emacs config file:
+
+#+begin_src elisp
+(setq igist-current-user-name "your-github-username")
+(setq igist-auth-marker "your-github-oauth-token")
+#+end_src
 
 #+begin_export html
 
 <details>
-  <summary>Show example</summary>
+  <summary>Another example</summary>
 
 ```elisp
 (use-package igist
   :init (setq-default igist-ask-for-description 'never)
   :config
-  (unless igist-current-user-name
-    (let ((default-directory user-emacs-directory))
+  (let ((default-directory user-emacs-directory))
       (condition-case nil
           (progn (setq igist-current-user-name
                        (car-safe
@@ -206,16 +234,18 @@ If the value of the variable ~igist-auth-marker~ is a string, it will be used as
                              (car-safe (process-lines "git" "config"
                                                       "github.oauth-token")))
                            igist-auth-marker)))
-        (error (message "Igist-current-user-name cannot setted"))))))
+        (error (message "Igist-current-user-name cannot setted")))))
 ```
 </details>
 #+end_export
 
+
+*Note*: In this method, your OAuth token will be stored as plain text in your emacs config file, which is insecure. Ensure your config file permissions are appropriately set to prevent unauthorized access.
+
+
 ** Usage
 
-*** General
-
-The simplest way is to invoke a transient popup with the list of available commands for the current buffer:
+With the authentication properly configured, you can now use =igist=. The simplest way is to invoke a transient popup with the list of available commands for the current buffer:
 
 - ~M-x igist-dispatch~ - in ~igists~ buffers it is bound to =M-o=.
 
@@ -314,3 +344,14 @@ Keymap for posting and editing comments:
 | =C-c C-c= | post comment |
 
 To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
+
+** Customization
+
+- ~igist-current-user-name~: This variable should be set to a string containing your GitHub username.
+- ~igist-auth-marker~: This variable can either be a string containing the OAuth token or a symbol indicating where to fetch the OAuth token.
+- ~igist-message-function~: Function to show messages. Should accept the same arguments as =message=.
+- ~igist-per-page-limit~: The number of results per page (max 100).
+- ~igist-ask-for-description~: When to prompt for description before posting new gists.
+- ~igist-enable-copy-gist-url-p~: Whether and when to add new or updated gist's =url= to kill ring.
+- ~igist-list-format~: The format of the user Tabulated Gists buffers.
+- ~igist-explore-format~: The format of the Explore Public Gists tabulated buffers. 

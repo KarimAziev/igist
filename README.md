@@ -11,52 +11,54 @@ The Emacs everywhere goal continues. These are the main features of
 
 ### Gists
 
-  - \[X\] create
-  - \[X\] edit
-  - \[X\] delete
-  - \[X\] star
-  - \[X\] unstar
-  - \[X\] fork
-  - \[X\] list
-  - \[X\] explore public gists
+- \[X\] create
+- \[X\] edit
+- \[X\] delete
+- \[X\] star
+- \[X\] unstar
+- \[X\] fork
+- \[X\] list
+- \[X\] explore public gists
 
 ### Comments
 
-  - \[X\] add
-  - \[X\] list
-  - \[X\] delete
-  - \[X\] edit
+- \[X\] add
+- \[X\] list
+- \[X\] delete
+- \[X\] edit
 
 # igist
 
->   - [About](#about)
->       - [Features](#features)
->           - [Gists](#gists)
->           - [Comments](#comments)
->       - [Requirements](#requirements)
->       - [Installation](#installation)
->           - [MELPA](#melpa)
->           - [Manually](#manually)
->           - [With `use-package`](#with-use-package)
->       - [Auth](#auth)
->           - [Secure](#secure)
->           - [Insecure](#insecure)
->       - [Usage](#usage)
->           - [General](#general)
->           - [List gists](#list-gists)
->           - [Table](#table)
->           - [Minibuffer Completions](#minibuffer-completions)
->           - [Edit gist](#edit-gist)
->           - [List comments](#list-comments)
->           - [Editing comment](#editing-comment)
+> - [About](#about)
+>   - [Features](#features)
+>     - [Gists](#gists)
+>     - [Comments](#comments)
+>   - [Requirements](#requirements)
+>   - [Installation](#installation)
+>     - [MELPA](#melpa)
+>     - [Manually](#manually)
+>     - [With `use-package`](#with-use-package)
+>   - [Auth](#auth)
+>     - [Setting Up token](#setting-up-token)
+>     - [Secure Way: Using
+>       auth-sources](#secure-way-using-auth-sources)
+>     - [Insecure way](#insecure-way)
+>   - [Usage](#usage)
+>     - [List gists](#list-gists)
+>     - [Table](#table)
+>     - [Minibuffer Completions](#minibuffer-completions)
+>     - [Edit gist](#edit-gist)
+>     - [List comments](#list-comments)
+>     - [Editing comment](#editing-comment)
+>   - [Customization](#customization)
 
 ## Requirements
 
-  - Emacs \>= 27.1
-  - ghub
-  - transient
-  - [Github API
-    token](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
+- Emacs \>= 27.1
+- ghub
+- transient
+- [Github API
+  token](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
 
 ## Installation
 
@@ -66,7 +68,7 @@ The Emacs everywhere goal continues. These are the main features of
 
 To get started, enable installing packages from MELPA:
 
-``` elisp
+```elisp
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
@@ -75,13 +77,13 @@ To get started, enable installing packages from MELPA:
 
 To fetch the list of packages you can do:
 
-``` example
+```example
 <M-x> package-refresh-contents
 ```
 
 And after that `igist` can be installed with:
 
-``` example
+```example
 <M-x> package-install igist
 ```
 
@@ -89,21 +91,21 @@ And after that `igist` can be installed with:
 
 Download the repository and it to your load path in your init file:
 
-``` elisp
+```elisp
 (add-to-list 'load-path "/path/to/igist")
 (require 'igist)
 ```
 
 ### With `use-package`
 
-``` elisp
+```elisp
 (use-package igist
   :bind (("M-o" . igist-dispatch)))
 ```
 
 Or if you use `straight.el`:
 
-``` elisp
+```elisp
 (use-package igist
   :bind (("M-o" . igist-dispatch))
   :straight (igist
@@ -111,7 +113,6 @@ Or if you use `straight.el`:
              :type git
              :host github))
 ```
-
 
 <details>
   <summary>Example configuration with keymaps</summary>
@@ -160,48 +161,82 @@ Or if you use `straight.el`:
                ("C-c C-c" . igist-post-comment)
                ("C-c C-k" . kill-current-buffer))))
 ```
+
 </details>
 
 ## Auth
 
-You need to ensure that you have [a GitHub API
-token](https://github.com/settings/tokens) with scope `gist`. Then there
-are two options to feed it.
+`igist` manages authentication through two customizable variables:
 
-### Secure
+- `igist-current-user-name`: This variable should be set to a string
+  containing your GitHub username.
 
-To use `auth-sources`, you need to add a such entry with a Github
-username and token, e.g.:
+- `igist-auth-marker`: This variable can either be a string containing
+  the OAuth token or a symbol indicating where to fetch the OAuth
+  token.
 
-``` example
-machine api.github.com login MY_GITHUB_USERNAME^igist password MY_GITHUB_TOKEN
+### Setting Up token
+
+Firsly, you need to ensure that you have [a GitHub API
+token](https://github.com/settings/tokens) with scope `gist`:
+
+1.  Log in to your GitHub account and navigate to settings.
+2.  Select the Developer settings option on the bottom of the sidebar.
+3.  Here you'll see a Personal access tokens section, click on it.
+4.  Click on "Generate new token", give your token a descriptive name.
+5.  Ensure the "gist" scope is checked, this will give igist the
+    necessary permissions it needs to manage your gists.
+6.  Click on Generate token at the bottom of the page. Be sure to copy
+    your new personal access token now as you cannot see it again.
+
+After getting your token, you can supply it to `igist` in one of two
+ways.
+
+### Secure Way: Using auth-sources
+
+Emacs `auth-sources` provide a secure way to store your GitHub username
+and OAuth token. To employ this method, set `igist-auth-marker` to the
+symbol `igist`:
+
+To employ this method, set `igist-auth-marker` to the symbol `igist`:
+
+```elisp
+(setq igist-auth-marker 'igist)
 ```
 
-Replace MY\_GITHUB\_USERNAME with your actual GitHub username and
-MY\_GITHUB\_TOKEN with the token.
+Next, add an entry to your `auth-sources`:
 
-To use other suffixes instead of `^igist` (`M-x customize-variable`
-`RET` and type `igist-auth-marker`).
+```plaintext
+machine api.github.com login YOUR-GITHUB-USERNAME^igist password YOUR-GITHUB-TOKEN
+```
+
+You can add this entry to your `~/.authinfo.gpg` file (recommended for
+secure, encrypted storage) or `~/.authinfo` (see variable
+`auth-sources`).
 
 You can read more in
 [ghub](https://magit.vc/manual/forge/Token-Creation.html#Token-Creation)
 manual, as igist relies on the provided API.
 
-### Insecure
+### Insecure way
 
-If the value of the variable `igist-auth-marker` is a string, it will be
-used as a token.
+While not recommended due to security issues, you can set
+`igist-auth-marker` and `igist-current-user-name` in your Emacs config
+file:
 
+```elisp
+(setq igist-current-user-name "your-github-username")
+(setq igist-auth-marker "your-github-oauth-token")
+```
 
 <details>
-  <summary>Show example</summary>
+  <summary>Another example</summary>
 
 ```elisp
 (use-package igist
   :init (setq-default igist-ask-for-description 'never)
   :config
-  (unless igist-current-user-name
-    (let ((default-directory user-emacs-directory))
+  (let ((default-directory user-emacs-directory))
       (condition-case nil
           (progn (setq igist-current-user-name
                        (car-safe
@@ -213,18 +248,22 @@ used as a token.
                              (car-safe (process-lines "git" "config"
                                                       "github.oauth-token")))
                            igist-auth-marker)))
-        (error (message "Igist-current-user-name cannot setted"))))))
+        (error (message "Igist-current-user-name cannot setted")))))
 ```
+
 </details>
+
+**Note**: In this method, your OAuth token will be stored as plain text
+in your emacs config file, which is insecure. Ensure your config file
+permissions are appropriately set to prevent unauthorized access.
 
 ## Usage
 
-### General
-
+With the authentication properly configured, you can now use `igist`.
 The simplest way is to invoke a transient popup with the list of
 available commands for the current buffer:
 
-  - `M-x igist-dispatch` - in `igists` buffers it is bound to `M-o`.
+- `M-x igist-dispatch` - in `igists` buffers it is bound to `M-o`.
 
 ### List gists
 
@@ -233,14 +272,14 @@ minibuffer completions.
 
 ### Table
 
-  - `M-x igist-list-gists` - to display gists of logged GitHub user.
+- `M-x igist-list-gists` - to display gists of logged GitHub user.
 
-  - `M-x igist-explore-public-gists` - list public gists sorted by most
-    recently updated to least recently updated.
-    [![](./igist-explore-demo.png)](./igist-explore-demo.png)
+- `M-x igist-explore-public-gists` - list public gists sorted by most
+  recently updated to least recently updated.
+  [![](./igist-explore-demo.png)](./igist-explore-demo.png)
 
-  - `M-x igist-list-other-user-gists` - to display public gists of
-    non-logged user.
+- `M-x igist-list-other-user-gists` - to display public gists of
+  non-logged user.
 
 This commands render and load gists with pagination. To stop or pause
 loading use command `igist-list-cancel-load` (default keybinding is
@@ -284,7 +323,7 @@ variable `igist-list-format` and for explore buffers -
 
 ### Minibuffer Completions
 
-  - `M-x igist-edit-list` - read Gist to edit from the minibuffer.
+- `M-x igist-edit-list` - read Gist to edit from the minibuffer.
 
 Ivy users can also use `igist-ivy-read-public-gists` and
 `igist-ivy-read-user-gists`.
@@ -332,3 +371,21 @@ This minor mode is turned on after commands `igist-edit-comment` and
 
 To customize these keybindings edit the variable
 `igist-comments-edit-mode-map`.
+
+## Customization
+
+- `igist-current-user-name`: This variable should be set to a string
+  containing your GitHub username.
+- `igist-auth-marker`: This variable can either be a string containing
+  the OAuth token or a symbol indicating where to fetch the OAuth
+  token.
+- `igist-message-function`: Function to show messages. Should accept
+  the same arguments as `message`.
+- `igist-per-page-limit`: The number of results per page (max 100).
+- `igist-ask-for-description`: When to prompt for description before
+  posting new gists.
+- `igist-enable-copy-gist-url-p`: Whether and when to add new or
+  updated gist's `url` to kill ring.
+- `igist-list-format`: The format of the user Tabulated Gists buffers.
+- `igist-explore-format`: The format of the Explore Public Gists
+  tabulated buffers.

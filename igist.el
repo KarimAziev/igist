@@ -6,7 +6,8 @@
 ;; URL: https://github.com/KarimAziev/igist
 ;; Version: 1.2.1
 ;; Keywords: tools
-;; Package-Requires: ((emacs "27.1") (ghub "3.5.6") (transient "0.3.7"))
+;; Package-Requires: ((emacs "27.1") (ghub "3.6.0") (transient "0.4.1"))
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -126,11 +127,12 @@
 
 ;;; Customization
 
-;; `igist-auth-marker'
-;;      Suffix added to the username as USERNAME^MARKER in authsoures.
-;;      For example, if the value of the marker is `igist' (which is the default value),
-;;      you need to add such entry:
-;;      machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN.
+
+;; `igist-current-user-name' is a customizable option that represents the
+;; GitHub user name used for making authorized requests.
+
+;; `igist-auth-marker' This variable can either be a string containing the OAuth
+;; token or a symbol indicating where to fetch the OAuth token.
 
 
 ;; `igist-per-page-limit'
@@ -186,9 +188,11 @@ DATA should be an argument for ACTION."
    "Click to expand"))
 
 (defun igist-find-children-spec (list-spec)
-  "Find children specification in a list.
+  "Find the position, spec, and parent spec of children in a LIST-SPEC.
 
-Argument LIST-SPEC is a variable that represents a list of specifications."
+Argument LIST-SPEC is a list of specifications that the function uses to find
+and return the position, specification, and parent specification of the
+subcolumns."
   (let ((subcolumns-spec)
         (subcolumns-parent-spec)
         (pos))
@@ -203,8 +207,8 @@ Argument LIST-SPEC is a variable that represents a list of specifications."
                                         :children)))))
     (list pos subcolumns-spec subcolumns-parent-spec)))
 
-(defun igist-collapse-row-children (&rest _)
-  "Collapse children of current row in a tabulated list."
+(defun igist-collapse-row-children ()
+  "Collapse the children of a row in a tabulated list."
   (pcase-let ((`(,beg . ,end)
                (igist-property-boundaries 'tabulated-list-id))
               (id (tabulated-list-get-id)))
@@ -216,7 +220,11 @@ Argument LIST-SPEC is a variable that represents a list of specifications."
       (setq igist-list-hidden-ids (push id igist-list-hidden-ids)))))
 
 (defun igist-expand-row-children (&optional value)
-  "Render VALUE as the children of current row in a tabulated list."
+  "Expand the row children in a tabulated list.
+
+Argument VALUE is an optional parameter that represents the entries of
+subcolumns if provided, otherwise it get the entries from the
+`igist-list-response'."
   (pcase-let
       ((`(,beg . ,end)
         (igist-property-boundaries 'tabulated-list-id))
@@ -269,7 +277,7 @@ expanded when toggling the children row."
       (igist-expand-row-children subentries))))
 
 (defun igist-toggle-all-children ()
-  "Toggle visibility of all children in the tabulated list."
+  "Toggle the visibility of all children in the igist tabulated list."
   (interactive)
   (setq igist-list-hidden-ids (if igist-list-hidden-ids
                                   nil
@@ -284,9 +292,10 @@ expanded when toggling the children row."
     (igist-toggle-children-row)))
 
 (defun igist-format-time-diff (time)
-  "Format TIME difference in seconds, minutes, hours, or days.
+  "Calculate and format the time difference from the current TIME.
 
-Argument TIME is a variable representing a specific time."
+Argument TIME is the time value that will be compared with the current time to
+calculate the time difference."
   (let* ((now (current-time))
          (diff-seconds (- (float-time now)
                           (float-time time)))
@@ -299,8 +308,10 @@ Argument TIME is a variable representing a specific time."
            (format "%d minutes ago" (truncate diff-minutes)))
           ((< diff-days 1)
            (format "%d hours ago" (truncate diff-hours)))
+          ((< diff-days 30)
+           (format "%d days ago" (truncate diff-days)))
           (t
-           (format "%d days ago" (truncate diff-days))))))
+           (format "%d months ago" (truncate (/ diff-days 30)))))))
 
 (defun igist-render-time (value)
   "Format a given VALUE as a date and time.
@@ -472,7 +483,8 @@ a function.
  used to format the data. A function will be called with the value of
 the corresponding field name.
 - PROPS is a plist of additional column properties.
-   Currently supported properties are:
+
+Currently supported properties are:
    - :right-align: If non-nil, the column should be right-aligned.
    - :pad-right: Number of additional padding spaces to theright of the column,
    - :children - Specification expandable row values in the same format,
@@ -513,7 +525,8 @@ a function.
  used to format the data. A function will be called with the value of
 the corresponding field name.
 - PROPS is a plist of additional column properties.
-   Currently supported properties are:
+
+Currently supported properties are:
    - :right-align: If non-nil, the column should be right-aligned.
    - :pad-right: Number of additional padding spaces to theright of the column,
    - :children - Specification expandable row values in the same format,
@@ -595,23 +608,35 @@ Should accept the same arguments as `message'."
 (defvar igist-before-save-hook '()
   "A list of hooks run before posting gist.")
 
-(defvar igist-current-user-name nil
-  "The GitHub user to make authorized requests.")
+(defcustom igist-current-user-name ""
+  "The GitHub username for the current user.
+
+This is the username used by the `igist' for interactions
+with the GitHub service. Setting this variable allows the
+package to make requests on behalf of the user for actions such
+as listing or creating gists."
+  :group 'igist
+  :type 'string)
 
 (defcustom igist-auth-marker 'igist
   "GitHub OAuth token or suffix added to the USERNAME^MARKER in auth sources.
 
-If the value is a string, it will be used as a token.
-If the value is a symbol, lookup token in the `auth-sources'.
+This variable can either hold an explicit OAuth token as a string,
+in which case igist will use this token for authentication, or a
+symbol that is used as a suffix for the `login' field in `auth-sources'.
 
-For example, if the value of the marker is `igist' (which is the default value),
-you need to add such entry:
+For example, if you set this to the symbol `igist' (the default setting),
+you would add an entry like this to your auth-sources:
 
-\"machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN\"."
+\"machine api.github.com login GITHUB_USERNAME^igist password GITHUB_TOKEN\".
+
+Igist will then use the GITHUB_TOKEN from this entry when authenticating
+with the GitHub API."
   :group 'igist
   :type '(radio
           (string :tag "OAuth Token")
           (symbol :tag "Suffix" igist)))
+
 
 (defvar igist-github-token-scopes '(gist)
   "The required GitHub API scopes.
@@ -784,6 +809,13 @@ at the values with which this function was called."
      (with-current-buffer (get-buffer ,buffer-or-name)
        (progn ,@body))))
 
+(defun igist-get-current-user-name ()
+  "Return the current user's name if it's a non-empty string."
+  (when (and igist-current-user-name
+             (stringp igist-current-user-name)
+             (not (string-empty-p igist-current-user-name)))
+    igist-current-user-name))
+
 (defun igist-get-user-buffer-name (user)
   "Return the name of buffer with USER's gists."
   (when user (concat "*igist-" user "*")))
@@ -819,15 +851,16 @@ at the values with which this function was called."
 
 (defun igist-editable-p (&optional gist)
   "Check whether user `igist-current-user-name' can edit GIST."
-  (and igist-current-user-name
+  (and (igist-get-current-user-name)
        (cond ((eq major-mode 'igist-list-mode)
               (when-let ((owner (igist-get-owner
                                  (or gist (igist-tabulated-gist-at-point)))))
-                (equal igist-current-user-name owner)))
+                (equal (igist-get-current-user-name) owner)))
              ((igist-edit-mode-p)
               (if-let ((owner (igist-get-owner
                                (or gist igist-current-gist))))
-                  (equal igist-current-user-name owner)
+                  (equal (igist-get-current-user-name)
+                         owner)
                 t)))))
 
 (defun igist-not-editable-p (&optional gist)
@@ -837,12 +870,12 @@ at the values with which this function was called."
 (defun igist-forkable (&optional gist)
   "Return t if user `igist-current-user-name' can fork GIST."
   (and
-   igist-current-user-name
+   (igist-get-current-user-name)
    (when-let ((owner (igist-get-owner (or
                                        gist
                                        (igist-tabulated-gist-at-point)
                                        igist-current-gist))))
-     (not (equal igist-current-user-name owner)))))
+     (not (equal (igist-get-current-user-name) owner)))))
 
 (defun igist-get-current-gist-url ()
   "Return HTML URL from `igist-current-gist'."
@@ -878,10 +911,10 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
   (ghub-request method
                 resource
                 params
-                :username (or username igist-current-user-name)
+                :username (or username (igist-get-current-user-name))
                 :query query
                 :auth (or auth
-                          (when igist-current-user-name
+                          (when (igist-get-current-user-name)
                             igist-auth-marker)
                           'none)
                 :forge (or forge 'github)
@@ -1173,14 +1206,14 @@ GIST should be raw GitHub item."
           (igist-read-gist-file "Filename: " parent)))))
 
 (defun igist-list-edit-gist-at-point (&optional _entry)
-  "Switch to the buffer with the content of a gist entry at the point."
+  "Edit the gist at the current point in a new window."
   (interactive)
   (when-let ((gist (igist-list-gist-to-fetch)))
     (let ((buff (igist-setup-edit-buffer gist)))
       (switch-to-buffer-other-window buff))))
 
 (defun igist-list-view-current ()
-  "Display content of a gist entry at the point without switching to buffer."
+  "Display gist in other window, without selecting it."
   (interactive)
   (when-let ((current-window (selected-window))
              (gist (igist-list-gist-to-fetch)))
@@ -1199,7 +1232,7 @@ Argument USER is the username of the user whose gists will be loaded."
   (igist-list-load-gists user))
 
 (defun igist-list-edit-description (&rest _)
-  "Edit description for current gist."
+  "Edit the description of the gist at the current point."
   (interactive)
   (if-let ((gist (igist-tabulated-gist-at-point)))
       (let ((description (igist-alist-get
@@ -1398,7 +1431,7 @@ column is the last column in the table."
            (insert (propertize " "
                                'display col-desc
                                'help-echo help-echo)))
-          (t (apply 'insert-text-button label (cdr col-desc))))
+          (t (apply #'insert-text-button label (cdr col-desc))))
     (let ((next-x (+ used-width pad-right width)))
       (when not-last-col
         (when (> pad-right 0)
@@ -1978,15 +2011,19 @@ If LOADING is non nil show spinner, otherwise hide."
 
 (defun igist-get-github-users ()
   "Return list of users in auth sources with host `api.github.com'."
-  (let ((all-users (delq nil (mapcar (igist-rpartial plist-get :user)
-                                     (auth-source-search
-                                      :host "api.github.com"
-                                      :require
-                                      '(:user :secret)
-                                      :max
-                                      most-positive-fixnum))))
-        (suffix (regexp-quote (concat "^" (symbol-name igist-auth-marker)))))
-    (or (seq-filter (apply-partially #'string-match-p suffix) all-users)
+  (let
+      ((all-users (delq nil (mapcar (igist-rpartial plist-get :user)
+                                    (auth-source-search
+                                     :host "api.github.com"
+                                     :require
+                                     '(:user :secret)
+                                     :max
+                                     most-positive-fixnum))))
+       (suffix
+        (when (symbolp igist-auth-marker)
+          (regexp-quote (concat "^" (symbol-name igist-auth-marker))))))
+    (or (and suffix
+             (seq-filter (apply-partially #'string-match-p suffix) all-users))
         all-users)))
 
 (defun igist-popup-minibuffer-select-window ()
@@ -2052,7 +2089,7 @@ If LOADING is non nil show spinner, otherwise hide."
                   :buffer (current-buffer)
                   :callback
                   (lambda (&rest _)
-                    (when igist-current-user-name
+                    (when (igist-get-current-user-name)
                       (igist-load-logged-user-gists)
                       (igist-message "Gist forked"))))
     (user-error "No gist for forking")))
@@ -2194,10 +2231,14 @@ Argument GIST is a variable representing a gist object."
   (igist-alist-get 'login (igist-alist-get 'owner gist)))
 
 (defun igist-setup-edit-buffer (gist &optional setup-fn)
-  "Setup edit buffer for a GIST with optional setup function.
+  "Set up a buffer for editing a specified GIST in Emacs.
 
-SETUP-FN is an optional argument that represents a function or macro to
-be called after setting up the edit buffer."
+Argument GIST is a data structure that contains information about a specific
+gist, such as its ID and filename.
+Argument SETUP-FN is an optional function that is called to perform additional
+setup on the buffer after it has been created and filled with the gist's
+content."
+  
   (let* ((filename (or (igist-alist-get 'filename gist)
                        (read-string "Filename: ")))
          (gist-id (igist-alist-get 'id gist))
@@ -2245,7 +2286,12 @@ be called after setting up the edit buffer."
         buffer))))
 
 (defun igist-setup-new-gist-buffer (filename content)
-  "Setup edit buffer for new gist with FILENAME and CONTENT."
+  "Create a new buffer for a gist with a specified FILENAME and CONTENT.
+
+Argument FILENAME is the name of the file that will be created in the new gist
+buffer.
+Argument CONTENT is the text or code that will be inserted into the newly
+created file."
   (let ((buffer (get-buffer-create
                  (igist-make-gist-key
                   `((id . ,"newgist")
@@ -2274,7 +2320,13 @@ be called after setting up the edit buffer."
     buffer))
 
 (defun igist-setup-comment-buffer (gist-id &optional comment-id comment-body)
-  "Setup and return buffer for editing COMMENT-ID or new comment for GIST-ID."
+  "Set up a buffer for editing a comment on a specific gist.
+
+Argument GIST-ID is the unique identifier of the Gist for which the comment
+buffer is being set up.
+Argument COMMENT-ID is the optional unique identifier of the comment in the
+Gist.
+Argument COMMENT-BODY is the optional text content of the comment in the Gist."
   (let* ((buffer-name (if comment-id
                           (format "*%s-%s-comment*" gist-id comment-id)
                         (format "*%s-comment*" gist-id)))
@@ -2846,7 +2898,7 @@ If BACKGROUND is nil, don't show user's buffer."
 
 (defun igist-load-logged-user-gists (&optional cb &rest args)
   "Load gists asynchronously with callback CB and ARGS."
-  (unless igist-current-user-name
+  (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (read-string "User: ")))
   (igist-list-load-gists igist-current-user-name
                          t
@@ -2878,10 +2930,10 @@ If BACKGROUND is nil, don't show user's buffer."
         (igist-spinner-show)
         (ghub-request "GET" url
                       nil
-                      :auth (if igist-current-user-name
+                      :auth (if (igist-get-current-user-name)
                                 igist-auth-marker
                               'none)
-                      :username igist-current-user-name
+                      :username (igist-get-current-user-name)
                       :query `((per_page . ,(igist-list-get-per-page-query
                                              buffer)))
                       :forge 'github
@@ -3136,7 +3188,7 @@ Argument URL is the url of a GitHub gist."
              (output-buffer
               (ghub-get url nil
                         :query `((per_page . 30))
-                        :auth (if igist-current-user-name
+                        :auth (if (igist-get-current-user-name)
                                   igist-auth-marker
                                 'none)
                         :callback
@@ -3224,11 +3276,8 @@ Argument USER is the username of the user whose gists will be displayed."
   (igist-ivy-read-gists "User gist: " (concat "/users/" user "/gists")))
 
 (defun igist-ivy-read-user-logged-gists (&optional prompt)
-  "Read a gist in the minibuffer with PROMPT, using Ivy completions.
-
-If the value of the variable `igist-current-user-name' is nil, prompt user
-in minibuffer."
-  (while (not igist-current-user-name)
+  "Read a gist in the minibuffer with PROMPT, using Ivy completions."
+  (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (igist-change-user)))
   (igist-ivy-read-gists (or prompt
                             "Gists: ")
@@ -3309,7 +3358,7 @@ If ACTION is non nil, call it with gist."
 (defun igist-edit-list ()
   "Read user gists in the minibuffer and open it in the edit buffer."
   (interactive)
-  (while (not igist-current-user-name)
+  (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (igist-change-user)))
   (cond ((eq completing-read-function 'ivy-completing-read)
          (igist-completing-read-gists "Edit gist: "
@@ -3340,6 +3389,8 @@ To stop or pause loading use command `igist-list-cancel-load'.
 
 If BACKGROUND is nil, don't show user's buffer."
   (interactive)
+  (while (not (igist-get-current-user-name))
+    (setq igist-current-user-name (igist-change-user)))
   (igist-list-request "/gists/starred"
                       igist-current-user-name))
 
@@ -3351,13 +3402,14 @@ If BACKGROUND is nil, don't show user's buffer."
 
 ;;;###autoload
 (defun igist-list-gists ()
-  "List the authenticated user's gists.
+  "List the authenticated user's gists and activate `igist-list-mode'.
 
-If the value of the variable `igist-current-user-name' is nil,
-prompt user in minibuffer."
+To stop or pause loading use command `igist-list-cancel-load'.
+
+See also `igist-list-mode'."
   (interactive)
-  (unless igist-current-user-name
-    (igist-change-user))
+  (while (not (igist-get-current-user-name))
+    (setq igist-current-user-name (igist-change-user)))
   (igist-list-load-gists
    igist-current-user-name nil))
 
@@ -3380,6 +3432,7 @@ prompt user in minibuffer."
 ;;;###autoload
 (defun igist-create-new-gist ()
   "Set up and switch to the editable gist buffer.
+
 If Transient Mark mode is enabled and the mark is active,
 insert it as initial content."
   (interactive)
@@ -3402,39 +3455,35 @@ reading.
 The third arg HISTORY, if non-nil, specifies a history list and optionally the
 initial position in the list."
   (interactive)
-  (let ((user
-         (if (stringp igist-auth-marker)
-             (read-string (or prompt "User: ") initial-input history)
-           (let* ((alist (mapcar (lambda (it)
-                                   (let ((parts (split-string it "[\\^]" t)))
-                                     (cons (pop parts)
-                                           (pop parts))))
-                                 (igist-get-github-users)))
-                  (annotf (lambda (str)
-                            (format "^%s" (cdr (assoc str alist)))))
-                  (login-name (completing-read (or prompt
-                                                   "Github user name: ")
-                                               (lambda (str pred action)
-                                                 (if (eq action 'metadata)
-                                                     `(metadata
-                                                       (annotation-function
-                                                        . ,annotf))
-                                                   (complete-with-action
-                                                    action alist
-                                                    str
-                                                    pred)))
-                                               nil
-                                               nil
-                                               initial-input
-                                               history))
-                  (marker (igist-alist-get login-name alist)))
-             (when-let ((marker (and marker (intern marker))))
-               (unless (eq marker igist-auth-marker)
-                 (setq igist-auth-marker marker)))
-             login-name))))
-    (if (string-empty-p user)
-        nil
-      user)))
+  (if (stringp igist-auth-marker)
+      (read-string (or prompt "User: ") initial-input history)
+    (let* ((alist (mapcar (lambda (it)
+                            (let ((parts (split-string it "[\\^]" t)))
+                              (cons (pop parts)
+                                    (pop parts))))
+                          (igist-get-github-users)))
+           (annotf (lambda (str)
+                     (format "^%s" (cdr (assoc str alist)))))
+           (login-name (completing-read (or prompt
+                                            "Github user name: ")
+                                        (lambda (str pred action)
+                                          (if (eq action 'metadata)
+                                              `(metadata
+                                                (annotation-function
+                                                 . ,annotf))
+                                            (complete-with-action
+                                             action alist
+                                             str
+                                             pred)))
+                                        nil
+                                        nil
+                                        initial-input
+                                        history))
+           (marker (igist-alist-get login-name alist)))
+      (when-let ((marker (and marker (intern marker))))
+        (unless (eq marker igist-auth-marker)
+          (setq igist-auth-marker marker)))
+      login-name)))
 
 ;;;###autoload
 (define-minor-mode igist-comments-edit-mode
@@ -3487,7 +3536,7 @@ See also `igist-before-save-hook'."
 
 ;; Transient
 (transient-define-argument igist-set-current-filename-variable ()
-  "Set a Lisp variable, `igist-current-filename'."
+  "Define an argument to rename the current filename in igist."
   :description "Rename"
   :class 'transient-lisp-variable
   :if (lambda ()
@@ -3499,13 +3548,6 @@ See also `igist-before-save-hook'."
   :reader #'igist-read-filename
   :argument "--filename=")
 
-(transient-define-argument igist-set-current-user ()
-  "Read user name and assign it in the variable `igist-current-user-name'."
-  :description "Login Name"
-  :class 'transient-lisp-variable
-  :variable 'igist-current-user-name
-  :argument "--user"
-  :reader #'igist-change-user)
 
 (transient-define-argument igist-set-current-description-variable ()
   "Read description and assign it in the variable `igist-current-description'."
@@ -3624,9 +3666,10 @@ Argument STEP is the amount by which the column width should be increased."
           (max 1 (+ (cadr spec) step)))))
 
 (defun igist-tabulated-list-widen-current-column (&optional n)
-  "Widen the current tabulated-list column by N chars.
-Interactively, N is the prefix numeric argument, and defaults to
-1."
+  "Widen or narrow the current column in a tabulated list.
+
+Argument N is an optional argument that specifies the number of columns to
+widen."
   (interactive "p")
   (unless n (setq n 1))
   (let ((col (igist-tabulated-column-at-point))
@@ -3694,7 +3737,7 @@ Interactively, N is the prefix numeric argument, and defaults to
 
 ;;;###autoload (autoload 'igist-table-menu "igist" nil t)
 (transient-define-prefix igist-table-menu ()
-  "Transient menu for resizing table columns."
+  "A menu for editing, saving, and adjusting column settings in igist table."
   ["Edit column"
    ("c" igist--transient-switch-column :description
     (lambda ()
@@ -3752,6 +3795,16 @@ Interactively, N is the prefix numeric argument, and defaults to
            (get-text-property (point) 'tabulated-list-column-name))
          (car (igist-get-columns))))
   (transient-setup 'igist-table-menu))
+
+(defun igist-set-current-user ()
+  "Read user name and assign it in the variable `igist-current-user-name'."
+  (interactive)
+  (customize-set-variable
+   'igist-current-user-name
+   (igist-change-user "GitHub user name:  "
+                      igist-current-user-name))
+  (when transient-current-command
+    (transient-setup transient-current-command)))
 
 ;;;###autoload (autoload 'igist-dispatch "igist" nil t)
 (transient-define-prefix igist-dispatch ()
@@ -3813,8 +3866,8 @@ Interactively, N is the prefix numeric argument, and defaults to
     ("R" igist-set-current-filename-variable)
     ("d" igist-set-current-description-variable)]
    ["List"
-    ("l" "My gists" igist-list-gists :inapt-if-nil igist-current-user-name)
-    ("m" "Starred" igist-list-starred :inapt-if-nil igist-current-user-name)
+    ("l" "My gists" igist-list-gists :inapt-if-not igist-get-current-user-name)
+    ("m" "Starred" igist-list-starred :inapt-if-not igist-get-current-user-name)
     ("E" "Explore" igist-explore-public-gists :inapt-if
      igist-current-buffer-explore-p)
     ("o" "Other user" igist-list-other-user-gists)
@@ -3825,9 +3878,9 @@ Interactively, N is the prefix numeric argument, and defaults to
    [:if-not-mode
     igist-list-mode
     "Create"
-    ("n" "New" igist-create-new-gist :inapt-if-nil igist-current-user-name)
-    ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-nil
-     igist-current-user-name)]]
+    ("n" "New" igist-create-new-gist :inapt-if-not igist-get-current-user-name)
+    ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-not
+     igist-get-current-user-name)]]
   [:if-non-nil
    igist-current-gist
    ["Files"
@@ -3843,9 +3896,9 @@ Interactively, N is the prefix numeric argument, and defaults to
   [:if-mode
    igist-list-mode
    ["Create"
-    ("n" "New" igist-create-new-gist :inapt-if-nil igist-current-user-name)
-    ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-nil
-     igist-current-user-name)]
+    ("n" "New" igist-create-new-gist :inapt-if-not igist-get-current-user-name)
+    ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-not
+     igist-get-current-user-name)]
    ["Files"
     ("+" "Add" igist-list-add-file :inapt-if-not igist-editable-p)
     ("-" "Delete" igist-delete-current-filename :inapt-if-not igist-editable-p)]
@@ -3854,14 +3907,24 @@ Interactively, N is the prefix numeric argument, and defaults to
     ("c" "Show" igist-load-comments :inapt-if-not tabulated-list-get-id)]]
   [:if igist-comments-list-mode-p
        ["Comments"
-        ("a" "Add" igist-add-comment :inapt-if-nil igist-current-user-name)
-        ("g" "Reload" igist-load-comments :inapt-if-nil igist-current-user-name)
+        ("a" "Add" igist-add-comment :inapt-if-not igist-get-current-user-name)
+        ("g" "Reload" igist-load-comments :inapt-if-not
+         igist-get-current-user-name)
         ("e" "Edit" igist-add-or-edit-comment :inapt-if-not
          igist-get-comment-id-at-point)
         ("D" "Delete" igist-delete-comment-at-point :inapt-if-not
          igist-get-comment-id-at-point)]]
   ["User"
-   ("u" igist-set-current-user)
+   ("u" igist-set-current-user
+    :description (lambda ()
+                   (concat "Login Name "
+                           (propertize
+                            (substring-no-properties
+                             (or
+                              igist-current-user-name
+                              ""))
+                            'face 'transient-value)))
+    :transient nil)
    ("q" "Quit" transient-quit-all)])
 
 (provide 'igist)
