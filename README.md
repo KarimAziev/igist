@@ -170,7 +170,6 @@ Or if you use `straight.el`:
 
 - `igist-current-user-name`: This variable should be set to a string
   containing your GitHub username.
-
 - `igist-auth-marker`: This variable can either be a string containing
   the OAuth token or a symbol indicating where to fetch the OAuth
   token.
@@ -195,8 +194,7 @@ ways.
 ### Secure Way: Using auth-sources
 
 Emacs `auth-sources` provide a secure way to store your GitHub username
-and OAuth token. To employ this method, set `igist-auth-marker` to the
-symbol `igist`:
+and OAuth token.
 
 To employ this method, set `igist-auth-marker` to the symbol `igist`:
 
@@ -294,7 +292,7 @@ loading use command `igist-list-cancel-load` (default keybinding is
 | `-`         | delete file from gist                    |
 | `D`         | delete the whole gist                    |
 | `K`         | stop loading                             |
-| `S`         | start gist                               |
+| `S`         | star gist                                |
 | `U`         | unstar gist                              |
 | `a`         | comment gist                             |
 | `c`         | show comments                            |
@@ -375,17 +373,21 @@ To customize these keybindings edit the variable
 ## Customization
 
 - `igist-current-user-name`: This variable should be set to a string
-  containing your GitHub username.
-- `igist-auth-marker`: This variable can either be a string containing
-  the OAuth token or a symbol indicating where to fetch the OAuth
-  token.
-- `igist-message-function`: Function to show messages. Should accept
-  the same arguments as `message`.
-- `igist-per-page-limit`: The number of results per page (max 100).
-- `igist-ask-for-description`: When to prompt for description before
-  posting new gists.
-- `igist-enable-copy-gist-url-p`: Whether and when to add new or
-  updated gist's `url` to kill ring.
-- `igist-list-format`: The format of the user Tabulated Gists buffers.
-- `igist-explore-format`: The format of the Explore Public Gists
-  tabulated buffers.
+  that contains your GitHub username.
+- `igist-auth-marker`: This variable can either be a string that
+  contains the OAuth token or a symbol indicating where to retrieve
+  the OAuth token.
+- `igist-message-function`: A custom function for displaying messages.
+  Should accept the same arguments as the `message` function.
+- `igist-per-page-limit`: The number of results displayed per page
+  should be a value ranging between 30 to 100. The default value is 30.
+- `igist-ask-for-description`: Determines when to prompt for a
+  description before posting new gists. The default setting prompts
+  for a description before saving a new gist.
+- `igist-enable-copy-gist-url-p`: Specifies whether and when to add
+  the URL of a new or updated gist to the kill ring. The default
+  setting is after the creation of new gists.
+- `igist-list-format`: Specifies the format of the user's Tabulated
+  Gists buffers.
+- `igist-explore-format`: Specifies the format of the Explore Public
+  Gists tabulated buffers.

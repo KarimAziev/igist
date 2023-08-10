@@ -593,7 +593,7 @@ Program `pandoc' should be installed for `org-mode'."
   :group 'igist)
 
 (defcustom igist-per-page-limit 30
-  "The number of results per page (max 100)."
+  "The number of results per page. It should be the value between 30 to 100."
   :type 'integer
   :group 'igist)
 
