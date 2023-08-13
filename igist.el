@@ -2384,8 +2384,8 @@ Argument GISTS is a list of gists."
                 (igist-get-languages igist-list-response))))
     (when (fboundp 'chart-bar-quickie)
       (chart-bar-quickie 'vertical "Gists"
-                         (mapcar 'car alist) "Language"
-                         (mapcar 'cdr alist) "# of occurrences"
+                         (mapcar #'car alist) "Language"
+                         (mapcar #'cdr alist) "# of occurrences"
                          20
                          (lambda (a b)
                            (> (cdr a)
@@ -3603,7 +3603,7 @@ See also `igist-before-save-hook'."
     (setq igist-table-current-column next-choice)
     (igist-tabulated-list-goto-column
      igist-table-current-column)
-    (transient-setup 'igist-table-menu)
+    (transient-setup #'igist-table-menu)
     next-choice))
 
 (defun igist-table-current-column-spec ()
@@ -3794,7 +3794,7 @@ Interactively, N is the prefix numeric argument, and defaults to
              igist-table-current-column
            (get-text-property (point) 'tabulated-list-column-name))
          (car (igist-get-columns))))
-  (transient-setup 'igist-table-menu))
+  (transient-setup #'igist-table-menu))
 
 (defun igist-set-current-user ()
   "Read user name and assign it in the variable `igist-current-user-name'."
