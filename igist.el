@@ -3641,13 +3641,28 @@ Argument COLUMN-NAME is the name of the column that the function/macro
                    car)
                   subcols))))
 
+(defun igist-seq-split (sequence length)
+  "Split SEQUENCE into a list of sub-sequences of at most LENGTH elements.
+All the sub-sequences will be LENGTH long, except the last one,
+which may be shorter."
+  (when (< length 1)
+    (error "Sub-sequence length must be larger than zero"))
+  (let ((result nil)
+        (seq-length (length sequence))
+        (start 0))
+    (while (< start seq-length)
+      (push (seq-subseq sequence start
+                        (setq start (min seq-length (+ start length))))
+            result))
+    (nreverse result)))
+
 (defun igist-get-prev-column-if-last (column-name)
   "Get previous column is COLUMN-NAME is last column.
 
 Argument COLUMN-NAME is the name of the column for which the previous column is
 to be retrieved."
-  (let* ((rows (seq-split (igist-get-all-cols)
-                          (length tabulated-list-format)))
+  (let* ((rows (igist-seq-split (igist-get-all-cols)
+                                (length tabulated-list-format)))
          (found (seq-find
                  (igist-compose (apply-partially #'string= column-name) car last)
                  rows)))
