@@ -2374,7 +2374,7 @@ Argument GISTS is a list of gists."
    '()))
 
 (defun igist-print-languages-chart ()
-  "Return a chart showing the occurrence of file extensions in a buffer."
+  "Show a chart showing the occurrence of languages in a tabulated buffer."
   (interactive)
   (require 'chart)
   (let ((alist (mapcar
@@ -2386,7 +2386,7 @@ Argument GISTS is a list of gists."
       (chart-bar-quickie 'vertical "Gists"
                          (mapcar #'car alist) "Language"
                          (mapcar #'cdr alist) "# of occurrences"
-                         20
+                         10
                          (lambda (a b)
                            (> (cdr a)
                               (cdr b)))))))
@@ -3865,7 +3865,8 @@ Interactively, N is the prefix numeric argument, and defaults to
      :transient t)
     ("<backtab>" "Toggle visibility of subrows"
      igist-toggle-all-children
-     :transient t)]
+     :transient t)
+    ("s" "Show languages statistics" igist-print-languages-chart)]
    [:if
     igist-edit-mode-p
     "Actions"
@@ -3940,7 +3941,16 @@ Interactively, N is the prefix numeric argument, and defaults to
                               ""))
                             'face 'transient-value)))
     :transient nil)
-   ("q" "Quit" transient-quit-all)])
+   ("q" "Quit" transient-quit-all)]
+  (interactive)
+  (when (derived-mode-p 'igist-list-mode)
+    (setq igist-table-current-column
+          (or
+           (if (member igist-table-current-column (igist-get-columns))
+               igist-table-current-column
+             (get-text-property (point) 'tabulated-list-column-name))
+           (car (igist-get-columns)))))
+  (transient-setup #'igist-dispatch))
 
 (provide 'igist)
 ;;; igist.el ends here
