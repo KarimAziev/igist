@@ -2624,6 +2624,7 @@ tabulated list, which is used to display data in a table-like format in Emacs."
               #'igist-imenu-prev-index-position)
   (setq-local imenu-extract-index-name-function
               #'igist-imenu-extract-index-name)
+  (font-lock-add-keywords nil '(("#[^[:space:]]*" . 'font-lock-keyword-face)))
   (use-local-map igist-list-mode-map))
 
 (defun igist-pandoc-from-string (string input-type output-type &rest options)
