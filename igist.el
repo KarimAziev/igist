@@ -1281,31 +1281,6 @@ Argument USER is the username of the user whose gists will be loaded."
                       "")))))
     file))
 
-(defun igist-parse-gist (format-spec gist)
-  "Return a list based on FORMAT-SPEC of the GIST's attributes for display."
-  (mapcar
-   (pcase-lambda (`(,key ,_name ,_width ,_sortable ,format-val . ,_extra-props))
-     (let ((value
-            (pcase key
-              ((or 'updated_at 'created_at)
-               (igist--get-time (cdr (assq
-                                      key
-                                      gist))))
-              (_ (cdr (assq
-                       key
-                       gist))))))
-       (if (functionp format-val)
-           (or (funcall format-val value) "")
-         (if (not value)
-             ""
-           (funcall
-            (if (memq key '(created_at updated_at))
-                #'format-time-string
-              #'format)
-            (or format-val "%s")
-            value)))))
-   format-spec))
-
 (defun igist-sort-pred-string (a b)
   "The default function to sort strings in ascending order.
 
