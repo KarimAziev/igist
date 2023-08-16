@@ -244,7 +244,7 @@ subcolumns if provided, otherwise it get the entries from the
         (igist-property-boundaries 'tabulated-list-id))
        (id (tabulated-list-get-id))
        (`(,subcolumns-spec-n ,subcolumns-spec ,subcolumns-parent-spec)
-        (igist-find-children-spec (symbol-value igist-table-list-format))))
+        (igist-find-children-spec igist-table-list-format)))
     (when (and beg end subcolumns-spec-n)
       (let* ((pl (nthcdr 5 subcolumns-spec))
              (list-format (plist-get pl :children))
@@ -1351,7 +1351,7 @@ column.  Negate the predicate that would be returned if
 `tabulated-list-sort-key' has a non-nil cdr."
   (when (and tabulated-list-sort-key
              (car tabulated-list-sort-key))
-    (let* ((format-spec (symbol-value igist-table-list-format))
+    (let* ((format-spec igist-table-list-format)
            (n (tabulated-list--column-number (car tabulated-list-sort-key)))
            (spec (nth n format-spec))
            (field (car spec))
@@ -1509,7 +1509,7 @@ Argument GIST is the input gist that contains information about a specific
 entry."
   (let ((id (cdr (assq 'id gist)))
         (beg   (point))
-        (list-spec (symbol-value igist-table-list-format))
+        (list-spec igist-table-list-format)
         (inhibit-read-only t)
         (subcolumns-spec)
         (subcolumns-parent-spec))
@@ -2458,10 +2458,10 @@ Argument GISTS is a list of gists."
                   it)
                 (igist-get-languages igist-list-response))))
     (when (fboundp 'chart-bar-quickie)
-      (chart-bar-quickie 'vertical "Gists"
+      (chart-bar-quickie 'horizontal "Gists"
                          (mapcar #'car alist) "Language"
                          (mapcar #'cdr alist) "# of occurrences"
-                         10
+                         20
                          (lambda (a b)
                            (> (cdr a)
                               (cdr b)))))))
@@ -2531,14 +2531,60 @@ MAX is length of most longest key."
   (string-trim (buffer-substring (line-beginning-position)
                                  (line-end-position))))
 
+
+(defun igist--revert-tabulated-buffers (sym newval &rest _)
+  "Update the format of tabulated buffers based on the new value provided.
+
+Argument SYM is a symbol that determines the type of buffer to revert,
+specifically whether it's an `igist-explore-format' buffer or a buffer in
+`igist-list-mode'.
+Argument NEWVAL is the new value to be set for `igist-table-list-format' and
+used to get the new `tabulated-list-format'."
+  (dolist (buff (buffer-list))
+    (when (if (eq sym 'igist-explore-format)
+              (igist-explore-buffer-p buff)
+            (with-current-buffer buff (derived-mode-p 'igist-list-mode)))
+      (with-current-buffer buff
+        (let ((loading igist-list-loading))
+          (when loading
+            (igist-list-cancel-load))
+          (setq igist-table-list-format
+                newval)
+          (let ((igist-table-list-format newval))
+            (setq tabulated-list-printer #'igist-tabulated-list-print-entry)
+            (setq tabulated-list-format
+                  (igist-get-tabulated-list-format
+                   newval))
+            (tabulated-list-init-header)
+            (igist-tabulated-list-print)
+            (when loading
+              (igist-list-refresh))))))))
+
+(defun igist--tabulated-list-revert ()
+  "Revert the tabulated list to its original format in Igist."
+  (setq igist-table-list-format
+        (if (igist-explore-buffer-p (current-buffer))
+            igist-explore-format
+          igist-list-format))
+  (setq tabulated-list-format
+        (igist-get-tabulated-list-format
+         igist-table-list-format)
+        tabulated-list-padding 2)
+  (tabulated-list-init-header)
+  (run-hooks 'tabulated-list-revert-hook)
+  (igist-tabulated-list-print t))
+
+
+(add-variable-watcher 'igist-list-format #'igist--revert-tabulated-buffers)
+(add-variable-watcher 'igist-explore-format #'igist--revert-tabulated-buffers)
+
 (defun igist-tabulated-list-revert (&rest _ignored)
   "The `revert-buffer-function' for `tabulated-list-mode'.
 It runs `tabulated-list-revert-hook', then calls `igist-tabulated-list-print'."
   (interactive)
   (unless (derived-mode-p 'igist-list-mode)
     (error "The current buffer is not in Igist-list-mode"))
-  (run-hooks 'tabulated-list-revert-hook)
-  (igist-tabulated-list-print t))
+  (igist--tabulated-list-revert))
 
 (defun igist-get-tabulated-list-format (list-format)
   "Convert LIST-FORMAT to tabulated.
@@ -2594,11 +2640,11 @@ tabulated list, which is used to display data in a table-like format in Emacs."
 \\{igist-list-mode-map}"
   (setq igist-table-list-format
         (if (igist-explore-buffer-p (current-buffer))
-            'igist-explore-format
-          'igist-list-format))
+            igist-explore-format
+          igist-list-format))
   (setq tabulated-list-format
         (igist-get-tabulated-list-format
-         (symbol-value igist-table-list-format))
+         igist-table-list-format)
         tabulated-list-padding 2)
   (tabulated-list-init-header)
   (setq tabulated-list-printer #'igist-tabulated-list-print-entry)
@@ -3814,7 +3860,9 @@ Interactively, N is the prefix numeric argument, and defaults to
 (defun igist-save-column-settings ()
   "Save column settings for igist explore or igist list format."
   (interactive)
-  (let* ((sym igist-table-list-format)
+  (let* ((sym (if (igist-explore-buffer-p (current-buffer))
+                  'igist-explore-format
+                'igist-list-format))
          (spec (symbol-value sym))
          (new-value (igist-update-fields-format-from-tabulated-format
                      spec
