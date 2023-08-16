@@ -30,24 +30,25 @@
 
 ;; Usage
 
-;;  `igist-dispatch' - to invoke transient popup with the list of available commands
+;;  `igist-dispatch' - Invoke transient menu with the list of available
+;;   commands.
 
 ;; Tabulated display:
 
-;; M-x `igist-list-gists' - to display your gists as table.
-;; M-x `igist-list-other-user-gists' - to display public gists of any user.
-;; M-x `igist-explore-public-gists' - List public gists sorted by most recently updated to least recently updated.
+;; M-x `igist-list-gists' - Display your gists as table.
+;; M-x `igist-list-other-user-gists' - Display public gists of any user.
+;; M-x `igist-explore-public-gists' - List public gists sorted.
 
 ;; Completions display:
 
-;; M-x `igist-edit-list' - Read user gists in minibuffer and open it in edit buffer.
+;; M-x `igist-edit-list' Read Gist to edit from the minibuffer.
 
 ;;; Create commands:
 
 ;; M-x `igist-create-new-gist'
 ;;      Create the editable gist buffer with the content of the current buffer.
 
-;; M-x `igist-new-gist-from-buffer' (&rest _ignore)
+;; M-x `igist-new-gist-from-buffer'
 ;;      Setup new gist buffer whole buffer contents.
 
 ;; M-x `igist-list-add-file'
@@ -55,6 +56,12 @@
 
 ;; M-x `igist-fork-gist'
 ;;      Fork gist at point in `igist-list-mode' or currently opened.
+
+;; M-x `igist-post-files' Post multiple files to Gist. If
+;;      there are marked files in the Dired buffer, use them; otherwise, read
+;;      the directory in the minibuffer with completions and then read multiple
+;;      files.
+
 
 ;; Delete commands:
 
@@ -127,26 +134,33 @@
 
 ;;; Customization
 
+;; - `igist-current-user-name': This variable should be set to a string
+;;   that contains your GitHub username.
 
-;; `igist-current-user-name' is a customizable option that represents the
-;; GitHub user name used for making authorized requests.
+;; - `igist-auth-marker': This variable can either be a string that
+;;   contains the OAuth token or a symbol indicating where to retrieve
+;;   the OAuth token.
 
-;; `igist-auth-marker' This variable can either be a string containing the OAuth
-;; token or a symbol indicating where to fetch the OAuth token.
+;; - `igist-message-function': A custom function for displaying messages.
+;;   Should accept the same arguments as the `message' function.
 
+;; - `igist-per-page-limit': The number of results displayed per page
+;;   should be a value ranging between 30 to 100. The default value is 30.
 
-;; `igist-per-page-limit'
-;;      The number of results per page (max 100).
+;; - `igist-ask-for-description': Determines when to prompt for a
+;;   description before posting new gists. The default setting prompts
+;;   for a description before saving a new gist.
 
-;; `igist-ask-for-description'
-;;      When to prompt for description before posting new gists.
+;; - `igist-enable-copy-gist-url-p': Specifies whether and when to add
+;;   the URL of a new or updated gist to the kill ring. The default
+;;   setting is after the creation of new gists.
 
-;; `igist-mode-for-comments'
-;;      Major mode when editing and viewing comments.
-;;      Program `pandoc' should be installed for `org-mode'.
+;; - `igist-list-format': Specifies the format of the user's Tabulated
+;;   Gists buffers.
 
-;; `igist-list-format'
-;;      Format for gist list.
+;; - `igist-explore-format': Specifies the format of the Explore Public
+;;   Gists tabulated buffers.
+
 
 ;;; Keymaps
 
@@ -1450,7 +1464,7 @@ column is the last column in the table."
 
 (defun igist-render-entry (elt list-format list-padding parent-spec &optional
                                extra-props)
-  "Render an entry ELT in a tabulated list with specified formatting LIST-FORMAT.
+  "Render an entry ELT in a tabulated list with formatting LIST-FORMAT.
 
 LIST-PADDING is a number of characters preceding each Tabulated List mode entry.
 
@@ -2150,6 +2164,85 @@ If LOADING is non nil show spinner, otherwise hide."
                             (funcall callback))))
                      (igist-message "Couldn't save gist."))))))
 
+(defun igist-files-to-gist-alist (files)
+  "Convert a list of FILES into an association list for creating GitHub gists.
+
+Argument FILES is a list of file paths that the function will use to create a
+list of alists, where each alist represents a file and its content."
+  (let ((gist-files))
+    (dolist (file files)
+      (let ((obj `(,(intern (file-name-nondirectory file)) .
+                   ((content .
+                             ,(with-temp-buffer
+                                (insert-file-contents file)
+                                (buffer-string)))))))
+        (push obj gist-files)))
+    (nreverse gist-files)))
+
+(defun igist-post-files-request (files &optional description public)
+  "Post FILES to a gist with optional DESCRIPTION and PUBLIC visibility.
+
+Argument FILES is a list of files that will be posted to the gist.
+Argument DESCRIPTION is an optional parameter that provides a DESCRIPTION for
+the gist.
+Argument PUBLIC is an optional boolean parameter that determines whether the
+gist is PUBLIC or not."
+  (let ((gist-files (igist-files-to-gist-alist files))
+        (buffer (igist-get-user-buffer-name (igist-get-current-user-name))))
+    (igist-post "/gists" nil
+                :payload
+                `((description . ,(or description ""))
+                  (public . ,public)
+                  (files . ,gist-files))
+                :buffer buffer
+                :callback
+                (lambda (value &rest _)
+                  (when value
+                    (igist-with-exisiting-buffer buffer
+                      (if igist-list-loading
+                          (igist-load-logged-user-gists)
+                        (setq igist-list-response (push value
+                                                        igist-list-response))
+                        (igist-debounce 'igist-render-timer 0.5
+                                        #'igist-list-render
+                                        igist-list-response))))))))
+;;;###autoload
+(defun igist-post-files (files &optional public)
+  "Post FILES to Gist with an optional PUBLIC visibility and description.
+
+The argument FILES is a list of files that the user wants to post on Gist. If
+there are marked files in the Dired buffer, use them; otherwise, read the
+directory in the minibuffer with completions and then read multiple files.
+
+The argument PUBLIC is an optional boolean value that determines whether the
+posted Gist should be PUBLIC or not.
+
+The Gist will be created without editing."
+  (interactive
+   (list
+    (or
+     (when (fboundp 'dired-get-marked-files)
+       (when-let ((dired-files (dired-get-marked-files)))
+         (when (or (derived-mode-p 'dired-mode)
+                   (yes-or-no-p (format "Post %d files?" (length dired-files))))
+           dired-files)))
+     (let ((dir (read-directory-name "Directory")))
+       (mapcar (igist-rpartial expand-file-name dir)
+               (completing-read-multiple
+                "Files: "
+                (seq-remove
+                 #'file-directory-p
+                 (directory-files
+                  dir nil
+                  directory-files-no-dot-files-regexp))))))
+    (yes-or-no-p "Public?")))
+  (while (not (igist-get-current-user-name))
+    (setq igist-current-user-name (read-string "User: ")))
+  (let ((description (if igist-ask-for-description (read-string "Description: ")
+                       "")))
+    (igist-post-files-request files description)))
+
+
 (defun igist-save-new-gist (buffer &optional callback)
   "Save new gist in BUFFER, refresh gists and execute CALLBACK without args."
   (let ((file (buffer-local-value 'igist-current-filename
@@ -2473,7 +2566,7 @@ tabulated list, where each element consists of a key, name, width, sortable
 flag, format value, and extra properties."
   (apply #'vector
          (mapcar
-          (pcase-lambda (`(,_key ,name ,width ,sortable ,_format-val . ,extra-props))
+          (pcase-lambda (`(,_key ,name ,width ,sortable ,_fmt . ,extra-props))
             (if extra-props
                 (let ((children (plist-get extra-props :children)))
                   (if children
@@ -2503,10 +2596,11 @@ tabulated list, which is used to display data in a table-like format in Emacs."
            (let ((children (plist-get extra-props :children)))
              (if children
                  (let ((pl (seq-copy extra-props)))
-                   (setq pl (plist-put pl :children
-                                       (igist-update-fields-format-from-tabulated-format
-                                        children
-                                        (plist-get (nthcdr 3 spec) :children))))
+                   (setq pl (plist-put
+                             pl :children
+                             (igist-update-fields-format-from-tabulated-format
+                              children
+                              (plist-get (nthcdr 3 spec) :children))))
                    (append (list key name width sortable format-val) pl))
                (append (list key name width sortable format-val) extra-props)))
          (list key name width sortable format-val))))
@@ -3525,14 +3619,8 @@ See also `igist-before-save-hook'."
   :keymap igist-edit-mode-map
   :global nil
   (when igist-edit-mode
-    (progn
-      (setq buffer-read-only nil)
-      (set-buffer-modified-p nil)
-      (use-local-map
-       (let ((map (copy-keymap
-                   igist-edit-mode-map)))
-         (set-keymap-parent map (current-local-map))
-         map)))))
+    (setq buffer-read-only nil)
+    (set-buffer-modified-p nil)))
 
 ;; Transient
 (transient-define-argument igist-set-current-filename-variable ()
@@ -3664,7 +3752,8 @@ to be retrieved."
   (let* ((rows (igist-seq-split (igist-get-all-cols)
                                 (length tabulated-list-format)))
          (found (seq-find
-                 (igist-compose (apply-partially #'string= column-name) car last)
+                 (igist-compose (apply-partially #'string= column-name)
+                                car last)
                  rows)))
     (cadr (reverse found))))
 
@@ -3896,7 +3985,17 @@ Interactively, N is the prefix numeric argument, and defaults to
     "Create"
     ("n" "New" igist-create-new-gist :inapt-if-not igist-get-current-user-name)
     ("b" "New from buffer" igist-new-gist-from-buffer :inapt-if-not
-     igist-get-current-user-name)]]
+     igist-get-current-user-name)
+    ("p" igist-post-files
+     :description
+     (lambda ()
+       (if-let ((marked-files
+                 (and (fboundp
+                       'dired-get-marked-files)
+                      (dired-get-marked-files))))
+           (format "Post %d marked files" (length marked-files))
+         "Post files"))
+     :inapt-if-not igist-get-current-user-name)]]
   [:if-non-nil
    igist-current-gist
    ["Files"
