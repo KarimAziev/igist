@@ -2174,6 +2174,11 @@ gist is PUBLIC or not."
                 :callback
                 (lambda (value &rest _)
                   (when value
+                    (when (memq igist-enable-copy-gist-url-p
+                                '(t after-new))
+                      (when-let ((url (igist-get-current-gist-url)))
+                        (kill-new url)
+                        (igist-message "Copied %s" url)))
                     (igist-with-exisiting-buffer buffer
                       (if igist-list-loading
                           (igist-load-logged-user-gists)
@@ -2214,9 +2219,10 @@ The Gist will be created without editing."
     (yes-or-no-p "Public?")))
   (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (read-string "User: ")))
-  (let ((description (if igist-ask-for-description (read-string "Description: ")
+  (let ((description (if igist-ask-for-description
+                         (read-string "Description: ")
                        "")))
-    (igist-post-files-request files description)))
+    (igist-post-files-request files description public)))
 
 
 (defun igist-save-new-gist (buffer &optional callback)
