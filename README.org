@@ -264,38 +264,44 @@ There are two ways in which gists can be presented - as a table or as minibuffer
 
 This commands render and load gists with pagination. To stop or pause loading use command ~igist-list-cancel-load~ (default keybinding is ~K~).
 
-| Key         | Command                                  |
-|-------------+------------------------------------------|
-| =RET=       | edit gist                                |
-| =C-j=       | view gist                                |
-| =v=         | view gist                                |
-| =+=         | add file to the gist                     |
-| =-=         | delete file from gist                    |
-| =D=         | delete the whole gist                    |
-| =K=         | stop loading                             |
-| =S=         | star gist                                |
-| =U=         | unstar gist                              |
-| =a=         | comment gist                             |
-| =c=         | show comments                            |
-| =d=         | edit gist description                    |
-| =f=         | fork gist                                |
-| =g=         | refresh gists                            |
-| =r=         | browse gist                              |
-| =s=         | sort gists                               |
-| =w=         | copy gist url                            |
-| ={=         | narrow current gist column               |
-| =}=         | widen current gist column                |
-| =<tab>=     | toggle visibility of gist files at point |
-| =<backtab>= | toggle visibility of all files           |
-| =C=         | configure and save view settings         |
+ *Gists Actions*
+| Key          | Description           | Command                         |
+|--------------+-----------------------+---------------------------------|
+| =RET=        | edit gist             | =igist-list-edit-gist-at-point= |
+| =v= or =C-j= | view gist             | =igist-list-view-current=       |
+| =+=          | add file to the gist  | =igist-list-add-file=           |
+| =-=          | delete file from gist | =igist-delete-current-filename= |
+| =D=          | delete the whole gist | =igist-delete-current-gist=     |
+| =K=          | stop loading          | =igist-list-cancel-load=        |
+| =S=          | star gist             | =igist-star-gist=               |
+| =U=          | unstar gist           | =igist-unstar-gist=             |
+| =a=          | comment gist          | =igist-add-comment=             |
+| =c=          | show comment          | =igist-load-comments=           |
+| =d=          | edit description      | =igist-list-edit-description=   |
+| =f=          | fork gist             | =igist-fork-gist=               |
+| =g=          | refresh gists         | =igist-list-refresh=            |
+| =r=          | browse gist           | =igist-browse-gist=             |
+| =s=          | sort gist             | =igist-tabulated-list-sort=     |
+| =w=          | copy gist url         | =igist-copy-gist-url=           |
 
-To customize these keys, see the variable =igist-list-mode-map=.
+*UI Actions*
 
-You can configure and save width of each column interactivelly with transient menu - ~igist-table-menu~.
+| Key            | Description                         | Command                                      |
+|----------------+-------------------------------------+----------------------------------------------|
+| =C=            | open transient menu for editing UI  | =igist-table-menu=                           |
+| =<tab>=        | toggle visibility of files at point | =igist-toggle-row-children-at-point=         |
+| =<backtab>=    | toggle visibility of all files      | =igist-toggle-all-children=                  |
+| ={=            | widen current gist column           | =igist-tabulated-list-widen-current-column=  |
+| =}=            | narrow current gist column          | =igist-tabulated-list-narrow-current-column= |
+| =M-]= or =M-}= | swap column with the next one       | =igist-swap-current-column=                  |
+| =M-[= or =M-{= | swap column with the previous one   | =igist-swap-current-column-backward=         |
+|                |                                     |                                              |
+
+You can change the width, reorder, or remove columns interactively with the transient menu - ~igist-table-menu~. If you want to save your settings, use the command =M-x igist-save-column-settings=. To discard, use =M-x igist-reset-columns-settings=.
 
 [[./igist-demo-view.gif][./igist-demo-view.gif]]
 
-To configure which columns to display in user's buffer customize variable ~igist-list-format~ and for explore buffers - ~igist-explore-format~.
+To customize these keys, see the variable =igist-list-mode-map=.
 
 
 *** Minibuffer Completions
