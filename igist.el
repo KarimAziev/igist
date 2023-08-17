@@ -306,26 +306,24 @@ expanded when toggling the children row."
     (igist-toggle-children-row)))
 
 (defun igist-format-time-diff (time)
-  "Calculate and format the time difference from the current TIME.
+"Calculate and format the time difference from the current TIME.
 
 Argument TIME is the time value that will be compared with the current time to
 calculate the time difference."
-  (let* ((now (current-time))
-         (diff-seconds (- (float-time now)
-                          (float-time time)))
-         (diff-days (/ diff-seconds 86400))
-         (diff-hours (/ diff-seconds 3600))
-         (diff-minutes (/ diff-seconds 60)))
-    (cond ((< diff-minutes 1)
-           (format "%d seconds ago" (truncate diff-seconds)))
-          ((< diff-hours 1)
-           (format "%d minutes ago" (truncate diff-minutes)))
-          ((< diff-days 1)
-           (format "%d hours ago" (truncate diff-hours)))
-          ((< diff-days 30)
-           (format "%d days ago" (truncate diff-days)))
-          (t
-           (format "%d months ago" (truncate (/ diff-days 30)))))))
+  (let ((diff-seconds (- (float-time (current-time)) (float-time time))))
+    (pcase-let ((`(,format-str . ,value)
+                 (cond ((< diff-seconds 60)
+                        (cons "%d second" (truncate diff-seconds)))
+                       ((< diff-seconds 3600)
+                        (cons "%d minute" (truncate (/ diff-seconds 60))))
+                       ((< diff-seconds 86400)
+                        (cons "%d hour" (truncate (/ diff-seconds 3600))))
+                       ((< diff-seconds 2592000)
+                        (cons "%d day" (truncate (/ diff-seconds 86400))))
+                       (t
+                        (cons "%d month" (truncate (/ diff-seconds 2592000)))))))
+      (format (concat format-str (if (= value 1) " ago" "s ago")) value))))
+
 
 (defun igist-render-time (value)
   "Format a given VALUE as a date and time.
