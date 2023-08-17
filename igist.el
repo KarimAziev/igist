@@ -373,9 +373,9 @@ Argument FILES is an alist of gist files."
     (owner "User" 10 t igist-render-user)
     (comments "Comments" 9 t igist-render-comments)
     (public "Public" 8 t igist-render-public)
-    (files "Files" 0 t igist-render-files
-           :children ((filename "File" 88 nil "%s")
-                      (language "Language" 0 nil "%s"))
+    (files "Files" 10 t igist-render-files
+           :children ((filename "File" 90 nil "%s")
+                      (language "Language" 8 nil "%s"))
            :align-to-column 1)))
 
 (defun igist-pick-from-alist (keys alist)
@@ -454,15 +454,41 @@ Argument KEYS is a list of KEYS to filter the alist by."
        (alist
         :key-type symbol
         :value-type
-        (list (string :tag "Column Name")
-              (integer :tag "Column Width" 10)
-              (choice
-               (boolean :tag "Sortable")
-               (function :tag "Sort function"))
-              (choice :value "%s"
-                      (string
-                       :tag "Format")
-                      (function :tag "Formatter")))))))))
+        (list
+         (string :tag "Column Name")
+         (integer :tag "Column Width" 10)
+         (choice
+          (boolean :tag "Sortable")
+          (function :tag "Sort function"))
+         (choice :value "%s"
+                 (string
+                  :tag "Format")
+                 (function :tag "Formatter"))
+         (set
+          :inline t
+          (list
+           :format "%v"
+           :inline t
+           (const
+            :format ""
+            :right-align)
+           (boolean :tag ":right-align" t))
+          (list
+           :format "%v"
+           :inline t
+           (const
+            :format ""
+            :pad-right)
+           (integer :tag ":pad-right" 1))
+          (list
+           :format "%v"
+           :inline t
+           (const
+            :format ""
+            :align-to-column)
+           (integer :tag ":align-to-column" 1))))))))))
+
+
 
 (defvar igist-explore-buffer-name "*igist-explore*"
   "Buffer name for tabulated gists display of multiple owners.")
