@@ -498,7 +498,7 @@ Argument KEYS is a list of KEYS to filter the alist by."
                                            description
                                            owner
                                            comments)
-                                         igist-default-formats)
+                                         (copy-tree igist-default-formats))
                                         '((files "Files" 0 t igist-render-files
                                                  :children
                                                  ((filename "File" 79
@@ -547,7 +547,7 @@ and save the result with command `igist-save-column-settings'."
                                 updated_at
                                 comments
                                 files)
-                              igist-default-formats)
+                              (copy-tree igist-default-formats))
   "The format of the user Tabulated Gists buffers.
 
 Each element in the alist represents a column and has the following structure:
