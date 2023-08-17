@@ -1,6 +1,6 @@
 #+TITLE: Changelog
 
-* v1.4.0    UNRELEASED
+* v1.4.0    2023-08-17
 
 ** New commands:
   - =igist-post-files= Post multiple files. In Dired it creates a gist from marked files.
