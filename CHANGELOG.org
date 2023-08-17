@@ -3,8 +3,11 @@
 * v1.4.0    UNRELEASED
 
 ** New commands:
-  - =igist-post-files= - post multiple files. In Dired it creates a gist from marked files.
-  - =igist-print-languages-chart= - Print a chart with language occurrences.
+  - =igist-post-files= Post multiple files. In Dired it creates a gist from marked files.
+  - =igist-print-languages-chart= Print a chart with language occurrences.
+  - =igist-swap-current-column= Swap current column with the next one.
+  - =igist-swap-current-column-backward= Swap current column with the previous one.
+  - =igist-list-remove-column= Remove column.
 ** Fixes:
   - Fix column resizing for Emacs versions prior to 29.
 ** Misc:
