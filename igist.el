@@ -630,9 +630,18 @@ Program `pandoc' should be installed for `org-mode'."
           (const :tag "Before posting" before-save))
   :group 'igist)
 
+(defun igist-check-per-page-range (n)
+  "Validate per page N."
+  (and (numberp n)
+       (>= n 30)
+       (<= n 100)))
+
 (defcustom igist-per-page-limit 30
   "The number of results per page. It should be the value between 30 to 100."
-  :type 'integer
+  :type '(restricted-sexp
+          :tag "Per page"
+          :value 30
+          :match-alternatives (igist-check-per-page-range))
   :group 'igist)
 
 (defcustom igist-message-function 'minibuffer-message
