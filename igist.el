@@ -684,7 +684,6 @@ with the GitHub API."
           (string :tag "OAuth Token")
           (symbol :tag "Suffix" igist)))
 
-
 (defvar igist-github-token-scopes '(gist)
   "The required GitHub API scopes.
 
@@ -762,6 +761,10 @@ only serves as documentation.")
     (define-key map (kbd "<backtab>") #'igist-toggle-all-children)
     (define-key map (kbd "<tab>") #'igist-toggle-row-children-at-point)
     (define-key map (kbd "C") #'igist-table-menu)
+    (define-key map (kbd "M-[") #'igist-swap-current-column-backward)
+    (define-key map (kbd "M-]") #'igist-swap-current-column)
+    (define-key map (kbd "M-{") #'igist-swap-current-column-backward)
+    (define-key map (kbd "M-}") #'igist-swap-current-column)
     (when (fboundp 'tabulated-list-widen-current-column)
       (define-key map [remap tabulated-list-widen-current-column]
                   #'igist-tabulated-list-widen-current-column))
@@ -770,7 +773,6 @@ only serves as documentation.")
                   #'igist-tabulated-list-narrow-current-column))
     map)
   "Keymap used in tabulated gists views.")
-
 
 (defvar igist-comments-list-mode-map
   (let ((map (make-sparse-keymap)))
@@ -896,6 +898,40 @@ at the values with which this function was called."
   "Apply `igist-message-function' with ARGS."
   (when igist-message-function
     (apply igist-message-function args)))
+
+(defun igist-swap (i j lst)
+  "Swap the elements at positions I and J in a given list LST.
+
+Argument I is the index of the first element in the list that you want to swap.
+Argument J is the index of the second element in the list that you want to swap
+with the first element.
+Argument LST is the list in which the swapping of elements will take place."
+  (let ((elem (nth i lst)))
+    (setf (nth i lst)
+          (nth j lst))
+    (setf (nth j lst) elem))
+  lst)
+
+(defun igist-seq-split (sequence length)
+  "Split SEQUENCE into a list of sub-sequences of at most LENGTH elements.
+All the sub-sequences will be LENGTH long, except the last one,
+which may be shorter."
+  (when (< length 1)
+    (error "Sub-sequence length must be larger than zero"))
+  (let ((result nil)
+        (seq-length (length sequence))
+        (start 0))
+    (while (< start seq-length)
+      (push (seq-subseq sequence start
+                        (setq start (min seq-length (+ start length))))
+            result))
+    (nreverse result)))
+
+(defun igist-get-current-list-format-sym ()
+  "Determine the current list format symbol based on the buffer type."
+  (if (igist-explore-buffer-p (current-buffer))
+      'igist-explore-format
+    'igist-list-format))
 
 (defun igist-editable-p (&optional gist)
   "Check whether user `igist-current-user-name' can edit GIST."
@@ -1297,7 +1333,10 @@ Argument USER is the username of the user whose gists will be loaded."
     (user-error "No gist at point")))
 
 (defun igist-read-filename-new (gist)
-  "Read a filename that doesn't exist in GIST."
+  "Prompt for a new filename for a GIST, ensuring it doesn't already exist.
+
+Argument GIST is an associative list (alist) representing a GitHub gist, which
+includes information such as the gist's ID and files."
   (let* ((filenames (mapcar (apply-partially #'igist-alist-get 'filename)
                             (igist-alist-get 'files gist)))
          (id (igist-alist-get 'id gist))
@@ -1418,14 +1457,12 @@ column is the last column in the table."
                (pad-right (or (plist-get props :pad-right) 1))
                (right-align (plist-get props :right-align))
                (value (cdr (assq field-name data)))
-               (col-desc (if (functionp format-val)
-                             (or (funcall format-val value) "")
-                           (funcall (if (memq field-name
-                                              '(created_at updated_at))
-                                        #'format-time-string
-                                      #'format)
-                                    (or format-val "%s")
-                                    (or value ""))))
+               (col-desc
+                (cond ((functionp format-val)
+                       (or (funcall format-val value) ""))
+                      (t (format
+                          (or format-val "%s")
+                          (or value "")))))
                (label
                 (cond ((stringp col-desc) col-desc)
                       ((eq (car col-desc) 'image) " ")
@@ -1741,7 +1778,7 @@ navigate in a tabulated list."
             (goto-char next)))))))
 
 (defun igist-goto-column (column-name)
-  "Go to specified column in tabulated list.
+  "Jump to specified column COLUMN-NAME in tabulated list.
 
 Argument COLUMN-NAME is the name of the column to which the function will
 navigate in a tabulated list."
@@ -1751,7 +1788,17 @@ navigate in a tabulated list."
                                   tabulated-list-format))))
   (igist-tabulated-list-goto-column column-name))
 
-(defvar-local igist-table-current-column nil)
+(defvar-local igist-table-current-column nil
+  "Name of the column to edit in `igist-table-menu'.")
+
+(defun igist-table-init-current-column ()
+  "Initialize and set value for `igist-table-current-column'."
+  (setq igist-table-current-column
+        (or
+         (if (member igist-table-current-column (igist-get-row-columns-at-point))
+             igist-table-current-column
+           (get-text-property (point) 'tabulated-list-column-name))
+         (car (igist-get-row-columns-at-point)))))
 
 (defun igist-tabulated-forward-column (&optional arg)
   "Go to the start of the next column after point on the current line.
@@ -1777,9 +1824,7 @@ If ARG is provided, move that many columns."
           (goto-char next))))))
 
 (defun igist-get-all-cols ()
-  "Widen the current tabulated-list column by N chars.
-Interactively, N is the prefix numeric argument, and defaults to
-1."
+  "Extract all column names from a tabulated list format."
   (let* ((child-cols (mapcar #'car
                              (plist-get
                               (nthcdr 3
@@ -2220,6 +2265,7 @@ gist is PUBLIC or not."
                         (igist-debounce 'igist-render-timer 0.5
                                         #'igist-list-render
                                         igist-list-response))))))))
+
 ;;;###autoload
 (defun igist-post-files (files &optional public)
   "Post FILES to Gist with an optional PUBLIC visibility and description.
@@ -2256,7 +2302,6 @@ The Gist will be created without editing."
                          (read-string "Description: ")
                        "")))
     (igist-post-files-request files description public)))
-
 
 (defun igist-save-new-gist (buffer &optional callback)
   "Save new gist in BUFFER, refresh gists and execute CALLBACK without args."
@@ -2564,7 +2609,6 @@ MAX is length of most longest key."
   (string-trim (buffer-substring (line-beginning-position)
                                  (line-end-position))))
 
-
 (defun igist--revert-tabulated-buffers (sym newval &rest _)
   "Update the format of tabulated buffers based on the new value provided.
 
@@ -2584,21 +2628,20 @@ used to get the new `tabulated-list-format'."
           (setq igist-table-list-format
                 newval)
           (let ((igist-table-list-format newval))
+            (setq igist-table-current-column nil)
             (setq tabulated-list-printer #'igist-tabulated-list-print-entry)
             (setq tabulated-list-format
                   (igist-get-tabulated-list-format
                    newval))
             (tabulated-list-init-header)
-            (igist-tabulated-list-print)
+            (igist-tabulated-list-print t)
             (when loading
               (igist-list-refresh))))))))
 
 (defun igist--tabulated-list-revert ()
   "Revert the tabulated list to its original format in Igist."
   (setq igist-table-list-format
-        (if (igist-explore-buffer-p (current-buffer))
-            igist-explore-format
-          igist-list-format))
+        (igist-get-current-list-format-sym))
   (setq tabulated-list-format
         (igist-get-tabulated-list-format
          igist-table-list-format)
@@ -2607,12 +2650,11 @@ used to get the new `tabulated-list-format'."
   (run-hooks 'tabulated-list-revert-hook)
   (igist-tabulated-list-print t))
 
-
 (add-variable-watcher 'igist-list-format #'igist--revert-tabulated-buffers)
 (add-variable-watcher 'igist-explore-format #'igist--revert-tabulated-buffers)
 
 (defun igist-tabulated-list-revert (&rest _ignored)
-  "The `revert-buffer-function' for `tabulated-list-mode'.
+  "The `revert-buffer-function' for `igist-list-mode'.
 It runs `tabulated-list-revert-hook', then calls `igist-tabulated-list-print'."
   (interactive)
   (unless (derived-mode-p 'igist-list-mode)
@@ -2994,7 +3036,6 @@ If WITH-HEADING is non nil, include also heading, otherwise only body."
     (when-let ((owner (igist-get-owner
                        (car igist-list-response))))
       (igist-list-load-gists owner))))
-
 
 (defun igist-list-loaded-callback (buffer value req callback callback-args)
   "Update the BUFFER with the loaded VALUE and trigger the CALLBACK.
@@ -3440,7 +3481,6 @@ Argument USER is the username of the user whose gists will be displayed."
                         (concat "/users/" igist-current-user-name
                                 "/gists")))
 
-
 ;;;###autoload
 (defun igist-ivy-read-public-gists ()
   "Explore public gists in the minibuffer, using Ivy completions."
@@ -3698,7 +3738,6 @@ See also `igist-before-save-hook'."
   :reader #'igist-read-filename
   :argument "--filename=")
 
-
 (transient-define-argument igist-set-current-description-variable ()
   "Read description and assign it in the variable `igist-current-description'."
   :description "Description"
@@ -3726,7 +3765,7 @@ See also `igist-before-save-hook'."
   :reader #'igist-toggle-public
   :argument "affirmative")
 
-(defun igist-get-columns ()
+(defun igist-get-row-columns-at-point ()
   "Return list of columns for the current tabulated list."
   (when (tabulated-list-get-id)
     (get-text-property (point) 'columns)))
@@ -3734,7 +3773,7 @@ See also `igist-before-save-hook'."
 (defun igist--transient-switch-column ()
   "Switch to the next column in a transient menu."
   (interactive)
-  (let* ((choices (igist-get-columns))
+  (let* ((choices (igist-get-row-columns-at-point))
          (current-idx (or (seq-position choices igist-table-current-column) -1))
          (next-idx (% (1+ current-idx)
                       (length choices)))
@@ -3790,21 +3829,6 @@ Argument COLUMN-NAME is the name of the column that the function/macro
                                     column-name)
                    car)
                   subcols))))
-
-(defun igist-seq-split (sequence length)
-  "Split SEQUENCE into a list of sub-sequences of at most LENGTH elements.
-All the sub-sequences will be LENGTH long, except the last one,
-which may be shorter."
-  (when (< length 1)
-    (error "Sub-sequence length must be larger than zero"))
-  (let ((result nil)
-        (seq-length (length sequence))
-        (start 0))
-    (while (< start seq-length)
-      (push (seq-subseq sequence start
-                        (setq start (min seq-length (+ start length))))
-            result))
-    (nreverse result)))
 
 (defun igist-get-prev-column-if-last (column-name)
   "Get previous column is COLUMN-NAME is last column.
@@ -3868,7 +3892,6 @@ Interactively, N is the prefix numeric argument, and defaults to
   (interactive "p")
   (igist-tabulated-list-widen-current-column (- n)))
 
-
 (defun igist-table-widen-current-column ()
   "Widen current column in table."
   (interactive)
@@ -3893,15 +3916,175 @@ Interactively, N is the prefix numeric argument, and defaults to
 (defun igist-save-column-settings ()
   "Save column settings for igist explore or igist list format."
   (interactive)
-  (let* ((sym (if (igist-explore-buffer-p (current-buffer))
-                  'igist-explore-format
-                'igist-list-format))
+  (let* ((sym (igist-get-current-list-format-sym))
          (spec (symbol-value sym))
          (new-value (igist-update-fields-format-from-tabulated-format
                      spec
                      tabulated-list-format)))
     (customize-save-variable sym new-value)
     new-value))
+
+(defun igist-reset-columns-settings ()
+  "Reset the column settings of the current igist buffer."
+  (interactive)
+  (let ((sym (igist-get-current-list-format-sym)))
+    (customize-set-variable
+     sym
+     (eval (car (get sym 'standard-value))))))
+
+(defun igist-list-remove-column (column-name)
+  "Hide a specified COLUMN-NAME in the current list or explore buffer."
+  (interactive
+   (list
+    (let* ((sym
+            (igist-get-current-list-format-sym))
+           (col-at-point (igist-tabulated-column-at-point))
+           (cols (igist-pluck-columns-names-from-list-format
+                  (symbol-value sym))))
+      (completing-read
+       "Remove column: " cols
+       nil t
+       (and (member
+             col-at-point cols)
+            col-at-point)))))
+  (let ((sym (igist-get-current-list-format-sym)))
+    (customize-set-variable sym
+                            (igist-remove-column-from-list-format
+                             column-name
+                             (igist-update-fields-format-from-tabulated-format
+                              (symbol-value
+                               sym)
+                              tabulated-list-format)))))
+
+(defun igist-remove-column-from-list-format (column-name cols)
+  "Remove a specified column from a list format COLS.
+
+Argument COLUMN-NAME is the name of the column that the user wants to remove
+from the list format.
+Argument COLS is a list of columns from which the specified column will be
+removed."
+  (let ((col)
+        (found)
+        (processed))
+    (while (and cols (not found))
+      (setq col (pop cols))
+      (if (equal (cadr col) column-name)
+          (progn (setq found col)
+                 (let ((width (caddr col))
+                       (prev-col (car processed)))
+                   (when prev-col
+                     (setf (caddr prev-col)
+                           (max 1 (+ width (caddr prev-col)))))))
+        (when-let* ((pl (nthcdr 5 col))
+                    (children (plist-get
+                               pl
+                               :children))
+                    (item (seq-find
+                           (lambda (s)
+                             (string= column-name (cadr s)))
+                           children)))
+          (setq found t)
+          (setq pl (plist-put pl :children (remove item children))))
+        (push col processed)))
+    (setq processed (nreverse processed))
+    (setq cols (if (and cols processed)
+                   (nconc processed cols)
+                 (or processed cols)))
+    cols))
+
+(defun igist-pluck-columns-names-from-list-format (list-format)
+  "Extract column names from a given list format.
+
+Argument LIST-FORMAT is a list of lists, where each sub-list represents a column
+and contains information such as key, name, old-width, sortable, format-val, and
+extra-props."
+  (let ((cols))
+    (pcase-dolist (`(,_key ,name ,_old-width ,_sortable ,_format-val .
+                           ,extra-props)
+                   list-format)
+      (setq cols (append cols
+                         (if (plist-get extra-props :children)
+                             (append (list name)
+                                     (mapcar #'cadr
+                                             (plist-get extra-props :children)))
+                           (list name)))))
+    cols))
+
+(defun igist-swap-current-column-backward ()
+  "Swap the current column at point backward with another column."
+  (interactive)
+  (igist-swap-current-column -1))
+
+(defun igist--adjust-next-pos (pos next-pos cols)
+  "Adjust the next position based on the length of the columns COLS.
+
+Argument POS is the current position in the list of columns.
+Argument NEXT-POS is the position to which we want to move in the list of
+columns.
+Argument COLS is the list of columns in which we are moving."
+  (if (and pos next-pos
+           (or (< next-pos 0)
+               (> next-pos (1- (length cols)))))
+      (if (< next-pos 0)
+          (1- (length cols))
+        0)
+    next-pos))
+
+(defun igist-swap-current-column (&optional n)
+  "Swap the current column with another column in a tabulated list buffer.
+
+Argument N is the number of columns to move forward or backward from the current
+column position."
+  (interactive "P")
+  (unless n
+    (setq n 1))
+  (let* ((col-name (or (igist-tabulated-column-at-point)
+                       (save-excursion
+                         (skip-chars-forward "\s\t")
+                         (igist-tabulated-column-at-point))
+                       (and (eolp)
+                            (save-excursion
+                              (forward-char -1)
+                              (igist-tabulated-column-at-point)))))
+         (sym (igist-get-current-list-format-sym))
+         (sym-value (symbol-value sym))
+         (cols (mapcar #'cadr sym-value))
+         (pos (seq-position cols col-name))
+         (next-pos
+          (when pos
+            (igist--adjust-next-pos pos (+ n pos)
+                                   cols)))
+         (next-value
+          (if (and col-name (not pos))
+              (mapcar
+               (lambda (p)
+                 (let* ((pl (nthcdr 5 p))
+                        (children (plist-get pl :children)))
+                   (if (not children)
+                       p
+                     (let* ((cols (mapcar #'cadr children))
+                            (pos (seq-position cols col-name))
+                            (next-pos
+                             (when pos
+                               (igist--adjust-next-pos pos
+                                                      (+ n pos)
+                                                      cols))))
+                       (if (not next-pos)
+                           p
+                         (setq pl (plist-put pl :children
+                                             (igist-swap pos next-pos
+                                                         children)))
+                         p)))))
+               sym-value)
+            (and pos next-pos
+                 (igist-swap pos next-pos sym-value)))))
+    (when next-value
+      (customize-set-variable sym
+                              next-value)
+      (igist-goto-column col-name)
+      (setq igist-table-current-column col-name)
+      (when transient-current-command
+        (transient-setup transient-current-command)))))
 
 ;;;###autoload (autoload 'igist-table-menu "igist" nil t)
 (transient-define-prefix igist-table-menu ()
@@ -3925,7 +4108,7 @@ Interactively, N is the prefix numeric argument, and defaults to
                             igist-table-current-column))
                           'transient-value
                         'transient-inactive-value)))
-        (igist-get-columns)
+        (igist-get-row-columns-at-point)
         (propertize "|" 'face
                     'transient-inactive-value))
        (propertize "]" 'face
@@ -3950,18 +4133,19 @@ Interactively, N is the prefix numeric argument, and defaults to
                            (or igist-table-current-column "")
                            (cadr
                             (igist-table-current-column-spec))))
-    :transient t)]
-  ["Save settings"
-   ("s" "Save this settings for future"
+    :transient t)
+   ("M-<left>" "Move column backward" igist-swap-current-column-backward
+    :transient nil)
+   ("M-<right>" "Move column forward" igist-swap-current-column
+    :transient nil)
+   ("r" "Remove column" igist-list-remove-column)]
+  ["Settings"
+   ("R" "Reset" igist-reset-columns-settings)
+   ("S" "Save"
     igist-save-column-settings
     :transient t)]
   (interactive)
-  (setq igist-table-current-column
-        (or
-         (if (member igist-table-current-column (igist-get-columns))
-             igist-table-current-column
-           (get-text-property (point) 'tabulated-list-column-name))
-         (car (igist-get-columns))))
+  (igist-table-init-current-column)
   (transient-setup #'igist-table-menu))
 
 (defun igist-set-current-user ()
@@ -4107,12 +4291,7 @@ Interactively, N is the prefix numeric argument, and defaults to
    ("q" "Quit" transient-quit-all)]
   (interactive)
   (when (derived-mode-p 'igist-list-mode)
-    (setq igist-table-current-column
-          (or
-           (if (member igist-table-current-column (igist-get-columns))
-               igist-table-current-column
-             (get-text-property (point) 'tabulated-list-column-name))
-           (car (igist-get-columns)))))
+    (igist-table-init-current-column))
   (transient-setup #'igist-dispatch))
 
 (provide 'igist)
