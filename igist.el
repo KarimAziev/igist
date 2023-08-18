@@ -696,20 +696,32 @@ only serves as documentation.")
 (defvar-local igist-current-gist nil
   "Current gist in the edit buffer.")
 
+(put 'igist-current-gist 'permanent-local t)
+
 (defvar-local igist-current-description nil
   "Current gist description in the edit buffer.")
+
+(put 'igist-current-description 'permanent-local t)
 
 (defvar-local igist-current-public nil
   "Whether the current gist in the edit buffer is public or private.")
 
+(put 'igist-current-public 'permanent-local t)
+
 (defvar-local igist-current-filename nil
   "Current gist filename.")
+
+(put 'igist-current-filename 'permanent-local t)
 
 (defvar-local igist-comment-gist-id nil
   "Current gist's id in the comment buffer.")
 
+(put 'igist-comment-gist-id 'permanent-local t)
+
 (defvar-local igist-comment-id nil
   "Current comment id.")
+
+(put 'igist-comment-id 'permanent-local t)
 
 (defvar-local igist-list-loading nil)
 (defvar-local igist-list-page 0)
@@ -3826,6 +3838,8 @@ See also `igist-before-save-hook'."
   (when igist-edit-mode
     (setq buffer-read-only nil)
     (set-buffer-modified-p nil)))
+
+(put 'igist-edit-mode 'permanent-local t)
 
 ;; Transient
 (transient-define-argument igist-set-current-filename-variable ()
