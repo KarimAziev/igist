@@ -785,6 +785,17 @@ only serves as documentation.")
     map)
   "A keymap used for displaying comments.")
 
+(defvar igist-tabulated-list-sort-button-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "<header-line> <mouse-1>")
+                #'igist-tabulated-list-col-sort)
+    (define-key map (kbd "<header-line> <mouse-2>")
+                #'igist-tabulated-list-col-sort)
+    (define-key map (kbd "<mouse-1>") #'igist-tabulated-list-col-sort)
+    (define-key map (kbd "<mouse-2>") #'igist-tabulated-list-col-sort)
+    "RET"                     #'igist-tabulated-list-sort
+    map))
+
 ;; Macros
 (defmacro igist-or (&rest functions)
   "Return an unary function which invoke FUNCTIONS until first non-nil result."
@@ -1441,6 +1452,97 @@ column.  Negate the predicate that would be returned if
                    (igist-alist-get field a)
                    (igist-alist-get field b)))))))
 
+(defun igist-tabulated-list-col-sort (&optional e)
+  "Sort Igist Tabulated List entries by the column of the mouse click E."
+  (interactive "e")
+  (let* ((pos (event-start e))
+         (obj (posn-object pos)))
+    (with-current-buffer (window-buffer (posn-window pos))
+      (igist-tabulated-list--sort-by-column-name
+       (get-text-property (if obj (cdr obj)
+                            (posn-point pos))
+                          'tabulated-list-column-name
+                          (car obj))))))
+
+
+
+(defun igist-tabulated-list-init-header ()
+  "Set up header line for the Igist Tabulated List buffer."
+  (let* ((x (max tabulated-list-padding 0))
+         (button-props `(help-echo "Click to sort by column"
+                                   mouse-face header-line-highlight
+                                   keymap ,igist-tabulated-list-sort-button-map))
+         (len (length tabulated-list-format))
+         (cols nil))
+    (push (propertize " " 'display
+                      `(space :align-to (+ header-line-indent-width ,x)))
+          cols)
+    (dotimes (n len)
+      (let* ((col (aref tabulated-list-format n))
+             (not-last-col (< n (1- len)))
+             (label (nth 0 col))
+             (lablen (length label))
+             (pname label)
+             (width (nth 1 col))
+             (props (nthcdr 3 col))
+             (pad-right (or (plist-get props :pad-right) 1))
+             (right-align (plist-get props :right-align))
+             (next-x (+ x pad-right width))
+             (available-space
+              (and not-last-col
+                   width)))
+        (when (and (>= lablen 3)
+                   not-last-col
+                   (> lablen available-space))
+          (setq label (truncate-string-to-width label available-space
+                                                nil nil t)))
+        (push
+         (cond ((not (nth 2 col))
+                (propertize label 'tabulated-list-column-name pname))
+               ((equal (car col)
+                       (car tabulated-list-sort-key))
+                (apply #'propertize
+                       (concat label
+                               (cond ((and (< lablen 3) not-last-col) "")
+                                     ((cdr tabulated-list-sort-key)
+                                      (format " %c"
+                                              tabulated-list-gui-sort-indicator-desc))
+                                     (t
+                                      (format " %c"
+                                              tabulated-list-gui-sort-indicator-asc))))
+                       'face 'bold
+                       'tabulated-list-column-name pname
+                       button-props))
+               (t (apply #'propertize label
+                         'tabulated-list-column-name pname
+                         button-props)))
+         cols)
+        (when right-align
+          (let ((shift (- width (string-width (car cols)))))
+            (when (> shift 0)
+              (setq cols
+                    (cons (car cols)
+                          (cons
+                           (propertize
+                            (make-string shift ?\s)
+                            'display
+                            `(space :align-to
+                                    (+ header-line-indent-width ,(+ x shift))))
+                           (cdr cols))))
+              (setq x (+ x shift)))))
+        (if (>= pad-right 0)
+            (push (propertize
+                   " "
+                   'display `(space :align-to
+                                    (+ header-line-indent-width ,next-x))
+                   'face 'fixed-pitch)
+                  cols))
+        (setq x next-x)))
+    (setq cols (apply #'concat (nreverse cols)))
+    (if tabulated-list-use-header-line
+        (setq header-line-format (list "" 'header-line-indent cols))
+      (setq-local tabulated-list--header-string cols))))
+
 (defun igist-tabulated-list-render-col (spec data used-width not-last-col)
   "Render a column DATA in a tabulated list with specified specification SPEC.
 SPEC is list of (FIELD-NAME COLUMN-NAME WIDTH SORTABLE FORMAT-VAL PROPS).
@@ -1719,7 +1821,7 @@ originally displayed in."
                       (< (gethash e1 tabulated-list--original-order)
                          (gethash e2 tabulated-list--original-order)))))
         (setq tabulated-list-sort-key nil)
-        (tabulated-list-init-header)
+        (igist-tabulated-list-init-header)
         (igist-tabulated-list-print t))
     ;; Sort based on a column name.
     (let ((name (if n
@@ -1729,6 +1831,7 @@ originally displayed in."
       (if (nth 2 (assoc name (append tabulated-list-format nil)))
           (igist-tabulated-list--sort-by-column-name name)
         (user-error "Cannot sort by %s" name)))))
+
 
 (defun igist-tabulated-list--sort-by-column-name (name)
   "Sort the tabulated list by the specified column NAME.
@@ -1745,7 +1848,7 @@ Argument NAME is the name of the column to sort by."
         (setcdr tabulated-list-sort-key
                 (not (cdr tabulated-list-sort-key)))
       (setq tabulated-list-sort-key (cons name nil)))
-    (tabulated-list-init-header)
+    (igist-tabulated-list-init-header)
     (igist-tabulated-list-print t)))
 
 (defun igist-tabulated-column-at-point ()
@@ -1891,7 +1994,7 @@ TIMER-SYM is a symbol to use as a timer."
 (defun igist-debounce-revert ()
   "Update tabulated entries in the current buffer and reschedule update timer."
   (igist-tabulated-list-print t)
-  (tabulated-list-init-header))
+  (igist-tabulated-list-init-header))
 
 (defun igist-ensure-buffer-visible (buffer &optional select)
   "Select BUFFER window. If SELECT is non-nil select window."
@@ -2633,7 +2736,7 @@ used to get the new `tabulated-list-format'."
             (setq tabulated-list-format
                   (igist-get-tabulated-list-format
                    newval))
-            (tabulated-list-init-header)
+            (igist-tabulated-list-init-header)
             (igist-tabulated-list-print t)
             (when loading
               (igist-list-refresh))))))))
@@ -2646,7 +2749,7 @@ used to get the new `tabulated-list-format'."
         (igist-get-tabulated-list-format
          igist-table-list-format)
         tabulated-list-padding 2)
-  (tabulated-list-init-header)
+  (igist-tabulated-list-init-header)
   (run-hooks 'tabulated-list-revert-hook)
   (igist-tabulated-list-print t))
 
@@ -2721,7 +2824,7 @@ tabulated list, which is used to display data in a table-like format in Emacs."
         (igist-get-tabulated-list-format
          igist-table-list-format)
         tabulated-list-padding 2)
-  (tabulated-list-init-header)
+  (igist-tabulated-list-init-header)
   (setq tabulated-list-printer #'igist-tabulated-list-print-entry)
   (setq-local imenu-prev-index-position-function
               #'igist-imenu-prev-index-position)
