@@ -191,16 +191,6 @@
 (defvar-local igist-table-list-format nil)
 (defvar-local igist-render-timer nil)
 
-(defun igist-scan-make-indicator (count action &optional data)
-  "Create button with COUNT of children.
-DATA should be an argument for ACTION."
-  (funcall
-   (if (fboundp 'buttonize) 'buttonize 'button-buttonize)
-   (format "%s" count)
-   action
-   data
-   "Click to expand"))
-
 (defun igist-find-children-spec (list-spec)
   "Find the position, spec, and parent spec of children in a LIST-SPEC.
 
@@ -339,9 +329,10 @@ time."
   "Render FILES and join them with newlines and padding.
 
 Argument FILES is an alist of gist files."
-  (igist-scan-make-indicator
-   (length files)
-   #'igist-toggle-children-row files))
+  (list
+   (format "%s" (length files))
+   'action
+   #'igist-toggle-children-row 'button-data files))
 
 (defun igist-render-comments (comments)
   "Default renderer for COMMENTS column."
