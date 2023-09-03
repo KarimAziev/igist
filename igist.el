@@ -3190,12 +3190,14 @@ the CALLBACK function."
                        (1+ (or igist-list-page 0))))))))
 
 (defun igist-list-load-gists (user &optional background callback callback-args)
-  "List USER's gists sorted by most recently updated to least recently updated.
+  "List the GitHub USER's gists asynchronously.
 
-Then execute CALLBACK with CALLBACK-ARGS.
-To stop or pause loading use command `igist-list-cancel-load'.
+Next, execute the function CALLBACK with the arguments CALLBACK-ARGS.
 
-If BACKGROUND is nil, don't show user's buffer."
+If optional argument BACKGROUND is non-nil, the buffer will not be shown.
+
+Loading of subsequent pages may be halted by the command
+`igist-list-cancel-load'."
   (igist-list-request
    (concat "/users/" user "/gists") user background callback callback-args))
 
@@ -3208,13 +3210,21 @@ If BACKGROUND is nil, don't show user's buffer."
                          cb args))
 
 (defun igist-list-request (url user &optional background callback callback-args)
-  "Request URL to list USER's gists with pagination.
+  "Fetch and possibly display a list of gists from a specified URL and USER.
 
-Then execute CALLBACK with CALLBACK-ARGS.
+Argument URL is a string that represents the url for the request.
 
-To stop or pause loading use command `igist-list-cancel-load'.
+Argument USER is a string that represents the GitHub username for the request.
 
-If BACKGROUND is nil, don't show user's buffer."
+If optional argument BACKGROUND is non-nil, the buffer will not be shown.
+
+Optional argument CALLBACK is a function that will be called when the request is
+completed.
+
+Optional argument CALLBACK-ARGS is a list of arguments that will be passed to
+the CALLBACK function.
+
+Loading next pages can be stopped by the command `igist-list-cancel-load'."
   (let ((buffer (get-buffer-create
                  (if user
                      (igist-get-user-buffer-name user)
@@ -3658,7 +3668,7 @@ If ACTION is non nil, call it with gist."
 
 ;;;###autoload
 (defun igist-edit-list ()
-  "Read user gists in the minibuffer and open it in the edit buffer."
+  "Read the user's gists in the minibuffer and open them in the edit buffer."
   (interactive)
   (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (igist-change-user)))
@@ -3671,13 +3681,12 @@ If ACTION is non nil, call it with gist."
 
 ;;;###autoload
 (defun igist-explore-public-gists (&optional background)
-  "List public gists sorted by most recently updated to least recently updated.
+  "List up to 3000 public gists, sorted by the most recent.
 
-Render and load up to 3000 gists with pagination.
+If BACKGROUND is non-nil, the user's buffer should not be displayed.
 
-To stop or pause loading use command `igist-list-cancel-load'.
-
-If BACKGROUND is non-nil, don't show buffer."
+Loading of subsequent pages may be halted by the command
+`igist-list-cancel-load'."
   (interactive)
   (igist-list-request "/gists/public" nil
                       background))
@@ -3686,10 +3695,8 @@ If BACKGROUND is non-nil, don't show buffer."
 (defun igist-list-starred ()
   "List the authenticated user's starred gists.
 
-Then execute CALLBACK with CALLBACK-ARGS.
-To stop or pause loading use command `igist-list-cancel-load'.
-
-If BACKGROUND is nil, don't show user's buffer."
+Loading of subsequent pages may be stopped by the command
+`igist-list-cancel-load'."
   (interactive)
   (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (igist-change-user)))
@@ -3698,15 +3705,19 @@ If BACKGROUND is nil, don't show user's buffer."
 
 ;;;###autoload
 (defun igist-list-other-user-gists (user)
-  "List the public gists of USER."
+  "List public gists of a specified GitHub USER.
+
+Argument USER is a string representing the username of the other user whose
+gists are to be listed."
   (interactive (list (read-string "User: ")))
   (igist-list-load-gists user nil))
 
 ;;;###autoload
 (defun igist-list-gists ()
-  "List the authenticated user's gists and activate `igist-list-mode'.
+  "List the gists of `igist-current-user-name'.
 
-To stop or pause loading use command `igist-list-cancel-load'.
+Loading of subsequent pages may be stopped by the command
+`igist-list-cancel-load', executed in tabulated buffer.
 
 See also `igist-list-mode'."
   (interactive)
