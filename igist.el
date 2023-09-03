@@ -2747,7 +2747,8 @@ used to get the new `tabulated-list-format'."
 (defun igist--tabulated-list-revert ()
   "Revert the tabulated list to its original format in Igist."
   (setq igist-table-list-format
-        (igist-get-current-list-format-sym))
+        (or igist-table-list-format
+            (symbol-value (igist-get-current-list-format-sym))))
   (setq tabulated-list-format
         (igist-get-tabulated-list-format
          igist-table-list-format)
@@ -2760,8 +2761,7 @@ used to get the new `tabulated-list-format'."
 (add-variable-watcher 'igist-explore-format #'igist--revert-tabulated-buffers)
 
 (defun igist-tabulated-list-revert (&rest _ignored)
-  "The `revert-buffer-function' for `igist-list-mode'.
-It runs `tabulated-list-revert-hook', then calls `igist-tabulated-list-print'."
+  "The `revert-buffer-function' for `igist-list-mode'."
   (interactive)
   (unless (derived-mode-p 'igist-list-mode)
     (error "The current buffer is not in Igist-list-mode"))
@@ -2829,6 +2829,7 @@ tabulated list, which is used to display data in a table-like format in Emacs."
         tabulated-list-padding 2)
   (igist-tabulated-list-init-header)
   (setq tabulated-list-printer #'igist-tabulated-list-print-entry)
+  (setq-local revert-buffer-function #'igist-tabulated-list-revert)
   (setq-local imenu-prev-index-position-function
               #'igist-imenu-prev-index-position)
   (setq-local imenu-extract-index-name-function
