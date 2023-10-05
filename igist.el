@@ -190,6 +190,8 @@
 (defvar-local igist-list-response nil)
 (defvar-local igist-table-list-format nil)
 (defvar-local igist-render-timer nil)
+(defvar-local igist-languages-filters nil)
+(defvar-local igist-filters nil)
 
 (defun igist-find-children-spec (list-spec)
   "Find the position, spec, and parent spec of children in a LIST-SPEC.
@@ -768,6 +770,8 @@ only serves as documentation.")
     (define-key map (kbd "M-]") #'igist-swap-current-column)
     (define-key map (kbd "M-{") #'igist-swap-current-column-backward)
     (define-key map (kbd "M-}") #'igist-swap-current-column)
+    (define-key map (kbd "?") #'igist-dispatch)
+    (define-key map (kbd "/") #'igist-filters-menu)
     (when (fboundp 'tabulated-list-widen-current-column)
       (define-key map [remap tabulated-list-widen-current-column]
                   #'igist-tabulated-list-widen-current-column))
@@ -940,6 +944,17 @@ which may be shorter."
                         (setq start (min seq-length (+ start length))))
             result))
     (nreverse result)))
+
+(defun igist--all-pass (item filters)
+  "Apply all FILTERS to an ITEM and return t if it passes all.
+
+Argument ITEM is the object that will be evaluated by the function or macro.
+Argument FILTERS is a list of functions that will be applied to the item in
+order."
+  (not (catch 'found
+         (dolist (filter filters)
+           (unless (funcall filter item)
+             (throw 'found t))))))
 
 (defun igist-get-current-list-format-sym ()
   "Determine the current list format symbol based on the buffer type."
@@ -1767,30 +1782,32 @@ current position in the tabulated list should be remembered or not."
       (unless tabulated-list-use-header-line
         (tabulated-list-print-fake-header)))
     (while entries
-      (let* ((gist (car entries))
-             (id (cdr (assq 'id gist))))
-        (and entry-id
-             (equal entry-id id)
-             (setq entry-id nil
-                   saved-pt (point)))
-        (if (or (not update)
-                (eobp))
-            (funcall tabulated-list-printer gist)
-          (while
-              (let ((local-id (tabulated-list-get-id)))
-                (cond ((equal id local-id)
-                       (forward-line 1)
-                       nil)
-                      ((or (not local-id)
-                           (funcall sorter gist
-                                    (list local-id
-                                          (tabulated-list-get-entry))))
-                       (funcall tabulated-list-printer gist)
-                       nil)
-                      (t t)))
-            (let ((old (point)))
-              (forward-line 1)
-              (delete-region old (point))))))
+      (when (or (not igist-filters)
+                (igist--all-pass (car entries) igist-filters))
+        (let* ((gist (car entries))
+               (id (cdr (assq 'id gist))))
+          (and entry-id
+               (equal entry-id id)
+               (setq entry-id nil
+                     saved-pt (point)))
+          (if (or (not update)
+                  (eobp))
+              (funcall tabulated-list-printer gist)
+            (while
+                (let ((local-id (tabulated-list-get-id)))
+                  (cond ((equal id local-id)
+                         (forward-line 1)
+                         nil)
+                        ((or (not local-id)
+                             (funcall sorter gist
+                                      (list local-id
+                                            (tabulated-list-get-entry))))
+                         (funcall tabulated-list-printer gist)
+                         nil)
+                        (t t)))
+              (let ((old (point)))
+                (forward-line 1)
+                (delete-region old (point)))))))
       (setq entries (cdr entries)))
     (when update
       (delete-region (point)
@@ -2611,6 +2628,20 @@ Argument COMMENT-BODY is the optional text content of the comment in the Gist."
         (setq-local igist-comment-id comment-id))
       buffer)))
 
+(defun igist--remove-filter (fn)
+  "Remove FN from list of filters `igist-filters'."
+  (setq igist-filters
+        (if (memq fn igist-filters)
+            (delq fn igist-filters)
+          igist-filters)))
+
+(defun igist--add-filter (fn)
+  "Add FN from list of filters `igist-filters'."
+  (setq igist-filters
+        (if (memq fn igist-filters)
+            igist-filters
+          (push fn igist-filters))))
+
 (defun igist-get-languages (gists)
   "Get languages used in GISTS and their corresponding gist IDs.
 
@@ -2631,6 +2662,80 @@ Argument GISTS is a list of gists."
        acc))
    gists
    '()))
+
+(defun igist-read-language (&optional prompt)
+  "Read a language used in current tabulated buffer with PROMPT and completions."
+  (let* ((langs (igist-get-languages igist-list-response))
+         (active-langs (mapcar (igist-rpartial assoc-string langs)
+                               igist-languages-filters))
+         (sorter (apply-partially #'seq-sort-by
+                                  (igist-compose length cdr)
+                                  #'>))
+         (alist
+          (if active-langs (append
+                            (funcall sorter
+                                     active-langs)
+                            (funcall sorter
+                                     (seq-remove
+                                      (igist-compose
+                                       (igist-rpartial
+                                        member
+                                        igist-languages-filters)
+                                       car)
+                                      langs)))
+            (funcall sorter langs)))
+         (annotf (lambda (str)
+                   (if (assoc-string str igist-languages-filters)
+                       (format " %d (Active)"
+                               (length (cdr (assoc-string str
+                                                          alist))))
+                     (format " %d " (length (cdr (assoc-string str alist))))))))
+    (completing-read (or prompt "Language: ")
+                     (lambda (str pred action)
+                       (if (eq action 'metadata)
+                           `(metadata
+                             (annotation-function . ,annotf))
+                         (complete-with-action action alist str pred))))))
+
+(defun igist--has-language-pred (gist)
+  "Check whether GIST has language specified in `igist-languages-filters'."
+  (seq-find
+   (pcase-lambda (`(,_file . ,props))
+     (member (or (cdr (assq 'language props)) "None")
+             igist-languages-filters))
+   (cdr (assq 'files gist))))
+
+(defun igist-toggle-language-filter (lang)
+  "Toggle the language filter by adding or removing a language LANG."
+  (interactive (list (igist-read-language "Add or remove filter by language: ")))
+  (setq igist-languages-filters
+        (if (or (not lang)
+                (string-empty-p lang)
+                (member lang igist-languages-filters))
+            nil
+          (list lang)))
+  (if igist-languages-filters
+      (igist--add-filter #'igist--has-language-pred)
+    (igist--remove-filter
+     #'igist--has-language-pred))
+  (igist-tabulated-list-print t)
+  (when transient-current-command
+    (transient-setup transient-current-command)))
+
+(transient-define-prefix igist-filters-menu ()
+  "A menu for filtering tabulated Gist's views."
+  ["Filters"
+   ("c" igist-toggle-language-filter
+    :description (lambda ()
+                   (concat "Languages "
+                           (if igist-languages-filters
+                               (propertize
+                                (string-join igist-languages-filters " ")
+                                'face
+                                'transient-value)
+                             ""))))]
+  (interactive)
+  (transient-setup #'igist-filters-menu))
 
 (defun igist-print-languages-chart ()
   "Show a chart showing the occurrence of languages in a tabulated buffer."
@@ -4296,7 +4401,6 @@ column position."
     ("D" "Delete" igist-delete-current-gist :inapt-if-not igist-editable-p)
     ("d" "Description" igist-list-edit-description :inapt-if-not
      tabulated-list-get-id)
-    ("C" "Configure table view" igist-table-menu)
     ("{" igist-tabulated-list-widen-current-column
      :description (lambda
                     ()
@@ -4322,8 +4426,7 @@ column position."
      :transient t)
     ("<backtab>" "Toggle visibility of subrows"
      igist-toggle-all-children
-     :transient t)
-    ("s" "Show languages statistics" igist-print-languages-chart)]
+     :transient t)]
    [:if
     igist-edit-mode-p
     "Actions"
@@ -4387,7 +4490,19 @@ column position."
     ("-" "Delete" igist-delete-current-filename :inapt-if-not igist-editable-p)]
    ["Comments"
     ("a" "Add" igist-add-comment :inapt-if-not tabulated-list-get-id)
-    ("c" "Show" igist-load-comments :inapt-if-not tabulated-list-get-id)]]
+    ("c" "Show" igist-load-comments :inapt-if-not tabulated-list-get-id)]
+   ["Settings"
+    ("C" "Configure table view" igist-table-menu)
+    ("/" igist-toggle-language-filter
+     :description (lambda ()
+                    (concat "Filter by language "
+                            (if igist-languages-filters
+                                (propertize
+                                 (string-join igist-languages-filters " ")
+                                 'face
+                                 'transient-value)
+                              ""))))
+    ("s" "Show languages statistics" igist-print-languages-chart)]]
   [:if igist-comments-list-mode-p
        ["Comments"
         ("a" "Add" igist-add-comment :inapt-if-not igist-get-current-user-name)
