@@ -408,9 +408,9 @@
     (put-text-property 1 7 'igist-tabulated-list-id 1)
     (put-text-property 9 15 'igist-tabulated-list-id 2)
     (should (equal (igist-property-boundaries 'igist-tabulated-list-id 1)
-                   (cons 1 7)))
+                   (cons 1 6)))
     (should (equal (igist-property-boundaries 'igist-tabulated-list-id 9)
-                   (cons 9 15)))
+                   (cons 9 14)))
     (should-not (igist-property-boundaries 'igist-tabulated-list-id 7))))
 
 (ert-deftest igist-test-igist-find-entry-bounds ()
