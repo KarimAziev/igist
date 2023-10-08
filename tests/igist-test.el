@@ -390,88 +390,41 @@
                         (raw_url . "https://gist.githubusercontent.com/KarimAziev/7c71af123452ff7b2360cece9108a6f4/raw/4aa4f32f5bd2402950f7b5355bcccd0353c5ca44/README.org")
                         (size . 12901)))))))))
 
-(ert-deftest igist-test--igist-get-tabulated-list-format ()
-  "Test the function that formats a list for tabulated display."
-  (should (equal (igist-get-tabulated-list-format
-                  '((id "ID" 10 nil "%s"
-                        :pad-right 2)
-                    (description "Description"
-                                 50 t "%s")
-                    (owner "User" 20 t
-                           igist-render-user)
-                    (comments "Comments" 10 t
-                              igist-render-comments)
-                    (files "Files" 0 t
-                           igist-render-files
-                           :children
-                           ((filename "File" 85
-                                      nil "%s")
-                            (language "Language"
-                                      0 nil "%s"))
-                           :align-to-column 1)))
-                 [("ID" 10 nil :pad-right 2)
-                  ("Description" 50 t)
-                  ("User" 20 t)
-                  ("Comments" 10 t)
-                  ("Files" 0 t
-                   :children
-                   [("File" 85 nil)
-                    ("Language" 0 nil)]
-                   :align-to-column 1)]))
-  (should (equal (igist-get-tabulated-list-format
-                  '((id "ID" 10 nil "%s"
-                        :pad-right 2)
-                    (description "Description"
-                                 50 t "%s")
-                    (owner "User" 20 t
-                           igist-render-user)
-                    (comments "Comments" 10 t
-                              igist-render-comments)))
-                 [("ID" 10 nil :pad-right 2)
-                  ("Description" 50 t)
-                  ("User" 20 t)
-                  ("Comments" 10 t)]))
-  (should (equal (igist-get-tabulated-list-format
-                  '((description "Description"
-                                 50 t "%s")
-                    (owner "User" 20 t
-                           igist-render-user)
-                    (comments "Comments" 10 t
-                              igist-render-comments)))
-                 [("Description" 50 t)
-                  ("User" 20 t)
-                  ("Comments" 10 t)])))
 
-(ert-deftest igist-test--igist-update-fields-format-from-tabulated-format ()
-  "Test the function `igist-update-fields-format-from-tabulated-format'."
-  (equal (igist-update-fields-format-from-tabulated-format
-          '((id "ID" 10 nil "%s" :pad-right 2)
-            (description "Description" 50 t "%s")
-            (owner "User" 20 t igist-render-user)
-            (comments "Comments" 10 t igist-render-comments)
-            (files "Files" 0 t igist-render-files
-                   :children
-                   ((filename "File" 85 nil "%s")
-                    (language "Language" 0 nil "%s"))
-                   :align-to-column 1))
-          [("ID" 40 nil :pad-right 2)
-           ("Description" 50 t)
-           ("User" 20 t)
-           ("Comments" 10 t)
-           ("Files" 0 t
-            :children
-            [("File" 95 nil)
-             ("Language" 0 nil)]
-            :align-to-column 1)])
-         '((id "ID" 40 nil "%s" :pad-right 2)
-           (description "Description" 50 t "%s")
-           (owner "User" 20 t igist-render-user)
-           (comments "Comments" 10 t igist-render-comments)
-           (files "Files" 0 t igist-render-files
-                  :children
-                  ((filename "File" 95 nil "%s")
-                   (language "Language" 0 nil "%s"))
-                  :align-to-column 1))))
+
+(ert-deftest igist-test-igist-files-to-gist-alist ()
+  (let ((temp-file-path (make-temp-file "test-file"))
+        (test-content "Testing igist-files-to-gist-alist"))
+    (with-temp-file temp-file-path
+      (insert test-content))
+    (let ((gist-alist (igist-files-to-gist-alist (list temp-file-path))))
+      (should (equal (car (car gist-alist))
+                     (intern (file-name-nondirectory temp-file-path))))
+      (should (string= (cdadar gist-alist) test-content)))))
+
+(ert-deftest igist-test-igist-property-boundaries ()
+  (with-temp-buffer
+    (insert "entry 1\nentry 2")
+    (put-text-property 1 7 'igist-tabulated-list-id 1)
+    (put-text-property 9 15 'igist-tabulated-list-id 2)
+    (should (equal (igist-property-boundaries 'igist-tabulated-list-id 1)
+                   (cons 1 7)))
+    (should (equal (igist-property-boundaries 'igist-tabulated-list-id 9)
+                   (cons 9 15)))
+    (should-not (igist-property-boundaries 'igist-tabulated-list-id 7))))
+
+(ert-deftest igist-test-igist-find-entry-bounds ()
+  (with-temp-buffer
+    (insert "entry 1\nentry 2")
+    (put-text-property 1 7 'igist-tabulated-list-id 1)
+    (put-text-property 9 15 'igist-tabulated-list-id 2)
+    (should (equal (igist-find-entry-bounds 1)
+                   (cons 1 6)))
+    (should (equal (igist-find-entry-bounds 2)
+                   (cons 9 14)))
+    (should (equal (igist-find-entry-bounds 2)
+                   (cons 9 14)))
+    (should-not (igist-find-entry-bounds 3))))
 
 
 (provide 'igist-test)
