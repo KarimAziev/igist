@@ -281,6 +281,7 @@ message string."
 
 Argument ID is a value that is used to find the entry bounds in the igist
 tabulated list."
+  (require 'text-property-search)
   (pcase-let ((`(,beg . ,end)
                (cond ((equal (igist-tabulated-list-get-id) id)
                       (igist-property-boundaries 'igist-tabulated-list-id))
@@ -301,7 +302,6 @@ tabulated list."
   "Update a specific row in the tabulated list with new DATA.
 
 Argument DATA is a list that contains the DATA to be updated in the row."
-  (require 'text-property-search)
   (pcase-let* ((col (current-column))
                (`(,beg . ,end)
                 (igist-find-entry-bounds (cdr (assq 'id data)))))
@@ -317,7 +317,6 @@ Argument DATA is a list that contains the DATA to be updated in the row."
   "Remove a specific entry identified by its ID from the igist tabulated list.
 
 Argument ID is a value that identifies the entry to be removed from the list."
-  (require 'text-property-search)
   (pcase-let* ((col (current-column))
                (`(,beg . ,end)
                 (save-excursion
