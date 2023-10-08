@@ -192,6 +192,7 @@
 (defvar-local igist-list-response nil)
 (defvar-local igist-table-list-format nil)
 (defvar-local igist-render-timer nil)
+(defvar-local igist-sync-timer nil)
 (defvar-local igist-languages-filters nil)
 (defvar-local igist-files-filter nil)
 (defvar-local igist-description-filter nil)
@@ -207,37 +208,47 @@
 See `igist-tabulated-list-tty-sort-indicator-asc' for the indicator used on
 `text-mode' frames."
   :group 'igist
-  :type 'character
-  :version "27.1")
+  :type 'character)
 
 (defcustom igist-tabulated-list-gui-sort-indicator-desc ?▲
   "Indicator for columns sorted in descending order, for GUI frames.
 See `igist-tabulated-list-tty-sort-indicator-desc' for the indicator used on
 `text-mode' frames."
   :group 'igist
-  :type 'character
-  :version "27.1")
+  :type 'character)
 
 (defcustom igist-tabulated-list-tty-sort-indicator-asc ?v
   "Indicator for columns sorted in ascending order, for `text-mode' frames.
 See `igist-tabulated-list-gui-sort-indicator-asc' for the indicator used on GUI
 frames."
   :group 'igist
-  :type 'character
-  :version "27.1")
+  :type 'character)
 
 (defcustom igist-tabulated-list-tty-sort-indicator-desc ?^
   "Indicator for columns sorted in ascending order, for `text-mode' frames.
 See `igist-tabulated-list-gui-sort-indicator-asc' for the indicator used on GUI
 frames."
   :group 'igist
-  :type 'character
-  :version "27.1")
+  :type 'character)
+
+(defcustom igist-tabulated-list-padding 2
+  "Number of characters preceding each IGist List mode entry."
+  :group 'igist
+  :type 'integer)
 
 (defcustom igist-debug-enabled-p nil
   "Whether to allow debug logging."
   :group 'igist
   :type 'boolean)
+
+(defcustom igist-use-header-line t
+  "Whether the Tabulated List buffer should use a header line."
+  :type 'boolean
+  :group 'igist)
+
+(defvar-local igist-tabulated-list-entries nil
+  "Entries displayed in the current IGist Buffer.")
+(put 'igist-tabulated-list-entries 'permanent-local t)
 
 
 (defvar-local igist-tabulated-list-sort-key nil
@@ -250,12 +261,8 @@ NAME is a string matching one of the column names in
 non-nil, means to invert the resulting sort.")
 (put 'igist-tabulated-list-sort-key 'permanent-local t)
 
-(defvar-local igist-tabulated-list--padding 0
-  "Number of characters preceding each Tabulated List mode entry.")
-
 (defsubst igist-tabulated-list-get-id (&optional pos)
-  "Return the entry ID of the Tabulated List entry at POS.
-The value is an ID object from `tabulated-list-entries', or nil.
+  "Return the entry ID of the IGist entry at POS.
 POS, if omitted or nil, defaults to point."
   (get-text-property (or pos (point)) 'igist-tabulated-list-id))
 
@@ -266,11 +273,32 @@ Argument MSG is a string that represents the message to be logged.
 Optional argument ARGS is a list of arguments that can be used to format the
 message string."
   (and igist-debug-enabled-p
-       (apply #'message (concat (format "igist: buffer (%s) window (%s) "
+       (apply #'message (concat (format "igist: buffer: %s window %s:\n"
                                         (buffer-name)
                                         (selected-window))
                                 (or msg ""))
               args)))
+
+(defun igist-find-entry-bounds (id)
+  "Find and return the boundaries of a specific entry in a tabulated list.
+
+Argument ID is a value that is used to find the entry bounds in the igist
+tabulated list."
+  (pcase-let ((`(,beg . ,end)
+               (cond ((equal (igist-tabulated-list-get-id) id)
+                      (igist-property-boundaries 'igist-tabulated-list-id))
+                     ((text-property-search-forward
+                       'igist-tabulated-list-id
+                       id
+                       t)
+                      (forward-char -1)
+                      (igist-property-boundaries 'igist-tabulated-list-id))
+                     ((text-property-search-backward 'igist-tabulated-list-id
+                                                     id
+                                                     t)
+                      (igist-property-boundaries 'igist-tabulated-list-id)))))
+    (when beg
+      (cons beg end))))
 
 (defun igist-update-entry (data)
   "Update a specific row in the tabulated list with new DATA.
@@ -278,25 +306,13 @@ message string."
 Argument DATA is a list that contains the DATA to be updated in the row."
   (require 'text-property-search)
   (pcase-let* ((col (current-column))
-               (data-id (cdr (assq 'id data)))
                (`(,beg . ,end)
-                (cond ((equal (igist-tabulated-list-get-id) data-id)
-                       (igist-property-boundaries 'igist-tabulated-list-id))
-                      ((text-property-search-forward
-                        'igist-tabulated-list-id
-                        data-id
-                        t)
-                       (forward-char -1)
-                       (igist-property-boundaries 'igist-tabulated-list-id))
-                      ((text-property-search-backward 'igist-tabulated-list-id
-                                                      data-id
-                                                      t)
-                       (igist-property-boundaries 'igist-tabulated-list-id)))))
+                (igist-find-entry-bounds (cdr (assq 'id data)))))
     (when (and beg end)
       (goto-char beg)
       (let ((inhibit-read-only t))
         (delete-region beg (1+ end))
-        (igist-list-render-row data)
+        (igist-render-entry data)
         (goto-char beg)
         (move-to-column col)))))
 
@@ -307,18 +323,8 @@ Argument ID is a value that identifies the entry to be removed from the list."
   (require 'text-property-search)
   (pcase-let* ((col (current-column))
                (`(,beg . ,end)
-                (cond ((equal (igist-tabulated-list-get-id) id)
-                       (igist-property-boundaries 'igist-tabulated-list-id))
-                      ((text-property-search-forward
-                        'igist-tabulated-list-id
-                        id
-                        t)
-                       (forward-char -1)
-                       (igist-property-boundaries 'igist-tabulated-list-id))
-                      ((text-property-search-backward 'igist-tabulated-list-id
-                                                      id
-                                                      t)
-                       (igist-property-boundaries 'igist-tabulated-list-id)))))
+                (save-excursion
+                  (igist-find-entry-bounds id))))
     (when (and beg end)
       (goto-char beg)
       (let ((inhibit-read-only t))
@@ -366,7 +372,7 @@ expanded when toggling the children row."
   (setq igist-list-hidden-ids (if igist-list-hidden-ids
                                   nil
                                 (mapcar (apply-partially #'igist-alist-get 'id)
-                                        tabulated-list-entries)))
+                                        igist-tabulated-list-entries)))
   (igist-tabulated-list-print t))
 
 (defun igist-toggle-row-children-at-point ()
@@ -496,7 +502,8 @@ Render the API URL for the given URL."
     (owner . igist-sort-pred-owner-login)
     (files . igist-sort-pred-list)))
 
-
+(defvar igist-explore-buffer-name "*igist-explore*"
+  "Buffer name for tabulated gists display of multiple owners.")
 
 (defun igist-pick-from-alist (keys alist)
   "Filter ALIST by KEYS.
@@ -632,63 +639,23 @@ if not provided, the length of the field name is used as the WIDTH."
       ,props)))
 
 
-
-
-(define-widget 'igist-list-custom-widget 'lazy
-  "Custom widget for Gist format."
-  :type
-  `(repeat
-    (choice
-     :tag "Column"
-     :value ,(car (last igist-default-formats))
-     ,@(mapcar (lambda (it)
-                 (igist-make-column-custom-type it))
-               '(id description comments owner
-                    user
-                    files
-                    node_id git_pull_url
-                    url forks_url commits_url
-                    git_push_url
-                    html_url public created_at
-                    updated_at
-                    comments_url truncated)))))
-
-
-(defvar igist-list-custom-type
-  `(repeat
-    (choice
-     :tag "Column"
-     :value (user "User" 9 t "%s" :pad-right 4)
-     ,@(mapcar (lambda (it)
-                 (igist-make-column-custom-type it))
-               '(id node_id git_pull_url
-                    url forks_url commits_url
-                    git_push_url
-                    html_url public created_at
-                    updated_at description
-                    comments user
-                    comments_url owner truncated))
-     ,(igist-make-column-custom-type 'files))))
-
-(defvar igist-explore-buffer-name "*igist-explore*"
-  "Buffer name for tabulated gists display of multiple owners.")
-
-(defcustom igist-explore-format '((id "ID" 9 nil "%s" :pad-right 4)
+(defcustom igist-explore-format '((id "ID" 10 nil "%s" :pad-right 4)
                                   (description "Description" 50
                                                igist-sort-pred-string "%s")
+                                  (updated_at "Updated" 15 igist-sort-pred-date
+                                              igist-render-time)
                                   (owner "User" 10 t igist-render-user
                                          :center-align t
                                          :pad-right 4)
                                   (comments "Comments" 9 igist-sort-pred-integer
                                             igist-render-comments
                                             :center-align t)
-                                  (files "Files" 0 t "%s"
-                                         :center-align t
+                                  (files "Files" 10 igist-sort-pred-list "%s"
                                          :children
-                                         ((filename "File" 79
-                                                    p          nil "%s")
-                                          (language "Language"
-                                                    0 nil "%s"))
+                                         ((filename "File" 90 nil "%s")
+                                          (language "Language" 8 nil
+                                                    igist-render-language
+                                                    :right-align t))
                                          :align-to-column 1))
   "The format of the Explore Public Gists tabulated buffers.
 
@@ -715,14 +682,27 @@ If non-nil, align the column should be center or right-aligned.
 \(FIELD COLUMN-NAME WIDTH SORTABLE FORMAT-FUNCTION/FORMAT-STRING)
    - :align-to-column - index of parent column to align children.
 
-User can interactively adjusts the width of the columns with commands:
+User can interactively add or remove columns, edit them adjusts the
+width of the columns with transient inferface:
 
-- `igist-tabulated-list-widen-current-column'
-- `igist-tabulated-list-narrow-current-column'
 - `igist-table-menu'
 
 and save the result with command `igist-save-column-settings'."
-  :type 'igist-list-custom-widget
+  :type `(repeat
+          (choice
+           :tag "Column"
+           :value ,(car (last igist-default-formats))
+           ,@(mapcar (lambda (it)
+                       (igist-make-column-custom-type it))
+                     '(id description comments owner
+                          user
+                          files
+                          node_id git_pull_url
+                          url forks_url commits_url
+                          git_push_url
+                          html_url public created_at
+                          updated_at
+                          comments_url truncated))))
   :group 'igist)
 
 (defcustom igist-list-format (igist-pick-from-alist
@@ -758,14 +738,27 @@ If non-nil, align the column should be center or right-aligned.
 \(FIELD COLUMN-NAME WIDTH SORTABLE FORMAT-FUNCTION/FORMAT-STRING)
    - :align-to-column - index of parent column to align children.
 
-User can interactively adjusts the width of the columns with commands:
+User can interactively add or remove columns, edit them adjusts the
+width of the columns with transient inferface:
 
-- `igist-tabulated-list-widen-current-column'
-- `igist-tabulated-list-narrow-current-column'
 - `igist-table-menu'
 
 and save the result with command `igist-save-column-settings'."
-  :type 'igist-list-custom-widget
+  :type `(repeat
+          (choice
+           :tag "Column"
+           :value ,(car (last igist-default-formats))
+           ,@(mapcar (lambda (it)
+                       (igist-make-column-custom-type it))
+                     '(id description comments owner
+                          user
+                          files
+                          node_id git_pull_url
+                          url forks_url commits_url
+                          git_push_url
+                          html_url public created_at
+                          updated_at
+                          comments_url truncated))))
   :group 'igist)
 
 (defcustom igist-enable-copy-gist-url-p 'after-new
@@ -1095,33 +1088,6 @@ at the values with which this function was called."
   (when igist-message-function
     (apply igist-message-function args)))
 
-(defun igist-swap (i j lst)
-  "Swap the elements at positions I and J in a given list LST.
-
-Argument I is the index of the first element in the list that you want to swap.
-Argument J is the index of the second element in the list that you want to swap
-with the first element.
-Argument LST is the list in which the swapping of elements will take place."
-  (let ((elem (nth i lst)))
-    (setf (nth i lst)
-          (nth j lst))
-    (setf (nth j lst) elem))
-  lst)
-
-(defun igist-seq-split (sequence length)
-  "Split SEQUENCE into a list of sub-sequences of at most LENGTH elements.
-All the sub-sequences will be LENGTH long, except the last one,
-which may be shorter."
-  (when (< length 1)
-    (error "Sub-sequence length must be larger than zero"))
-  (let ((result nil)
-        (seq-length (length sequence))
-        (start 0))
-    (while (< start seq-length)
-      (push (seq-subseq sequence start
-                        (setq start (min seq-length (+ start length))))
-            result))
-    (nreverse result)))
 
 (defun igist--all-pass (item filters)
   "Apply all FILTERS to an ITEM and return t if it passes all.
@@ -1143,13 +1109,19 @@ order."
 (defun igist-editable-p (&optional gist)
   "Check whether user `igist-current-user-name' can edit GIST."
   (and (igist-get-current-user-name)
-       (cond ((derived-mode-p 'igist-list-mode)
+       (cond (gist
+              (if-let ((owner (igist-get-owner
+                               gist)))
+                  (equal (igist-get-current-user-name)
+                         owner)
+                t))
+             ((derived-mode-p 'igist-list-mode)
               (when-let ((owner (igist-get-owner
-                                 (or gist (igist-tabulated-gist-at-point)))))
+                                 (igist-tabulated-gist-at-point))))
                 (equal (igist-get-current-user-name) owner)))
              ((igist-edit-mode-p)
               (if-let ((owner (igist-get-owner
-                               (or gist igist-current-gist))))
+                               igist-current-gist)))
                   (equal (igist-get-current-user-name)
                          owner)
                 t)))))
@@ -1339,29 +1311,52 @@ have the same meaning, as in `ghub-request'."
 
 ;; Common utils
 
-(defun igist-visible-windows ()
-  "Return a list of the visible, non-popup (dedicated) windows."
-  (seq-filter (igist-or
-               (igist-rpartial window-parameter 'visible)
-               (igist-compose not window-dedicated-p))
-              (window-list)))
+(defun igist-take-last (n lst)
+  "Return the last N elements from a list.
 
-(defun igist-get-all-edit-buffers ()
-  "Return all buffers with the loaded content of gists."
-  (seq-filter
-   (igist-and buffer-live-p
-              (apply-partially #'buffer-local-value 'igist-current-gist))
-   (buffer-list)))
+Argument N is an integer that specifies the number of elements to take from the
+end of the list.
+Argument LST is a list from which the last N elements will be taken."
+  (let ((len (length lst)))
+    (if (> n len)
+        lst
+      (nthcdr (- len n) lst))))
 
-(defun igist-buffer-window (buffer)
-  "Return visible and non-dedicated window BUFFER or nil."
-  (seq-find
-   (igist-compose
-    (apply-partially #'eq (if (stringp buffer)
-                              (get-buffer buffer)
-                            buffer))
-    window-buffer)
-   (igist-visible-windows)))
+(defun igist-insert-at (list elem index)
+  "Insert ELEM at INDEX in LIST."
+  (if (zerop index)
+      (cons elem list)
+    (let ((prev (nthcdr (1- index) list)))
+      (setcdr prev (cons elem (cdr prev)))
+      list)))
+
+(defun igist-swap (i j lst)
+  "Swap the elements at positions I and J in a given list LST.
+
+Argument I is the index of the first element in the list that you want to swap.
+Argument J is the index of the second element in the list that you want to swap
+with the first element.
+Argument LST is the list in which the swapping of elements will take place."
+  (let ((elem (nth i lst)))
+    (setf (nth i lst)
+          (nth j lst))
+    (setf (nth j lst) elem))
+  lst)
+
+(defun igist-seq-split (sequence length)
+  "Split SEQUENCE into a list of sub-sequences of at most LENGTH elements.
+All the sub-sequences will be LENGTH long, except the last one,
+which may be shorter."
+  (when (< length 1)
+    (error "Sub-sequence length must be larger than zero"))
+  (let ((result nil)
+        (seq-length (length sequence))
+        (start 0))
+    (while (< start seq-length)
+      (push (seq-subseq sequence start
+                        (setq start (min seq-length (+ start length))))
+            result))
+    (nreverse result)))
 
 (defun igist-alist-get (key alist)
   "Find the first element of ALIST whose car equals KEY and return its cdr."
@@ -1451,18 +1446,6 @@ GIST should be raw GitHub item."
                                    igist-current-gist))))
     (browse-url gist-url)))
 
-(defun igist-str-align-center (str width)
-  "Pad STR with spaces on the right to increase the length to WIDTH."
-  (let ((len-str (length str))
-        (diff))
-    (cond ((progn (setq diff (- width len-str))
-                  (>= diff 2))
-           (let ((padding (make-string (/ diff 2) ?\ )))
-             (concat padding str padding)))
-          ((< diff 0)
-           (substring str 0 (+ diff len-str)))
-          (t str))))
-
 (defun igist-list-gist-to-fetch ()
   "Get tabulated gist with file at point."
   (or (igist-tabulated-gist-file-at-point)
@@ -1539,22 +1522,6 @@ Argument USER is the username of the user whose gists will be loaded."
         (read-string "User: "))))
   (igist-list-load-gists user))
 
-;; (defun igist-list-edit-description (&rest _)
-;;   "Edit the description of the gist at the current point."
-;;   (interactive)
-;;   (if-let ((gist (igist-tabulated-gist-at-point)))
-;;       (let ((description (igist-alist-get
-;;                           'description gist)))
-;;         (if (igist-editable-p gist)
-;;             (igist-patch (concat "/gists/" (igist-alist-get 'id gist))
-;;                          nil
-;;                          :payload `((description . ,(read-string "Description: "
-;;                                                                  description)))
-;;                          :callback (lambda (&rest _)
-;;                                      (igist-load-logged-user-gists)))
-;;           (message (or description
-;;                        "No description"))))
-;;     (user-error "No gist at point")))
 
 (defun igist-list-edit-description (&optional id)
   "Edit the description of a specified gist pin the igist list.
@@ -1567,30 +1534,45 @@ It has no default value."
         (cdr (assq 'id (cdr (igist-completing-read-gists "Gist Id: ")))))))
   (let* ((gist (or (and igist-rendered-hash
                         (gethash id igist-rendered-hash))
-                   (igist-alist-find-by-prop 'id id igist-list-response)))
+                   (igist-alist-find-by-prop 'id id igist-list-response)
+                   (ghub-get (concat "/gists/" id)
+                             nil
+                             :username (igist-get-current-user-name)
+                             :auth igist-auth-marker
+                             :silent t)))
          (description (igist-alist-get
                        'description gist)))
     (cond ((igist-editable-p gist)
-           (let* ((input (if
-                             (and
-                              description
-                              (not
-                               (string-empty-p
-                                description)))
-                             description
-                           (let* ((files (igist-alist-get
-                                          'files
-                                          gist))
-                                  (file
-                                   (alist-get
-                                    'filename
-                                    (cdar files))))
-                             (and file
-                                  (capitalize
-                                   (file-name-base
-                                    file))))))
-                  (payload `((description .
-                                          ,(read-string "Description: " input)))))
+           (let*
+               ((input
+                 (if
+                     (and
+                      description
+                      (not
+                       (string-empty-p
+                        description)))
+                     description
+                   (let* ((files (igist-alist-get
+                                  'files
+                                  gist))
+                          (file
+                           (alist-get
+                            'filename
+                            (cdar files))))
+                     (and file
+                          (with-temp-buffer
+                            (insert (file-name-base
+                                     file))
+                            (let ((case-fold-search nil))
+                              (while (re-search-backward "[A-Z]+" nil t 1)
+                                (unless (bobp)
+                                  (insert "\s"))))
+                            (string-trim
+                             (buffer-substring-no-properties
+                              (point-min)
+                              (point-max))))))))
+                (payload `((description .
+                                        ,(read-string "Description: " input)))))
              (igist-patch (concat "/gists/" id)
                           nil
                           :silent t
@@ -1711,7 +1693,7 @@ column.  Negate the predicate that would be returned if
       (igist-tabulated-list--sort-by-column-name
        (get-text-property (if obj (cdr obj)
                             (posn-point pos))
-                          'tabulated-list-column-name
+                          'igist-tabulated-list-column-name
                           (car obj))))))
 
 
@@ -1772,7 +1754,7 @@ Argument LIST-FORMAT is a list that defines the format of the table.
 Optional argument ALLOW-CHILDREN is a boolean value.
 If it is non-nil, the function will allow nested tables.
 Its default value is nil."
-  (let* ((x (max igist-tabulated-list--padding 0))
+  (let* ((x (max igist-tabulated-list-padding 0))
          (button-props `(help-echo "Click to sort by column"
                                    mouse-face header-line-highlight
                                    keymap
@@ -1813,7 +1795,8 @@ Its default value is nil."
           (setq label (string-join (split-string label "[\n\r\f]" t) " ")))
         (push
          (cond ((not sortable)
-                (propertize label 'tabulated-list-column-name pname
+                (propertize label 'igist-tabulated-list-column-name
+                            pname
                             'field-name field-name))
                ((equal col-name
                        (car igist-tabulated-list-sort-key))
@@ -1831,10 +1814,10 @@ Its default value is nil."
                          (concat label
                                  suffix)
                          'face 'bold
-                         'tabulated-list-column-name pname
+                         'igist-tabulated-list-column-name pname
                          button-props)))
                (t (apply #'propertize label
-                         'tabulated-list-column-name pname
+                         'igist-tabulated-list-column-name pname
                          button-props)))
          cols)
         (when-let* ((label-width (string-width (car cols)))
@@ -1862,7 +1845,7 @@ Its default value is nil."
                   cols))
         (setq x next-x)))
     (if children
-        (let* ((igist-tabulated-list--padding
+        (let* ((igist-tabulated-list-padding
                 (car
                  (seq-take (reverse widths)
                            children-indent)))
@@ -1871,49 +1854,6 @@ Its default value is nil."
           (concat parcols "\n" child-cols))
       (apply #'concat (nreverse cols)))))
 
-(defcustom igist-use-header-line t
-  "Whether the Tabulated List buffer should use a header line."
-  :type 'boolean
-  :group 'igist)
-
-
-(defvar-local igist-header-line-spinner (propertize
-                                         "Loading... "
-                                         'face  'warning)
-  "A spinner instance for header line.")
-
-(defconst igist-header-loading-indicator (propertize
-                                          "Loading... "
-                                          'face  'warning))
-
-(defcustom igist-header-line-status-format '(:eval
-                                             (when igist-list-loading
-                                               igist-header-loading-indicator))
-  "Addional header line format cell."
-  :type '(choice (item
-                  :tag "None"
-                  :value nil)
-                 sexp)
-  :group 'igist)
-
-(defvar-local igist-list-spinner nil)
-(defconst igist-spinner--mode-line-construct
-  '(:eval
-    (when igist-list-loading
-      (unless igist-list-spinner
-        (setq igist-list-spinner
-              (spinner-create 'box-in-circle (current-buffer) 10 0)))
-      (spinner-print igist-list-spinner)))
-  "Construct used to display a spinner in `mode-line-process'.")
-
-
-(defun igist-start-header-line-spinner ()
-  "Start a spinner in the header line."
-  (unless (or (not igist-header-line-status-format)
-              (memq igist-header-line-status-format header-line-format))
-    (setq-local header-line-format
-                (cons igist-header-line-status-format
-                      header-line-format))))
 
 (defun igist-tabulated-list-init-header ()
   "Set up header line for the Igist Tabulated List buffer."
@@ -1924,15 +1864,13 @@ Its default value is nil."
                                     igist-table-list-format)))))
 
 (defun igist-tabulated-list-render-col (spec data used-width not-last-col)
-  "Render a column DATA in a tabulated list with specified specification SPEC.
-SPEC is list of (FIELD-NAME COLUMN-NAME WIDTH SORTABLE FORMAT-VAL PROPS).
-First element in the SPEC should be a key for a value data
-DATA should be an alist of first spec.
+  "Render a column in a tabulated list with specified properties and format.
 
-Argument USED-WIDTH is the total width of previous columns in the row.
-
+Argument SPEC is a list that specifies the column specification.
+Argument DATA is an association list that represents the values to be rendered.
+Argument USED-WIDTH is an integer that represents the width used so far.
 Argument NOT-LAST-COL is a boolean value that indicates whether the current
-column is the last column in the table."
+column is the last one or not."
   (pcase-let ((`(,field-name ,column-name ,width ,_sortable ,format-val .
                              ,props)
                spec))
@@ -1976,10 +1914,10 @@ column is the last column in the table."
                            (/ (- width label-width) 2))
                           ((plist-get props :right-align)
                            (- width label-width)))))
-          ;; (insert (propertize (make-string shift ?\s)
-          ;;                     'display
-          ;;                     `(space :align-to ,(+ used-width shift))))
-          (insert (make-string shift ?\s))
+          (insert (propertize (make-string shift ?\s)
+                              'display
+                              `(space :align-to ,(+ used-width
+                                                    shift))))
           (setq width (- width shift))
           (setq used-width (+ used-width shift)))
         (cond ((stringp col-desc)
@@ -1999,7 +1937,7 @@ column is the last column in the table."
                      (make-string (- width (min width label-width)) ?\s)
                      'display `(space :align-to ,next-x))))
           (add-text-properties opoint (point)
-                               (list 'tabulated-list-column-name
+                               (list 'igist-tabulated-list-column-name
                                      column-name
                                      'field-name
                                      field-name
@@ -2007,27 +1945,26 @@ column is the last column in the table."
                                      value))
           next-x)))))
 
-(defun igist-list-render-list-format (list-format data &optional list-padding
-                                                  extra-props)
-  "Render a list in a specific format using provided DATA and optional padding.
 
-Argument LIST-FORMAT is a list that defines the format of the list to be
+(defun igist-list-render-list-format (list-format data &optional padding props)
+  "Render a DATA list format with optional PADDING and properties.
+
+Argument LIST-FORMAT is a list that specifies the format of the list to be
 rendered.
-
-Argument DATA is a list that contains the DATA to be rendered according to the
-LIST-FORMAT.
-
-Optional argument LIST-PADDING is an integer that defines the padding for the
-list.
-The default value is 0."
+Argument DATA is an alist of the first spec.
+Optional argument PADDING is an integer that specifies the total width of
+previous columns in the row.
+If not provided, its default value is 0.
+Optional argument PROPS is a list of properties to be added to the text.
+If not provided, its default value is nil."
   (let ((beg (point))
         (children-spec)
         (widths)
         (last-col-spec (car (last list-format)))
-        (used-width (or list-padding 0))
+        (used-width (or padding 0))
         (col-names))
-    (when (and list-padding (> list-padding 0))
-      (insert (make-string list-padding ?\s)))
+    (when (and padding (> padding 0))
+      (insert (make-string padding ?\s)))
     (dolist (spec list-format)
       (let ((col-name (cadr spec)))
         (when-let ((pl (nthcdr 5 spec))
@@ -2048,135 +1985,126 @@ The default value is 0."
           (setq used-width w))))
     (add-text-properties
      beg (point)
-     (if extra-props
-         (append `(columns ,(nreverse col-names)) extra-props)
+     (if props
+         (append `(columns ,(nreverse col-names)) props)
        `(columns ,(nreverse col-names))))
     (append children-spec (list (reverse widths)))))
 
-(defun igist-list-render-row (data)
-  "Render a row in the igist list using provided DATA and format.
-
-Argument DATA is of type list.
-Argument LIST-FORMAT is of type list.
-Optional argument PADDING is of type number with a default value of 0."
-  (let ((id (cdr (assq 'id data)))
-        (inhibit-read-only t)
-        (beg (point)))
-    (pcase-let ((`(,children ,child-data ,parent-field ,align-to-col ,widths)
-                 (igist-list-render-list-format igist-table-list-format
-                                                data
-                                                igist-tabulated-list--padding)))
-      (when (and igist-default-collapsed (not (gethash id igist-rendered-hash)))
-        (push id igist-list-hidden-ids))
-      (when (and child-data
-                 (igist-entry-expanded-p id))
-        (pcase-dolist (`(,key . ,subdata) child-data)
-          (insert ?\n)
-          (igist-list-render-list-format children
-                                         subdata
-                                         (when (and align-to-col widths)
-                                           (apply #'+
-                                                  (seq-take
-                                                   widths
-                                                   align-to-col)))
-                                         `(subrow ,key parent-field
-                                                  ,parent-field))))
-      (puthash id data igist-rendered-hash))
-    (insert ?\n)
-    (add-text-properties
-     beg (point)
-     `(igist-tabulated-list-id ,id))))
-
-(defun igist-render-entry (elt list-format list-padding parent-spec &optional
-                               extra-props)
-  "Render an entry ELT in a tabulated list with formatting LIST-FORMAT.
-
-LIST-PADDING is a number of characters preceding each Tabulated List mode entry.
-
-LIST-FORMAT is a list that specifies the properties of the entry columns in the
-format (field-name column-name width sortable renderer [extra-props]).
-
-PARENT-SPEC is a LIST-FORMAT in the Tabulated list format.
-
-Argument EXTRA-PROPS is an optional argument that allows the user to provide
-additional properties to be added to the text."
-  (let ((x  (max list-padding 0))
-        (ncols (length list-format))
-        (inhibit-read-only t)
-        (beg (point))
-        (col-names))
-    (if (> list-padding 0)
-        (insert (make-string x ?\s)))
-    (dotimes (n ncols)
-      (let ((width (nth 1 (aref parent-spec n)))
-            (spec (nth n list-format))
-            (col-name))
-        (setq col-name (cadr spec))
-        (push col-name col-names)
-        (setq x (igist-tabulated-list-render-col
-                 (append (list (car spec) col-name
-                               width)
-                         (seq-drop spec 3))
-                 elt
-                 x
-                 (< (1+ n)
-                    (length list-format))))))
-    (add-text-properties
-     beg (point)
-     (if extra-props
-         (append `(columns ,(nreverse col-names))
-                 extra-props)
-       `(columns ,(nreverse col-names))))))
-
-(defun igist-restore-position (position &optional column saved-offset)
-  "Restore POSITION and COLUMN in Emacs Lisp.
-
-Argument SAVED-OFFSET is the number of lines to move forward from the given
-POSITION.
-Argument COLUMN is the optional COLUMN number to move the cursor to.
-Argument POSITION is the POSITION in the buffer to move the cursor to."
-  (goto-char position)
-  (when saved-offset
-    (forward-line saved-offset))
-  (when column
-    (move-to-column column)))
+(defun igist-render-entry (data)
+  "Render a single entry of DATA in the Igist list table."
+  (let* ((id (cdr (assq 'id data)))
+         (hash (gethash id igist-rendered-hash)))
+    (unless (assq 'deleted hash)
+      (let ((inhibit-read-only t)
+            (beg (point)))
+        (pcase-let
+            ((`(,children ,child-data ,parent-field ,align-to-col ,widths)
+              (igist-list-render-list-format igist-table-list-format
+                                             data
+                                             igist-tabulated-list-padding)))
+          (when (and igist-default-collapsed (not hash))
+            (push id igist-list-hidden-ids))
+          (when (and child-data
+                     (igist-entry-expanded-p id))
+            (pcase-dolist (`(,key . ,subdata) child-data)
+              (insert ?\n)
+              (igist-list-render-list-format children
+                                             subdata
+                                             (when (and align-to-col widths)
+                                               (apply #'+
+                                                      (seq-take
+                                                       widths
+                                                       align-to-col)))
+                                             `(subrow ,key parent-field
+                                                      ,parent-field))))
+          (puthash id data igist-rendered-hash))
+        (insert ?\n)
+        (add-text-properties
+         beg (point)
+         `(igist-tabulated-list-id ,id))))))
 
 (defmacro igist-with-position (&rest body)
   "Save and restore cursor position while executing provided code BODY."
   (let ((saved-pt (make-symbol "saved-pt"))
         (saved-col (make-symbol "saved-col"))
-        (saved-wind (make-symbol "saved-wind"))
-        (saved-buff (make-symbol "saved-buff")))
-    `(let ((,saved-pt (point))
+        (saved-wind-start (make-symbol "saved-wind-start"))
+        (saved-buff (make-symbol "saved-buff"))
+        (id (make-symbol "id")))
+    `(let ((,id (igist-tabulated-list-get-id))
+           (,saved-pt (point))
            (,saved-col (current-column))
-           (,saved-wind (selected-window))
-           (,saved-buff (current-buffer)))
+           (,saved-buff (current-buffer))
+           (,saved-wind-start))
+       (when (get-buffer-window ,saved-buff)
+         (setq ,saved-wind-start (window-start
+                                  (get-buffer-window ,saved-buff))))
        (unwind-protect
            (progn ,@body)
          (when (buffer-live-p ,saved-buff)
            (with-current-buffer ,saved-buff
-             (if (window-live-p ,saved-wind)
-                 (with-selected-window ,saved-wind
-                   (goto-char (min ,saved-pt (point-max)))
-                   (move-to-column ,saved-col))
-               (goto-char (min ,saved-pt (point-max)))
-               (move-to-column ,saved-col))))))))
+             (goto-char ,saved-pt))
+           (dolist (wnd (get-buffer-window-list ,saved-buff nil t))
+             (set-window-point wnd ,saved-pt)
+             (when ,saved-wind-start
+               (set-window-start wnd ,saved-wind-start))))))))
+
+(defmacro igist-remember-pos (remember-pos &rest body)
+  "Save and restore cursor position and column in a buffer after executing BODY.
+
+Argument REMEMBER-POS is a boolean value that determines whether the position
+should be remembered or not.
 
 
-
-(defun igist-tabulated-list-update-entries (entries)
-  "Update ENTRIES in the `igist-rendered-hash' if they exist.
-
-Argument ENTRIES is a list that contains the ENTRIES to be updated in the
-tabulated list."
-  (when igist-rendered-hash
-    (message "igist: updating")
-    (igist-with-position
-     (dolist (entry entries)
-       (when (gethash (cdr (assq 'id entry))
-                      igist-rendered-hash)
-         (igist-update-entry entry))))))
-
+Argument BODY is a list of expressions that will be evaluated in the context of
+the macro."
+  (let ((saved-pt (make-symbol "saved-pt"))
+        (saved-col (make-symbol "saved-col"))
+        (saved-buff (make-symbol "saved-buff"))
+        (entry-id (make-symbol "entry-id"))
+        (saved-offset (make-symbol "saved-offset"))
+        (saved-wind-start (make-symbol "saved-wind-start")))
+    `(let ((,saved-pt)
+           (,saved-col)
+           (,saved-offset)
+           (,entry-id)
+           (,saved-buff)
+           (,saved-wind-start))
+       (when ,remember-pos
+         (setq ,entry-id (igist-tabulated-list-get-id))
+         (when ,entry-id
+           (setq ,saved-buff (current-buffer))
+           (when (get-buffer-window ,saved-buff)
+             (setq ,saved-wind-start (window-start
+                                      (get-buffer-window ,saved-buff))))
+           (setq ,saved-col (current-column))
+           (while (get-text-property (point)
+                                     'subrow)
+             (forward-line -1)
+             (setq ,saved-offset (1+ (or ,saved-offset 0))))
+           (setq ,saved-pt (point))))
+       (unwind-protect
+           (progn ,@body)
+         (if (not ,remember-pos)
+             (goto-char (point-min))
+           (when (and ,entry-id
+                      (buffer-live-p ,saved-buff))
+             (with-current-buffer ,saved-buff
+               (goto-char ,saved-pt)
+               (let ((bounds (igist-find-entry-bounds ,entry-id)))
+                 (when bounds
+                   (goto-char (car bounds))
+                   (when ,saved-offset
+                     (forward-line ,saved-offset)
+                     (when (> (point)
+                              (cdr bounds))
+                       (goto-char (cdr bounds))))
+                   (when ,saved-col
+                     (move-to-column ,saved-col))))
+               (setq ,saved-pt (point)))
+             (dolist (wnd (get-buffer-window-list ,saved-buff nil t))
+               (set-window-point wnd ,saved-pt)
+               (when ,saved-wind-start
+                 (set-window-start wnd ,saved-wind-start)))))))))
 
 (defun igist-tabulated-list-print (&optional remember-pos)
   "Prints a tabulated list with optional sorting.
@@ -2185,89 +2113,36 @@ Argument UPDATE is an optional boolean flag that determines whether the
 tabulated list should be updated or not.
 Argument REMEMBER-POS is an optional boolean flag that determines whether the
 current position in the tabulated list should be remembered or not."
-  (message "igist: printing %s" remember-pos)
-  (let ((inhibit-read-only t)
-        (entries tabulated-list-entries)
-        (inhibit-modification-hooks t)
-        (sorter (igist-list--get-sorter))
-        saved-pt
-        saved-col
-        saved-offset
-        entry-id)
-    (when remember-pos
-      (setq entry-id (igist-tabulated-list-get-id))
-      (setq saved-col (current-column))
-      (when entry-id
-        (while (get-text-property (point)
-                                  'subrow)
-          (forward-line -1)
-          (setq saved-offset (1+ (or saved-offset 0)))))
-      (setq saved-pt (point)))
+  (igist-remember-pos remember-pos
+                      (let ((inhibit-read-only t)
+        (entries igist-tabulated-list-entries)
+        (sorter (igist-list--get-sorter)))
     (when sorter
       (setq entries (sort entries sorter)))
-    (delete-region (point-min) (point-max))
+    (delete-region (point-min)
+                   (point-max))
     (while entries
       (when (or (not igist-filters)
                 (igist--all-pass (car entries) igist-filters))
-        (let* ((gist (car entries))
-               (id (cdr (assq 'id gist))))
-          (and entry-id
-               (equal entry-id id)
-               (setq entry-id nil
-                     saved-pt (point)))
-          (unless (assq 'deleted
-                        (gethash id igist-rendered-hash))
-            (igist-list-render-row gist))))
+        (igist-render-entry (car entries)))
       (setq entries (cdr entries)))
-    (setq-local mode-name (format "Gists[%d]" (length tabulated-list-entries)))
-    (if saved-pt
-        (igist-restore-position saved-pt
-                                saved-col
-                                saved-offset)
-      (goto-char (point-min)))))
-
-(defun igist-add-entries (&optional new-entries remember-pos)
-  "Add new entries to the existing list of gists, preserving the current position.
-
-Optional argument NEW-ENTRIES is a list of new entries to be added to the
-existing list of entries.
-Optional argument REMEMBER-POS is a boolean value, with no default value, that
-determines whether the function should remember the current position in the list
-of entries."
-  (let ((inhibit-read-only t)
-        saved-pt
-        saved-col
-        saved-offset
-        entry-id)
-    (when remember-pos
-      (setq entry-id (igist-tabulated-list-get-id))
-      (setq saved-col (current-column))
-      (when entry-id
-        (while (get-text-property (point)
-                                  'subrow)
-          (forward-line -1)
-          (setq saved-offset (1+ (or saved-offset 0)))))
-      (setq saved-pt (point)))
-    (setq tabulated-list-entries (nconc tabulated-list-entries new-entries))
-    (goto-char (point-max))
-    (while new-entries
-      (when (or (not igist-filters)
-                (igist--all-pass (car new-entries) igist-filters))
-        (let* ((gist (car new-entries))
-               (id (cdr (assq 'id gist))))
-          (and entry-id
-               (equal entry-id id)
-               (setq entry-id nil
-                     saved-pt (point)))
-          (igist-list-render-row gist)))
-      (setq new-entries (cdr new-entries)))
     (set-buffer-modified-p nil)
-    (setq-local mode-name (format "Gists[%d]" (length tabulated-list-entries)))
-    (if saved-pt
-        (igist-restore-position saved-pt
-                                saved-col
-                                saved-offset)
-      (goto-char (point-min)))))
+    (setq-local mode-name (format "Gists[%d]" (length igist-tabulated-list-entries))))))
+
+(defun igist-tabulated-list-update-entries (entries)
+  "Update ENTRIES in the `igist-rendered-hash' if they exist.
+
+Argument ENTRIES is a list that contains the ENTRIES to be updated in the
+tabulated list.
+
+REQ is a `ghub--req' struct, used for loading next page."
+  (when igist-rendered-hash
+    (igist-with-position
+     (dolist (entry entries)
+       (when (gethash (cdr (assq 'id entry))
+                      igist-rendered-hash)
+         (igist-update-entry entry)))
+     (set-buffer-modified-p nil))))
 
 (defun igist-tabulated-list-sort (&optional n)
   "Sort Tabulated List entries by the column at point.
@@ -2285,15 +2160,14 @@ originally displayed in."
       (progn
         (unless igist-tabulated-list--original-order
           (error "Order is already in original order"))
-        (setq tabulated-list-entries
-              (sort tabulated-list-entries
+        (setq igist-tabulated-list-entries
+              (sort igist-tabulated-list-entries
                     (lambda (e1 e2)
                       (< (gethash e1 igist-tabulated-list--original-order)
                          (gethash e2 igist-tabulated-list--original-order)))))
         (setq igist-tabulated-list-sort-key nil)
         (igist-tabulated-list-init-header)
         (igist-tabulated-list-print t))
-        ;; Sort based on a column name.
     (let ((spec (if n
                     (nth n igist-table-list-format)
                   (igist-find-column-spec
@@ -2309,7 +2183,7 @@ Argument NAME is the name of the column to sort by."
     (unless igist-tabulated-list--original-order
     ;; Store the original order so that we can restore it later.
       (setq igist-tabulated-list--original-order (make-hash-table))
-      (cl-loop for elem in tabulated-list-entries
+      (cl-loop for elem in igist-tabulated-list-entries
                for i from 0
                do (setf (gethash elem igist-tabulated-list--original-order) i)))
                ;; Flip the sort order on a second click.
@@ -2322,7 +2196,57 @@ Argument NAME is the name of the column to sort by."
 
 (defun igist-tabulated-column-at-point (&optional pos)
   "Get tabulated column name at position POS or current point."
-  (get-text-property (or pos (point)) 'tabulated-list-column-name))
+  (get-text-property (or pos (point)) 'igist-tabulated-list-column-name))
+
+(defun igist-closest-column ()
+  "Determine the closest column to the current point in a tabulated list."
+  (let ((pos (point)))
+    (or (igist-tabulated-column-at-point pos)
+        (let ((line-beg (line-beginning-position))
+              (line-end (line-end-position)))
+          (or
+           (if-let ((closest-pos
+                     (cond ((= line-beg pos)
+                            (next-single-property-change
+                             pos
+                             'igist-tabulated-list-column-name
+                             nil
+                             line-end))
+                           ((= line-end pos)
+                            (previous-single-property-change
+                             pos
+                             'igist-tabulated-list-column-name
+                             nil
+                             line-beg)))))
+               (igist-tabulated-column-at-point closest-pos))
+           (let ((positions
+                  (seq-filter
+                   #'cdr
+                   (mapcar
+                    (lambda (prop-pos)
+                      (and prop-pos
+                           (cons
+                            prop-pos
+                            (igist-tabulated-column-at-point
+                             prop-pos))))
+                    (list
+                     (previous-single-property-change
+                      pos
+                      'igist-tabulated-list-column-name
+                      nil
+                      line-beg)
+                     (next-single-property-change
+                      pos
+                      'igist-tabulated-list-column-name
+                      nil
+                      line-end))))))
+             (cdar (seq-sort-by (lambda (p)
+                                  (let ((delta (- pos
+                                                  (car p))))
+                                    (if (< delta 0)
+                                        (- delta)
+                                      delta)))
+                                #'< positions))))))))
 
 (defun igist-tabulated-list-goto-column (column-name)
   "Go to specified column in tabulated list.
@@ -2343,7 +2267,7 @@ navigate in a tabulated list."
                     (and (>= pos beg)
                          (> end pos))))
         (when-let ((next (next-single-property-change
-                          (point) 'tabulated-list-column-name
+                          (point) 'igist-tabulated-list-column-name
                           nil
                           end)))
           (when (<= next end)
@@ -2386,7 +2310,7 @@ If ARG is provided, move that many columns."
                   (- arg)))
       (let ((next
              (funcall fn
-                      (point) 'tabulated-list-column-name
+                      (point) 'igist-tabulated-list-column-name
                       nil limit)))
         (when next
           (goto-char next))))))
@@ -2417,12 +2341,13 @@ If ARG is provided, move that many columns."
     (append (mapcar #'cadr igist-table-list-format)
             child-cols)))
 
+
 (defun igist-list-render (&optional _req)
   "Render list of GISTS."
-  (if tabulated-list-entries
-      (progn (setq tabulated-list-entries igist-list-response)
+  (if igist-tabulated-list-entries
+      (progn (setq igist-tabulated-list-entries igist-list-response)
              (igist-tabulated-list-print t))
-    (setq tabulated-list-entries igist-list-response)
+    (setq igist-tabulated-list-entries igist-list-response)
     (igist-tabulated-list-print)))
 
 (defun igist--run-in-buffer (buffer timer-sym fn &rest args)
@@ -2587,25 +2512,26 @@ If LOADING is non nil show spinner, otherwise hide."
                'public
                gist)))
 
-(defun igist-sync-gists-lists (response)
+(defun igist--sync-gists-edit-buffers (response)
   "Synchronize gists buffers with RESPONSE."
-  (let ((buffers (igist-get-all-edit-buffers)))
-    (dolist (buff buffers)
+  (dolist (buff (buffer-list))
+    (when (buffer-local-value 'igist-current-gist buff)
       (with-current-buffer buff
         (when-let ((gist
                     (and
-                     (alist-get 'created_at
-                                igist-current-gist)
+                     (cdr (assq 'created_at igist-current-gist))
                      (igist-find-by-id-and-file
-                      (igist-alist-get
-                       'id
-                       igist-current-gist)
-                      (or (igist-alist-get
-                           'filename
-                           igist-current-gist)
-                          igist-current-filename)
+                      (cdr (assq 'id igist-current-gist))
+                      (cdr (assq 'filename igist-current-gist))
                       response))))
           (igist-refresh-buffer-vars gist))))))
+
+(defun igist-sync-gists-lists (response)
+  "Synchronize gists buffers with RESPONSE."
+  (igist-debounce 'igist-sync-timer
+                  1
+                  #'igist--sync-gists-edit-buffers
+                  response))
 
 (defun igist-get-gist-buffers-by-id (id)
   "Return all live gist buffers with ID."
@@ -2701,8 +2627,8 @@ If LOADING is non nil show spinner, otherwise hide."
   (let ((str
          (if-let ((status (seq-find #'numberp value)))
              (let ((msg (igist-alist-get 'message (car (last value)))))
-               (format "Igist request error: %s (%s)" status msg))
-           (format "Igist request error: %s" value))))
+               (format "IGist request error: %s (%s)" status msg))
+           (format "IGist request error: %s" value))))
     (message
      (or (if (facep 'error)
              (propertize str 'face 'error)
@@ -2757,12 +2683,11 @@ If LOADING is non nil show spinner, otherwise hide."
 (defun igist-save-existing-gist (buffer &optional callback)
   "Save gist in BUFFER. If CALLBACK is non-nil, call it without arguments."
   (let* ((gist (buffer-local-value 'igist-current-gist buffer))
-         (id (igist-alist-get 'id gist))
          (orig-filename (igist-alist-get 'filename gist))
          (new-filename (buffer-local-value
                         'igist-current-filename
                         buffer)))
-    (igist-patch (concat "/gists/" id)
+    (igist-patch (concat "/gists/" (igist-alist-get 'id gist))
                  nil
                  :payload (igist-make-gist-payload
                            (or orig-filename
@@ -2783,7 +2708,7 @@ If LOADING is non nil show spinner, otherwise hide."
                  :buffer buffer
                  :callback
                  (lambda (val &rest _ignored)
-                   (if (igist-alist-get 'id val)
+                   (if-let ((id (igist-alist-get 'id val)))
                        (igist-with-exisiting-buffer buffer
                          (let ((new-gist
                                 (igist-normalize-gist-file val
@@ -2854,8 +2779,7 @@ gist is PUBLIC or not."
                           (igist-load-logged-user-gists)
                         (setq igist-list-response (push value
                                                         igist-list-response))
-                        (igist-debounce 'igist-render-timer 0.5
-                                        #'igist-list-render))))))))
+                        (igist-list-render))))))))
 
 ;;;###autoload
 (defun igist-post-files (files &optional public)
@@ -2945,27 +2869,28 @@ The Gist will be created without editing."
   "Set up local variables with given GIST and FILENAME.
 
 Argument FILENAME is a string that represents the name of a file."
-  (let ((gist-id (igist-alist-get 'id gist)))
-    (setq-local header-line-format (format
-                                    "Gist %s %s"
-                                    (or filename
-                                        (igist-alist-get 'filename gist))
-                                    (igist-make-file-counter gist)))
+  (let ((gist-id (cdr (assq 'id gist))))
+    (setq-local header-line-format (list "" 'header-line-indent
+                                         (format
+                                          "Gist %s %s"
+                                          (or filename
+                                              (igist-alist-get 'filename gist))
+                                          (igist-make-file-counter gist))))
     (setq-local igist-current-gist gist)
     (setq-local igist-current-filename (if gist-id
                                            (or igist-current-filename
                                                filename)
                                          filename))
     (setq-local igist-current-description (or igist-current-description
-                                              (igist-alist-get
-                                               'description
-                                               gist)
+                                              (cdr (assq
+                                                    'description
+                                                    gist))
                                               ""))
     (setq-local igist-current-public (if gist-id
                                          (or igist-current-public
-                                             (igist-alist-get
-                                              'public
-                                              gist))
+                                             (cdr (assq
+                                                   'public
+                                                   gist)))
                                        (yes-or-no-p "Public?")))))
 
 (defun igist-get-owner (gist)
@@ -2982,7 +2907,6 @@ gist, such as its ID and filename.
 Argument SETUP-FN is an optional function that is called to perform additional
 setup on the buffer after it has been created and filled with the gist's
 content."
-
   (let* ((filename (or (igist-alist-get 'filename gist)
                        (read-string "Filename: ")))
          (gist-id (igist-alist-get 'id gist))
@@ -3258,11 +3182,7 @@ gists."
                                  value-sym
                                  value
                                  pred)
-                                (igist-debounce
-                                 'igist-render-timer
-                                 0.5
-                                 #'igist-tabulated-list-print
-                                 t)))))
+                                (igist-schedule-render)))))
                         nil t))
           (read-string prompt))
       (when transient-current-command
@@ -3533,34 +3453,6 @@ Argument NEWVAL is the new value to be set for `igist-table-list-format'."
     (error "The current buffer is not in Igist-list-mode"))
   (igist--tabulated-list-revert))
 
-
-(defun igist-update-fields-format-from-tabulated-format (list-format
-                                                         tabulated-format)
-  "Update fields format from tabulated format TABULATED-FORMAT.
-Argument LIST-FORMAT is a field specification.
-Argument TABULATED-FORMAT is a variable that represents the format of a
-tabulated list, which is used to display data in a table-like format in Emacs."
-  (seq-map-indexed
-   (pcase-lambda (`(,key ,name ,_old-width ,sortable ,format-val .
-                         ,extra-props)
-                  i)
-     (let ((spec (aref tabulated-format i))
-           (width))
-       (setq width (nth 1 spec))
-       (if extra-props
-           (let ((children (plist-get extra-props :children)))
-             (if children
-                 (let ((pl (seq-copy extra-props)))
-                   (setq pl (plist-put
-                             pl :children
-                             (igist-update-fields-format-from-tabulated-format
-                              children
-                              (plist-get (nthcdr 3 spec) :children))))
-                   (append (list key name width sortable format-val) pl))
-               (append (list key name width sortable format-val) extra-props)))
-         (list key name width sortable format-val))))
-   list-format))
-
 (define-derived-mode igist-list-mode special-mode "Gists"
   "Major mode for browsing gists.
 \\<igist-list-mode-map>
@@ -3615,23 +3507,6 @@ tabulated list, which is used to display data in a table-like format in Emacs."
   (setq igist-table-list-format
         igist-explore-format))
 
-
-(defun igist-pandoc-from-string (string input-type output-type &rest options)
-  "Execute `pandoc' on STRING in INPUT-TYPE to OUTPUT-TYPE additional OPTIONS."
-  (setq options (delete nil (flatten-list options)))
-  (let ((args (append
-               (list "pandoc" t t nil)
-               (list "-f" input-type "-t"
-                     output-type)
-               options)))
-    (with-temp-buffer
-      (insert string)
-      (let ((status (apply #'call-process-region (append (list (point-min)
-                                                               (point-max))
-                                                         args))))
-        (when (eq 0 status)
-          (buffer-string))))))
-
 (defun igist-render-comment-to-md (gist-id comment-alist)
   "Render and comment COMMENT-ALIST for gist with GIST-ID in markdown format."
   (let ((comment (alist-get 'body comment-alist))
@@ -3658,11 +3533,12 @@ comment."
         (comment-id (alist-get 'id comment-alist))
         (updated
          (format-time-string "%D %R"
-                             (parse-iso8601-time-string (igist-alist-get 'updated_at
-                                                               comment-alist))))
+                             (parse-iso8601-time-string (igist-alist-get
+                                                         'updated_at
+                                                         comment-alist))))
         (author (alist-get 'login (alist-get 'user comment-alist))))
     (propertize
-     (format "** %s:\n\s%s\n\s\s%s" author
+     (format "** %s:\n%s\n\s\s%s" author
              (string-join (list ":PROPERTIES:" (format ":UPDATED: %s" updated)
                                 ":END:")
                           "\n")
@@ -3919,8 +3795,8 @@ the function FN."
 (defun igist-kill-all-gists-buffers ()
   "Kill all editable Gists buffers."
   (interactive)
-  (dolist (buff (igist-get-all-edit-buffers))
-    (when (buffer-live-p buff)
+  (dolist (buff (buffer-list))
+    (when (buffer-local-value 'igist-current-gist buff)
       (with-current-buffer buff
         (set-buffer-modified-p nil))
       (kill-buffer buff))))
@@ -3935,7 +3811,7 @@ the function FN."
                                        buffer))))
              (length prev-response)
            (or igist-per-page-limit 30))))
-    (number-to-string (min estimed-gists-count 100))))
+    (min estimed-gists-count 100)))
 
 (defun igist-list-cancel-load ()
   "Cancel loading of gists list."
@@ -3954,13 +3830,11 @@ the function FN."
                        (car igist-list-response))))
       (igist-list-load-gists owner))))
 
-(defun igist-cancel-render-timer ()
-  "Cancel the `igist-render-timer' using the `igist-cancel-timer' function."
-  (igist-cancel-timer 'igist-render-timer))
+(defun igist-schedule-render (&optional delay)
+  "Schedule the rendering of the gists with an optional DELAY.
 
-(defun igist-schedule-render ()
-  "Schedule the rendering of the igist list with a delay of 0.5 seconds."
-  (igist-debounce 'igist-render-timer 0.5
+Optional argument DELAY is a number, with a default value of 0.5."
+  (igist-debounce 'igist-render-timer (or delay 0.5)
                   #'igist-list-render))
 
 
@@ -3981,7 +3855,7 @@ the CALLBACK function."
                    igist-list-loading nil)
              (when (functionp cancel-fn)
                (funcall cancel-fn))))
-          ((not (ghub-continue req))
+          ((not (bufferp (ghub-continue req)))
            (with-current-buffer buffer
              (setq igist-list-response value
                    igist-list-loading nil
@@ -3990,46 +3864,40 @@ the CALLBACK function."
              (igist-list-render)
              (when callback callback-args
                    (apply callback callback-args))
-             (igist-spinner-stop))
-           (igist-sync-gists-lists
-            value))
-          ((and (eq 'igist-explore-mode
-                    (buffer-local-value 'major-mode buffer)))
-           (with-current-buffer buffer
-             (when (get-buffer-window buffer)
-               (setq igist-list-response value
-                     igist-list-loading t
-                     igist-list-page
-                     (1+ (or igist-list-page 0)))
-               (igist-debounce 'igist-render-timer 0.5
-                               #'igist-list-render))))
+             (igist-spinner-stop)
+             (when value
+               (igist-sync-gists-lists
+                value))))
           ((>= (length value)
                (1- (length
-                    (buffer-local-value 'tabulated-list-entries buffer))))
+                    (buffer-local-value 'igist-tabulated-list-entries buffer))))
            (with-current-buffer buffer
              (setq igist-list-response value
-                   igist-list-loading t)
+                   igist-list-loading t
+                   igist-list-page (1+ (or igist-list-page 0)))
              (when (get-buffer-window buffer)
                (if (or (not igist-rendered-hash)
                        (hash-table-empty-p igist-rendered-hash))
                    (igist-list-render)
-                 (igist-debounce 'igist-render-timer 0.5
-                                 #'igist-list-render)))))
-          ((eq 'igist-explore-mode
-               (buffer-local-value 'major-mode buffer))
-           nil)
+                 (igist-schedule-render)))
+             (when value
+               (igist-sync-gists-lists
+                value))))
           (t
            (with-current-buffer buffer
              (setq igist-list-response value
                    igist-list-loading t
-                   igist-list-page
-                   (1+ (or igist-list-page 0)))
-             (when (get-buffer-window buffer)
-               (igist-debounce 'igist-render-timer 0.5
-                               (if (> (length value)
-                                      (length tabulated-list-entries))
-                                   #'igist-list-render
-                                 #'igist-tabulated-list-update-entries))))))))
+                   igist-list-page (1+ (or igist-list-page 0)))
+             (let ((per-page (and (get-buffer-window buffer)
+                                  (ghub-req-extra req))))
+               (when per-page
+                 (igist-debounce 'igist-render-timer 0.5
+                                 #'igist-tabulated-list-update-entries
+                                 (igist-take-last per-page value))))
+             (when value
+               (igist-sync-gists-lists
+                value)))))))
+
 
 (defun igist-list-load-gists (user &optional background callback callback-args)
   "List the GitHub USER's gists asynchronously.
@@ -4050,46 +3918,8 @@ Loading of subsequent pages may be halted by the command
   (igist-list-load-gists igist-current-user-name
                          t
                          cb args))
-(defvar igist-hash-table nil)
 
-(defun igist-list-fetch (&optional user page)
-  "Fetch and display a list of gists for a specific USER or public gists.
 
-Optional argument USER is a string representing the username of the USER whose
-gists are to be fetched.
-If not provided, the function fetches public gists.
-
-Optional argument PAGE is an integer representing the PAGE number of the gists
-to be fetched.
-If not provided, the function defaults to fetching the first PAGE."
-  (interactive)
-  (setq page (or page 1))
-  (pcase-let* ((`(,buff-name . ,mode)
-                (if user
-                    (igist-get-user-buffer-name user)
-                  (cons igist-explore-buffer-name
-                        'igist-explore-mode)))
-               (buff (get-buffer buff-name)))
-    (unless buff
-      (setq buff (get-buffer-create buff-name))
-      (with-current-buffer buff
-        (setq igist-list-response nil)
-        (funcall mode)
-        (igist-tabulated-list-init-header))
-      (igist-ensure-buffer-visible buff))
-    (igist-list-request-per-page
-     (if user (concat "/users/" user "/gists")
-       "/gists/public")
-     page
-     10
-     (lambda (value)
-       (let ((len (length value)))
-         (igist-with-exisiting-buffer buff
-           (if (zerop len)
-               nil
-             (igist-add-entries value t)
-             (igist-debounce 'igist-render-timer 1 'igist-list-fetch
-                             user (1+ page)))))))))
 
 (defun igist-json-parse-string (str &optional object-type array-type null-object
                                     false-object)
@@ -4147,42 +3977,6 @@ represent a JSON false value.  It defaults to `:false'."
                                                    (point-max)))))
               (documentation_url . "https://github.com/magit/ghub/wiki/Github-Errors")))))))
 
-(defun igist-list-request-per-page (url &optional page per_page callback)
-  "Fetches a specified number of gists per PAGE from a given URL.
-
-Argument URL is a string that represents the URL for the request.
-
-Optional argument PAGE is an integer representing the PAGE number for the
-request.
-If not provided, the function will request the first PAGE.
-
-Optional argument PER_PAGE is an integer representing the number of items per
-PAGE for the request.
-If not provided, the function will request 30 items per PAGE by default.
-
-Optional argument CALLBACK is a function to be called with the response value
-when the request is complete.
-If not provided, no CALLBACK function will be executed."
-  (ghub-request "GET" url
-                nil
-                :auth (if (igist-get-current-user-name)
-                          igist-auth-marker
-                        'none)
-                :username (igist-get-current-user-name)
-                :query `((per_page . ,(or per_page 30))
-                         (page . ,page))
-                :forge 'github
-                :host "api.github.com"
-                :errorback
-                (lambda (&rest args)
-                  (setq igist-list-loading nil)
-                  (setq igist-list-cancelled nil)
-                  (igist-show-request-error (car args)))
-                :callback
-                (lambda (value _headers _status _req)
-                  (when callback
-                    (funcall callback value)))))
-
 (defun igist-list-request (url user &optional background callback callback-args)
   "Fetch and possibly display a list of gists from a specified URL and USER.
 
@@ -4221,32 +4015,38 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
                                         callback
                                         callback-args))))
         (setq igist-list-loading t)
+        (setq igist-list-page 1)
         (igist-spinner-show)
-        (ghub-request "GET" url
-                      nil
-                      :auth (if (igist-get-current-user-name)
-                                igist-auth-marker
-                              'none)
-                      :username (igist-get-current-user-name)
-                      :host "api.github.com"
-                      :query `((per_page . ,(igist-list-get-per-page-query
-                                             buffer)))
-                      :forge 'github
-                      :errorback
-                      (lambda (&rest args)
-                        (when buffer
-                          (igist-with-exisiting-buffer
-                              buffer
-                            (igist-spinner-stop)))
-                        (igist-show-request-error (car args)))
-                      :callback
-                      (lambda (value _headers _status req)
-                        (condition-case nil
-                            (igist-list-loaded-callback buffer value req
-                                                        callback
-                                                        callback-args)
-                          (error (setq igist-list-cancelled nil)
-                                 (setq igist-list-loading nil)))))
+        (let ((per-page (igist-list-get-per-page-query
+                         buffer)))
+          (ghub-request "GET" url
+                        nil
+                        :auth (if (igist-get-current-user-name)
+                                  igist-auth-marker
+                                'none)
+                        :username (igist-get-current-user-name)
+                        :host "api.github.com"
+                        :reader #'igist--read-json-payload
+                        :query `((per_page . ,per-page))
+                        :forge 'github
+                        :errorback
+                        (lambda (&rest args)
+                          (when buffer
+                            (igist-with-exisiting-buffer
+                                buffer
+                              (igist-spinner-stop)))
+                          (igist-show-request-error (car args)))
+                        :callback
+                        (lambda (value _headers _status req)
+                          (condition-case nil
+                              (progn
+                                (setf (ghub-req-extra req) per-page)
+                                (igist-list-loaded-callback buffer value req
+                                                            callback
+                                                            callback-args))
+                            (error (setq igist-list-cancelled nil)
+                                   (setq igist-list-loading nil)
+                                   (igist-spinner-stop))))))
         (unless background
           (igist-ensure-buffer-visible buffer))))))
 
@@ -4429,6 +4229,12 @@ gist BUFFER is saved.
 
 Also run hooks from `igist-before-save-hook'."
   (with-current-buffer buffer
+    (setq-local header-line-format (list ""
+                                         (if (facep 'warning)
+                                             (propertize
+                                              "Saving..."
+                                              'face  'warning)
+                                           "Saving...")))
     (run-hooks 'igist-before-save-hook)
     (run-hooks 'before-save-hook))
   (if
@@ -4828,15 +4634,10 @@ initial position in the list."
   :reader #'igist-toggle-public
   :argument "affirmative")
 
-(defun igist-get-row-columns-at-point ()
-  "Return list of columns for the current tabulated list."
-  (when (igist-tabulated-list-get-id)
-    (get-text-property (point) 'columns)))
-
 (defun igist--transient-switch-column ()
   "Switch to the next column in a transient menu."
   (interactive)
-  (let* ((choices (igist-get-row-columns-at-point))
+  (let* ((choices (igist-get-all-cols))
          (current-idx (or (seq-position choices igist-table-current-column) -1))
          (next-idx (% (1+ current-idx)
                       (length choices)))
@@ -4861,29 +4662,6 @@ initial position in the list."
 (defun igist-table-current-column-spec ()
   "Find the current column specification in the table."
   (igist-find-column-spec igist-table-current-column))
-
-(defun igist-children-from-spec (spec)
-  "Extract the children property from the given specification list.
-
-Argument SPEC is a list that represents the specification from which children
-are to be extracted."
-  (let ((pl (nthcdr 5 spec)))
-    (plist-get pl :children)))
-
-
-(defun igist-find-column-spec-by-field-path (&rest fields-path)
-  "Find the column specification by field path in a table list format.
-
-Argument FIELDS-PATH is a list of fields that specifies the path to the desired
-column in the table."
-  (let ((spec)
-        (list-format igist-table-list-format))
-    (while (and fields-path list-format)
-      (setq spec (assq (car fields-path) list-format))
-      (setq list-format (igist-children-from-spec spec))
-      (setq fields-path (cdr fields-path)))
-    (unless fields-path
-      spec)))
 
 (defun igist-find-column-spec (column-name)
   "Find the column specification for a given COLUMN-NAME.
@@ -4949,7 +4727,7 @@ Argument N is an optional argument that specifies the number of columns to
 widen."
   (interactive "p")
   (unless n (setq n 1))
-  (let ((col (igist-tabulated-column-at-point))
+  (let ((col (igist-closest-column))
         (keep-old-col
          (memq last-command
                '(igist-tabulated-list-widen-current-column
@@ -4968,7 +4746,7 @@ widen."
                    (igist-tabulated-column-at-point))))
     (when igist-table-current-column
       (igist-table-inc-column-width n)
-      (igist--tabulated-list-revert)
+      (igist-remember-pos t (igist--tabulated-list-revert))
       (when transient-current-command
         (transient-setup transient-current-command)))))
 
@@ -4991,9 +4769,13 @@ Interactively, N is the prefix numeric argument, and defaults to
   (igist-table-inc-column-width -1)
   (igist--tabulated-list-revert))
 
+(defun igist-transient-setup-current-command ()
+  "Setup the transient specified by `transient-current-command' if it is non nil."
+  (when transient-current-command
+    (transient-setup transient-current-command)))
 
 (defun igist-table-update-current-column-name ()
-  "Read and update the current column width value in the minibuffer."
+  "Read and set new name for current column."
   (interactive)
   (when-let ((spec (igist-table-current-column-spec)))
     (let ((newval (read-string "Column name: " (cadr spec))))
@@ -5001,8 +4783,7 @@ Interactively, N is the prefix numeric argument, and defaults to
             newval)
       (igist--tabulated-list-revert)
       (setq igist-table-current-column newval)
-      (when transient-current-command
-        (transient-setup transient-current-command)))))
+      (igist-transient-setup-current-command))))
 
 (defun igist-table-update-current-column-width ()
   "Read and update the current column width value in the minibuffer."
@@ -5014,7 +4795,7 @@ Interactively, N is the prefix numeric argument, and defaults to
     (igist--tabulated-list-revert)))
 
 (defun igist-table-update-current-column-sortable ()
-  "Read and update the current column width value in the minibuffer."
+  "Toggle whether the current column is sortable."
   (interactive)
   (when-let ((spec (igist-table-current-column-spec)))
     (pcase-let ((`(,_key ,name ,old-width ,sortable ,format-val .
@@ -5029,11 +4810,10 @@ Interactively, N is the prefix numeric argument, and defaults to
                (igist-tabulated-list-sort -1)))
             ((not sortable)
              (igist-tabulated-list--sort-by-column-name name))))
-    (when transient-current-command
-      (transient-setup transient-current-command))))
+    (igist-transient-setup-current-command)))
 
 (defun igist-table-update-current-column-pad-right ()
-  "Read and update the current column width value in the minibuffer."
+  "Update the right padding of the current column in the igist table."
   (interactive)
   (when-let ((spec (igist-table-current-column-spec)))
     (setf (nthcdr 5 spec)
@@ -5041,11 +4821,10 @@ Interactively, N is the prefix numeric argument, and defaults to
                      (read-number "Pad right: "
                                   (plist-get (nthcdr 5 spec) :pad-right))))
     (igist--tabulated-list-revert)
-    (when transient-current-command
-      (transient-setup transient-current-command))))
+    (igist-transient-setup-current-command)))
 
 (defun igist-table-update-current-column-align ()
-  "Update the alignment of the current column."
+  "Update the alignment of the current column in the igist table."
   (interactive)
   (when-let ((spec (igist-table-current-column-spec)))
     (setf (nthcdr 5 spec)
@@ -5062,8 +4841,7 @@ Interactively, N is the prefix numeric argument, and defaults to
                 (t (plist-put (nthcdr 5 spec)
                               :center-align t))))
     (igist--tabulated-list-revert)
-    (when transient-current-command
-      (transient-setup transient-current-command))))
+    (igist-transient-setup-current-command)))
 
 (defun igist-save-column-settings ()
   "Save column settings for igist explore or igist list format."
@@ -5080,63 +4858,6 @@ Interactively, N is the prefix numeric argument, and defaults to
     (set-default sym
                  (or (eval (car (get sym 'saved-value)))
                      (eval (car (get sym 'standard-value)))))))
-
-(defun igist-closest-column ()
-  "Determine the closest column to the current point in a tabulated list."
-  (let ((pos (point)))
-    (or (igist-tabulated-column-at-point pos)
-        (let ((line-beg (line-beginning-position))
-              (line-end (line-end-position)))
-          (or
-           (if-let ((closest-pos
-                     (cond ((= line-beg pos)
-                            (next-single-property-change
-                             pos
-                             'tabulated-list-column-name
-                             nil
-                             line-end))
-                           ((= line-end pos)
-                            (previous-single-property-change
-                             pos
-                             'tabulated-list-column-name
-                             nil
-                             line-beg)))))
-               (igist-tabulated-column-at-point closest-pos))
-           (let ((positions
-                  (seq-filter
-                   #'cdr
-                   (mapcar
-                    (lambda (prop-pos)
-                      (and prop-pos
-                           (cons
-                            prop-pos
-                            (igist-tabulated-column-at-point
-                             prop-pos))))
-                    (list
-                     (previous-single-property-change
-                      pos
-                      'tabulated-list-column-name
-                      nil
-                      line-beg)
-                     (next-single-property-change
-                      pos
-                      'tabulated-list-column-name
-                      nil
-                      line-end))))))
-             (cdar (seq-sort-by (lambda (p)
-                                  (let ((delta (- pos
-                                                  (car p))))
-                                    (if (< delta 0)
-                                        (- delta)
-                                      delta)))
-                                #'< positions))))))))
-(defun igist-insert-at (list elem index)
-  "Insert ELEM at INDEX in LIST."
-  (if (zerop index)
-      (cons elem list)
-    (let ((prev (nthcdr (1- index) list)))
-      (setcdr prev (cons elem (cdr prev)))
-      list)))
 
 (defun igist-list-add-column (column-name)
   "Add a new column to the igist table list format.
@@ -5308,35 +5029,60 @@ column position."
       (when transient-current-command
         (transient-setup transient-current-command)))))
 
+(defun igist-transient-render-cols (list-format)
+  "Render columns for a transient description LIST-FORMAT.
 
+Argument LIST-FORMAT is a list that defines the format of the table."
+  (let* ((cols nil)
+         (children))
+    (pcase-dolist (`(,_field-name ,col-name ,_width ,_sortable ,_format-spec .
+                                  ,props)
+                   list-format)
+      (setq cols (push
+                  (propertize (substring-no-properties col-name)
+                              'face (if
+                                        (and
+                                         igist-table-current-column
+                                         (string=
+                                          col-name
+                                          igist-table-current-column))
+                                        'transient-value
+                                      'transient-inactive-value))
+                  cols))
+      (when (plist-get props :children)
+        (setq children (plist-get props :children))))
+    (if children
+        (let* ((child-cols (igist-transient-render-cols children))
+               (parcols (string-join (nreverse cols)
+                                     (propertize "|"
+                                                 'face
+                                                 'transient-inactive-value))))
+          (concat parcols "\n" child-cols))
+      (string-join (nreverse cols)
+                   (propertize "|"
+                               'face
+                               'transient-inactive-value)))))
+
+(defun igist-transient-column-descriptions ()
+  "Generate and format the column descriptions for the transient menu."
+  (let ((label "Column: "))
+    (concat
+     "Column: "
+     (propertize "[" 'face
+                 'transient-inactive-value)
+     (replace-regexp-in-string
+      "\n"
+      (concat "\n" (make-string (+ 3 (length label)) ?\ ))
+      (igist-transient-render-cols igist-table-list-format))
+     (propertize "]" 'face
+                 'transient-inactive-value))))
 
 ;;;###autoload (autoload 'igist-table-menu "igist" nil t)
 (transient-define-prefix igist-table-menu ()
   "A menu for editing, saving, and adjusting column settings in igist table."
   ["Edit column"
    ("c" igist--transient-switch-column :description
-    (lambda ()
-      (concat
-       "Column "
-       (propertize "[" 'face
-                   'transient-inactive-value)
-       (mapconcat
-        (lambda (choice)
-          (propertize choice
-                      'face
-                      (if
-                          (and
-                           igist-table-current-column
-                           (string=
-                            choice
-                            igist-table-current-column))
-                          'transient-value
-                        'transient-inactive-value)))
-        (igist-get-row-columns-at-point)
-        (propertize "|" 'face
-                    'transient-inactive-value))
-       (propertize "]" 'face
-                   'transient-inactive-value))))]
+    igist-transient-column-descriptions)]
   [:setup-children
    (lambda (&rest _argsn)
      (mapcar
@@ -5345,21 +5091,22 @@ column position."
       (pcase-let ((`(,_field-name ,col-name ,width ,sortable ,format-spec .
                                   ,props)
                    (igist-table-current-column-spec)))
-        (list (list "n" 'igist-table-update-current-column-name
+        (list (list "n" #'igist-table-update-current-column-name
                     :description
                     (lambda ()
                       (concat "Column Name: "
                               (propertize (or col-name "") 'face
                                           'transient-value))))
-              (list "w" 'igist-table-update-current-column-width
+              (list "w" #'igist-table-update-current-column-width
                     :description
                     (lambda ()
                       (concat "Width: "
-                              (propertize (format "%s"
-                                                  width)
-                                          'face
-                                          'transient-value))))
-              (list "<right>" 'igist-table-widen-current-column
+                              (propertize
+                               (format "%s"
+                                       width)
+                               'face
+                               'transient-value))))
+              (list "<right>" #'igist-table-widen-current-column
                     :description (lambda
                                    ()
                                    (format "Increase %s width (%s)"
@@ -5367,7 +5114,7 @@ column position."
                                            (caddr
                                             (igist-table-current-column-spec))))
                     :transient t)
-              (list "<left>" 'igist-table-narrow-current-column
+              (list "<left>" #'igist-table-narrow-current-column
                     :description (lambda
                                    ()
                                    (format "Decrease %s width (%s)"
@@ -5376,14 +5123,14 @@ column position."
                                             (igist-table-current-column-spec))))
                     :transient t)
               ""
-              (list "s" 'igist-table-update-current-column-sortable
+              (list "s" #'igist-table-update-current-column-sortable
                     :description
                     (lambda ()
                       (format "Sortable: %s" sortable)))
               (list "f" 'ignore :description
                     (lambda ()
                       (format "Format: %s " format-spec)))
-              (list "a" 'igist-table-update-current-column-align
+              (list "a" #'igist-table-update-current-column-align
                     :description
                     (lambda ()
                       (concat
@@ -5405,12 +5152,13 @@ column position."
                                     'transient-inactive-value))
                        (propertize "]" 'face
                                    'transient-inactive-value))))
-              (list "p" 'igist-table-update-current-column-pad-right
+              (list "p" #'igist-table-update-current-column-pad-right
                     :description
                     (lambda ()
-                      (format ":pad-right %s" (plist-get
-                                               props
-                                               :pad-right))))))))]
+                      (format ":pad-right %s"
+                              (plist-get
+                               props
+                               :pad-right))))))))]
   [("M-<left>" "Move column backward" igist-swap-current-column-backward
     :transient nil)
    ("M-<right>" "Move column forward" igist-swap-current-column
@@ -5425,49 +5173,6 @@ column position."
   (interactive)
   (igist-table-init-current-column)
   (transient-setup #'igist-table-menu))
-
-(defun igist--convert-markdown-to-org (str)
-  "Convert string STR from markdown to org markup."
-  (interactive)
-  (with-temp-buffer
-    (insert str)
-    (goto-char (point-min))
-    (while (re-search-forward "`\\|\\*\\{1,2\\}\\|_" nil t)
-      (pcase (match-string 0)
-        ("`" (if (looking-at "``")
-                 (progn (backward-char)
-                        (delete-char 3)
-                        (insert "#+begin_src ")
-                        (when (re-search-forward "^```" nil t)
-                          (replace-match "#+end_src")))
-               (replace-match "=")))
-        ("**"
-         (cond ((looking-at "\\*\\(?:[[:word:]]\\|\s\\)")
-                (delete-char 1))
-               ((looking-back "\\(?:[[:word:]]\\|\s\\)\\*\\{2\\}"
-                              (max (- (point) 3)
-                                   (point-min)))
-                (delete-char -1))))
-        ((or "_" "*")
-         (if (save-match-data
-               (and (looking-back "\\(?:[[:space:]]\\)\\(?:_\\|\\*\\)"
-                                  (max (- (point) 2)
-                                       (point-min)))
-                    (not (looking-at "[[:space:]]"))))
-             (and
-              (save-excursion
-                (when (and (re-search-forward (regexp-quote (match-string 0))
-                                              nil t)
-                           (looking-at "[[:space]]\\|\s")
-                           (not (looking-back
-                                 "\\(?:[[:space]]\\|\s\\)\\(?:_\\|\\*\\)"
-                                 (max (- (point) 2)
-                                      (point-min)))))
-                  (delete-char -1)
-                  (insert "/") t))
-              (progn (delete-char -1)
-                     (insert "/")))))))
-    (buffer-string)))
 
 ;;;###autoload
 (define-minor-mode igist-comments-edit-mode
