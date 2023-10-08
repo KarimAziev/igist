@@ -273,10 +273,7 @@ Argument MSG is a string that represents the message to be logged.
 Optional argument ARGS is a list of arguments that can be used to format the
 message string."
   (and igist-debug-enabled-p
-       (apply #'message (concat (format "igist: buffer: %s window %s:\n"
-                                        (buffer-name)
-                                        (selected-window))
-                                (or msg ""))
+       (apply #'message (concat (or msg ""))
               args)))
 
 (defun igist-find-entry-bounds (id)
@@ -3454,9 +3451,37 @@ Argument NEWVAL is the new value to be set for `igist-table-list-format'."
   (igist--tabulated-list-revert))
 
 (define-derived-mode igist-list-mode special-mode "Gists"
-  "Major mode for browsing gists.
+  "Major mode for displaying Gists in a table view.
+
+In this major mode, each gist is displayed as an table entry.
+
+An expanded table entry will display nested row entries - gist's files.
+
+The exact format of an entry, as well as the addition, editing, reordering,
+or removal of columns, can be configured by either editing the custom
+variable `igist-list-format', or interactively via `igist-table-menu'.
+
+Users can configure whether the gists should be collapsed by default in user
+buffers initial view by editing the custom variable
+`igist-user-gists-init-collapsed'.
+
+The mode also provides incremental filtering via the `igist-filters-menu'
+command.
+
+In general, most mode commands can be accessed via
+the `igist-dispatch' menu command.
+
+Other custom variables related to this mode include:
+
+- `igist-tabulated-list-padding'
+- `igist-use-header-line'
+- `igist-tabulated-list-gui-sort-indicator-asc'
+- `igist-tabulated-list-gui-sort-indicator-desc'
+- `igist-tabulated-list-tty-sort-indicator-asc'
+- `igist-tabulated-list-tty-sort-indicator-desc'
+
 \\<igist-list-mode-map>
-\\{igist-list-mode-map}"
+\\{igist-list-mode-map}."
   (setq-local truncate-lines t)
   (setq-local buffer-undo-list t)
   (setq-local glyphless-char-display
@@ -3500,9 +3525,13 @@ Argument NEWVAL is the new value to be set for `igist-table-list-format'."
 (put 'igist-list-mode 'mode-class 'special)
 
 (define-derived-mode igist-explore-mode igist-list-mode "Gists-Explore"
-  "Major mode for exploring public Gists.
+  "Major mode for exploring public Gists in a special mode.
+
+This mode allow to add, edit, reorder, or remove columns
+interactively with the transient command - `igist-table-menu'.
+
 \\<igist-list-mode-map>
-\\{igist-list-mode-map}"
+\\{igist-list-mode-map}."
   (setq igist-default-collapsed igist-explore-gists-init-collapsed)
   (setq igist-table-list-format
         igist-explore-format))
@@ -5079,7 +5108,7 @@ Argument LIST-FORMAT is a list that defines the format of the table."
 
 ;;;###autoload (autoload 'igist-table-menu "igist" nil t)
 (transient-define-prefix igist-table-menu ()
-  "A menu for editing, saving, and adjusting column settings in igist table."
+  "Invoke a transient prefix command to modify table columns in Igist list mode."
   ["Edit column"
    ("c" igist--transient-switch-column :description
     igist-transient-column-descriptions)]
@@ -5221,7 +5250,10 @@ See also `igist-before-save-hook'."
 
 ;;;###autoload (autoload 'igist-dispatch "igist" nil t)
 (transient-define-prefix igist-dispatch ()
-  "Transient menu for gists."
+  "Invoke a transient menu to manage GitHub gists through various actions.
+
+The commands available in the menu vary based on the current major mode and
+editing mode."
   :transient-non-suffix #'transient--do-stay
   [[:if-derived
     igist-list-mode
