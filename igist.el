@@ -1462,9 +1462,10 @@ GIST should be raw GitHub item."
     (let ((buff (igist-setup-edit-buffer gist)))
       (switch-to-buffer-other-window buff))))
 
-(defun igist-list-view-current (gist)
+(defun igist-list-view-current (&optional gist)
   "Display GIST in other window, without selecting it."
   (interactive (list (igist-list-gist-to-fetch)))
+  (unless gist (setq gist (igist-list-gist-to-fetch)))
   (when gist
     (let ((current-window (selected-window)))
       (with-selected-window current-window
