@@ -108,8 +108,6 @@
 
 ;; M-x `igist-list-edit-description' (&rest _)
 ;;      Edit description for current gist at point in tabulated list mode.
-
-
 ;; Comments commands:
 
 ;; M-x `igist-post-comment'
@@ -242,7 +240,7 @@ frames."
   :type 'boolean)
 
 (defcustom igist-use-header-line t
-  "Whether the Tabulated List buffer should use a header line."
+  "Whether the Igist List buffer should use a header line."
   :type 'boolean
   :group 'igist)
 
@@ -912,42 +910,45 @@ only serves as documentation.")
 
 (defvar igist-list-mode-map
   (let ((map (make-sparse-keymap)))
+  ;; gist actions
+    (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
+    (define-key map (kbd "v") #'igist-list-view-current)
+    (define-key map (kbd "C-j") #'igist-list-view-current)
     (define-key map (kbd "+") #'igist-list-add-file)
     (define-key map (kbd "-") #'igist-delete-current-filename)
-    (define-key map (kbd "g") #'igist-list-refresh)
-    (define-key map (kbd "G") #'igist-tabulated-list-revert)
-    (define-key map (kbd "c") #'igist-load-comments)
-    (define-key map (kbd "w") #'igist-copy-gist-url)
-    (define-key map (kbd "a") #'igist-add-comment)
-    (define-key map (kbd "f") #'igist-fork-gist)
-    (define-key map (kbd "d") #'igist-list-edit-description)
-    (define-key map (kbd "r") #'igist-browse-gist)
+    (define-key map (kbd "D") #'igist-delete-current-gist)
     (define-key map (kbd "S") #'igist-star-gist)
     (define-key map (kbd "U") #'igist-unstar-gist)
-    (define-key map (kbd "D") #'igist-delete-current-gist)
+    (define-key map (kbd "a") #'igist-add-comment)
+    (define-key map (kbd "c") #'igist-load-comments)
+    (define-key map (kbd "d") #'igist-list-edit-description)
+    (define-key map (kbd "f") #'igist-fork-gist)
+    (define-key map (kbd "w") #'igist-copy-gist-url)
+    (define-key map (kbd "r") #'igist-browse-gist)
     (define-key map (kbd "L") #'igist-clone-gist)
-    (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
-    (define-key map (kbd "C-j") #'igist-list-view-current)
-    (define-key map (kbd "v") #'igist-list-view-current)
+    ;; list UI
+    (define-key map (kbd "C") #'igist-table-menu)
+    (define-key map (kbd "/") #'igist-filters-menu)
+    (define-key map (kbd "?") #'igist-dispatch)
+    (define-key map (kbd "K") #'igist-list-cancel-load)
+    (define-key map (kbd "g") #'igist-list-refresh)
     (define-key map (kbd "s") #'igist-tabulated-list-sort)
+    (define-key map (kbd "G") #'igist-tabulated-list-revert)
     (define-key map (kbd "}") #'igist-tabulated-list-widen-current-column)
     (define-key map (kbd "{") #'igist-tabulated-list-narrow-current-column)
-    (define-key map (kbd "K") #'igist-list-cancel-load)
     (define-key map (kbd "<backtab>") #'igist-toggle-all-children)
     (define-key map (kbd "<tab>") #'igist-toggle-row-children-at-point)
-    (define-key map (kbd "C") #'igist-table-menu)
     (define-key map (kbd "M-[") #'igist-swap-current-column-backward)
     (define-key map (kbd "M-]") #'igist-swap-current-column)
     (define-key map (kbd "M-{") #'igist-swap-current-column-backward)
     (define-key map (kbd "M-}") #'igist-swap-current-column)
-    (define-key map (kbd "?") #'igist-dispatch)
-    (define-key map (kbd "/") #'igist-filters-menu)
     (define-key map (kbd "n") #'next-line)
     (define-key map (kbd "p") #'previous-line)
     (define-key map (kbd "C-M-f") #'igist-tabulated-forward-column)
     (define-key map (kbd "C-M-b") #'igist-tabulated-backward-column)
     (define-key map (kbd "C-M-n") #'igist-list-forward-row-and-preview)
     (define-key map (kbd "C-M-p") #'igist-list-backward-row-and-preview)
+    ;; loading gists
     (set-keymap-parent map (make-composed-keymap button-buffer-map
                                                  special-mode-map))
     map)
@@ -3464,32 +3465,20 @@ Argument NEWVAL is the new value to be set for `igist-table-list-format'."
 (define-derived-mode igist-list-mode special-mode "Gists"
   "Major mode for displaying Gists in a table view.
 
-In this major mode, each gist is displayed as an table entry.
-
-An expanded table entry will display nested row entries - gist's files.
+In this major mode, each gist is displayed as an table entry with nested
+row entries - gist's files. Users can configure whether the gists should be
+collapsed by default in user buffers initial view by editing the custom variable
+`igist-user-gists-init-collapsed'.
 
 The exact format of an entry, as well as the addition, editing, reordering,
-or removal of columns, can be configured by either editing the custom
-variable `igist-list-format', or interactively via `igist-table-menu'.
-
-Users can configure whether the gists should be collapsed by default in user
-buffers initial view by editing the custom variable
-`igist-user-gists-init-collapsed'.
+or removal of columns, can be configured by either editing interactively
+via `igist-table-menu' or the custom variable `igist-list-format'.
 
 The mode also provides incremental filtering via the `igist-filters-menu'
 command.
 
-In general, most mode commands can be accessed via
-the `igist-dispatch' menu command.
-
-Other custom variables related to this mode include:
-
-- `igist-tabulated-list-padding'
-- `igist-use-header-line'
-- `igist-tabulated-list-gui-sort-indicator-asc'
-- `igist-tabulated-list-gui-sort-indicator-desc'
-- `igist-tabulated-list-tty-sort-indicator-asc'
-- `igist-tabulated-list-tty-sort-indicator-desc'
+The following commands are available (most mode commands can be accessed via
+the `igist-dispatch' menu command):
 
 \\<igist-list-mode-map>
 \\{igist-list-mode-map}."
@@ -3536,10 +3525,22 @@ Other custom variables related to this mode include:
 (put 'igist-list-mode 'mode-class 'special)
 
 (define-derived-mode igist-explore-mode igist-list-mode "Gists-Explore"
-  "Major mode for exploring public Gists in a special mode.
+  "Major mode for exploring public Gists in a table view.
 
-This mode allow to add, edit, reorder, or remove columns
-interactively with the transient command - `igist-table-menu'.
+In this major mode, each gist is displayed as an table entry with nested
+row entries - gist's files. Users can configure whether the gists should be
+collapsed by default in user buffers initial view by editing the custom variable
+`igist-user-gists-init-collapsed'.
+
+The exact format of an entry, as well as the addition, editing, reordering,
+or removal of columns, can be configured by either editing interactively
+via `igist-table-menu' or the custom variable `igist-explore-format'.
+
+The mode also provides incremental filtering via the `igist-filters-menu'
+command.
+
+The following commands are available (most mode commands can be accessed via
+the `igist-dispatch' menu command):
 
 \\<igist-list-mode-map>
 \\{igist-list-mode-map}."
@@ -4648,7 +4649,9 @@ If not provided, the default PROTOCOL is \"git@\"."
 If BACKGROUND is non-nil, the user's buffer should not be displayed.
 
 Loading of subsequent pages may be halted by the command
-`igist-list-cancel-load'."
+`igist-list-cancel-load'.
+
+See also `igist-explore-mode'."
   (interactive)
   (igist-list-request "/gists/public" nil
                       background))
@@ -4676,12 +4679,10 @@ gists are to be listed."
 
 ;;;###autoload
 (defun igist-list-gists ()
-  "List the gists of `igist-current-user-name'.
+  "List the gists of `igist-current-user-name' and activate `igist-list-mode'.
 
 Loading of subsequent pages may be stopped by the command
-`igist-list-cancel-load', executed in tabulated buffer.
-
-See also `igist-list-mode'."
+`igist-list-cancel-load', executed in tabulated buffer."
   (interactive)
   (while (not (igist-get-current-user-name))
     (setq igist-current-user-name (igist-change-user)))
@@ -5328,7 +5329,8 @@ which are then processed and concatenated into a single string."
                :description
                (lambda ()
                  (igist-concat-descriptions "Toggle sortable "
-                                            (igist-add-transient-face sortable))))
+                                            (igist-add-transient-face sortable
+                                                                      "nil"))))
          (list "f" 'ignore :description
                (lambda ()
                  (format "Format: %s " format-spec)))
