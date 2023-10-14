@@ -2,37 +2,43 @@
 
 # About
 
-The Emacs everywhere goal continues. These are the main features of
-`igist` to help you never leave Emacs to manage your gists.
+`igist` is a modern Emacs package that offers enhanced convenience for
+GitHub Gist enthusiasts.
 
-![](./igist-demo.gif)
+[![](./igist-table-demo.gif)](./igist-table-demo.gif)
 
-## Features
+[![](./igist-demo.gif)](./igist-demo.gif)
 
-### Gists
+## Comparison with other Emacs Gist Libraries
 
-- \[X\] create
-- \[X\] edit
-- \[X\] delete
-- \[X\] star
-- \[X\] unstar
-- \[X\] fork
-- \[X\] list
-- \[X\] explore public gists
+Several Emacs packages for GitHub gists already exist. `igist` not only
+includes the core functionalities of managing gists - such as editing,
+listing, and creating - but also introduces many new features.
 
-### Comments
+- **Transient Command Interface**: By adopting the transient command
+  interface, `igist` provides context-aware actions for managing
+  GitHub Gists. The use of transient interfaces leads to smoother task
+  flows, reduces the need for keystrokes, and offers a more intuitive
+  user experience.
 
-- \[X\] add
-- \[X\] list
-- \[X\] delete
-- \[X\] edit
+- **Asynchronous Advanced Rendering**: `igist` presents advanced
+  rendering capabilities, including incremental and asynchronous
+  loading and rendering. This ensures that the Emacs interface remains
+  responsive even when handling a large number of Gists.
+
+- **Customization on the Fly**: `igist` focuses on providing an
+  interface for live configuration of how gists should be displayed.
+  Users can adjust column width and alignment, alter sortability, and
+  add, rename or remove columns on the fly.
+
+- **Incremental Filtering**: This feature allows filtering of Gists by
+  filename, description, or programming.
 
 # igist
 
 > - [About](#about)
->   - [Features](#features)
->     - [Gists](#gists)
->     - [Comments](#comments)
+>   - [Comparison with other Emacs Gist
+>     Libraries](#comparison-with-other-emacs-gist-libraries)
 >   - [Requirements](#requirements)
 >   - [Installation](#installation)
 >     - [MELPA](#melpa)
@@ -283,48 +289,54 @@ This commands render and load gists with pagination. To stop or pause
 loading use command `igist-list-cancel-load` (default keybinding is
 `K`).
 
-**Gists Actions**
+<div id="igist-list-mode-map">
 
-| Key          | Description           | Command                         |
-| ------------ | --------------------- | ------------------------------- |
-| `RET`        | edit gist             | `igist-list-edit-gist-at-point` |
-| `v` or `C-j` | view gist             | `igist-list-view-current`       |
-| `+`          | add file to the gist  | `igist-list-add-file`           |
-| `-`          | delete file from gist | `igist-delete-current-filename` |
-| `D`          | delete the whole gist | `igist-delete-current-gist`     |
-| `K`          | stop loading          | `igist-list-cancel-load`        |
-| `S`          | star gist             | `igist-star-gist`               |
-| `U`          | unstar gist           | `igist-unstar-gist`             |
-| `a`          | comment gist          | `igist-add-comment`             |
-| `c`          | show comment          | `igist-load-comments`           |
-| `d`          | edit description      | `igist-list-edit-description`   |
-| `f`          | fork gist             | `igist-fork-gist`               |
-| `g`          | refresh gists         | `igist-list-refresh`            |
-| `r`          | browse gist           | `igist-browse-gist`             |
-| `s`          | sort gist             | `igist-tabulated-list-sort`     |
-| `w`          | copy gist url         | `igist-copy-gist-url`           |
+| Key            | Description                            | Command                                      |
+| -------------- | -------------------------------------- | -------------------------------------------- |
+| `RET`          | edit gist at point                     | `igist-list-edit-gist-at-point`              |
+| `v` or `C-j`   | view gist at point                     | `igist-list-view-current`                    |
+| `<backtab>`    | toggle all children                    | `igist-toggle-all-children`                  |
+| `<tab>`        | toggle row children at point           | `igist-toggle-row-children-at-point`         |
+| `+`            | add file to gist                       | `igist-list-add-file`                        |
+| `-`            | delete current filename                | `igist-delete-current-filename`              |
+| `D`            | delete current gist                    | `igist-delete-current-gist`                  |
+| `S`            | star gist                              | `igist-star-gist`                            |
+| `U`            | unstar gist                            | `igist-unstar-gist`                          |
+| `a`            | add comment                            | `igist-add-comment`                          |
+| `c`            | load comments                          | `igist-load-comments`                        |
+| `d`            | edit description                       | `igist-list-edit-description`                |
+| `f`            | fork gist                              | `igist-fork-gist`                            |
+| `w`            | copy gist url                          | `igist-copy-gist-url`                        |
+| `r`            | browse gist                            | `igist-browse-gist`                          |
+| `L`            | clone gist                             | `igist-clone-gist`                           |
+| `?`            | open transient menu with main commands | `igist-dispatch`                             |
+| `C`            | open transient menu for editing UI     | `igist-table-menu`                           |
+| `/`            | open transient menu for filtering      | `igist-filters-menu`                         |
+| `K`            | cancel load                            | `igist-list-cancel-load`                     |
+| `g`            | refresh gists                          | `igist-list-refresh`                         |
+| `s`            | sort gist                              | `igist-tabulated-list-sort`                  |
+| `G`            | force rerender                         | `igist-tabulated-list-revert`                |
+| `}`            | widen current column                   | `igist-tabulated-list-widen-current-column`  |
+| `{`            | narrow current column                  | `igist-tabulated-list-narrow-current-column` |
+| `M-]` or `M-}` | swap column with the next one          | `igist-swap-current-column`                  |
+| `M-[` or `M-{` | swap column with the previous one      | `igist-swap-current-column-backward`         |
+| `C-M-n`        | forward gist and preview               | `igist-list-forward-row-and-preview`         |
+| `C-M-p`        | backward gist and preview              | `igist-list-backward-row-and-preview`        |
+| `n`            | move to next line                      | `next-line`                                  |
+| `p`            | move to previous line                  | `previous-line`                              |
+| `C-M-f`        | forward to next column                 | `igist-tabulated-forward-column`             |
+| `C-M-b`        | move to the previous column            | `igist-tabulated-backward-column`            |
 
-**UI Actions**
+igist-list-mode-map
 
-| Key            | Description                         | Command                                      |
-| -------------- | ----------------------------------- | -------------------------------------------- |
-| `C`            | open transient menu for editing UI  | `igist-table-menu`                           |
-| `<tab>`        | toggle visibility of files at point | `igist-toggle-row-children-at-point`         |
-| `<backtab>`    | toggle visibility of all files      | `igist-toggle-all-children`                  |
-| `{`            | widen current gist column           | `igist-tabulated-list-widen-current-column`  |
-| `}`            | narrow current gist column          | `igist-tabulated-list-narrow-current-column` |
-| `M-]` or `M-}` | swap column with the next one       | `igist-swap-current-column`                  |
-| `M-[` or `M-{` | swap column with the previous one   | `igist-swap-current-column-backward`         |
-|                |                                     |                                              |
+</div>
+
+To customize these keys, see the variable `igist-list-mode-map`.
 
 You can change the width, reorder, or remove columns interactively with
 the transient menu - `igist-table-menu`. If you want to save your
 settings, use the command `M-x igist-save-column-settings`. To discard,
 use `M-x igist-reset-columns-settings`.
-
-[![](./igist-demo-view.gif)](./igist-demo-view.gif)
-
-To customize these keys, see the variable `igist-list-mode-map`.
 
 ### Minibuffer Completions
 
@@ -391,7 +403,7 @@ To customize these keybindings edit the variable
 - `igist-ask-for-description`: Determines when to prompt for a
   description before posting new gists. The default setting prompts
   for a description before saving a new gist.
-- `igist-enable-copy-gist-url-p`: Specifies whether and when to add
+- `igist-enable-copy-gist-url-p`: Specifies whether and when to addp
   the URL of a new or updated gist to the kill ring. The default
   setting is after the creation of new gists.
 - `igist-list-format`: Specifies the format of the user's Tabulated
