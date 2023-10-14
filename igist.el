@@ -837,6 +837,16 @@ with the GitHub API."
           (string :tag "OAuth Token")
           (symbol :tag "Suffix" igist)))
 
+(defcustom igist-clone-default-directory 'igist-clone-get-default-directory
+  "Default directory to use when `igist-clone-gist' reads destination.
+If nil or symbol `default-directory' then use the value of `default-directory'.
+If a directory, then use that.  If a function, then call that
+with the gist id as only argument and use the returned value."
+  :group 'igist
+  :type '(radio (const     :tag "value of default-directory" default-directory)
+                (directory :tag "constant directory")
+                (function  :tag "function's value")))
+
 (defvar igist-github-token-scopes '(gist)
   "The required GitHub API scopes.
 
@@ -915,6 +925,7 @@ only serves as documentation.")
     (define-key map (kbd "S") #'igist-star-gist)
     (define-key map (kbd "U") #'igist-unstar-gist)
     (define-key map (kbd "D") #'igist-delete-current-gist)
+    (define-key map (kbd "L") #'igist-clone-gist)
     (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
     (define-key map (kbd "C-j") #'igist-list-view-current)
     (define-key map (kbd "v") #'igist-list-view-current)
@@ -4312,17 +4323,19 @@ Argument URL is the url of a GitHub gist."
         :index-fn #'ivy-recompute-index-swiper-async)
       (let* ((gists-alist)
              (gists-keys)
+             (done)
              (buff (current-buffer))
              (output-buffer
               (ghub-get url nil
-                        :query `((per_page . 30))
+                        :query `((per_page . ,igist-per-page-limit))
                         :auth (if (igist-get-current-user-name)
                                   igist-auth-marker
                                 'none)
                         :callback
                         (lambda (value _headers _status req)
                           (when (and (active-minibuffer-window)
-                                     (buffer-live-p buff))
+                                     (buffer-live-p buff)
+                                     (not done))
                             (with-current-buffer buff
                               (setq gists-alist
                                     (igist-normalize-gists value))
@@ -4383,11 +4396,12 @@ Argument URL is the url of a GitHub gist."
         (unwind-protect
             (assoc (ivy-read prompt gists-keys
                              :action (lambda (gist)
-                                       (if ivy-exit
-                                           gist
-                                         (with-current-buffer buff
-                                           (igist-edit-buffer
-                                            (cdr (assoc gist gists-alist))))))
+                                       (if (not ivy-exit)
+                                           (with-current-buffer buff
+                                             (igist-edit-buffer
+                                              (cdr (assoc gist gists-alist))))
+                                         (setq done t)
+                                         gist))
                              :caller caller)
                    gists-alist)
           (when (buffer-live-p output-buffer)
@@ -4493,6 +4507,139 @@ If ACTION is non nil, call it with gist."
         (t (igist-load-logged-user-gists #'igist-completing-read-gists
                                          "Edit gist\s"
                                          #'igist-edit-gist))))
+
+(defun igist-parent-dir (filename)
+  "Return the directory name of the parent directory of FILENAME.
+If FILENAME is at the root of the filesystem, return nil.
+If FILENAME is relative, it is interpreted to be relative
+to `default-directory', and the result will also be relative."
+  (let* ((expanded-filename (expand-file-name filename))
+         (parent
+          (file-name-directory
+           (directory-file-name
+            expanded-filename))))
+    (cond ((or (null
+                parent)
+               (equal
+                parent
+                expanded-filename))
+           nil)
+          ((not (file-name-absolute-p
+                 filename))
+           (file-relative-name
+            parent))
+          (t
+           parent))))
+
+(defun igist--dir-empty-p (dir)
+  "Check if a specified directory is empty.
+
+Argument DIR is a string representing the directory path to be checked if it is
+empty or not."
+  (not (directory-files dir
+                        nil
+                        directory-files-no-dot-files-regexp
+                        t 1)))
+
+(defun igist-clone-get-default-directory (&optional _gist-id)
+  "Return default directory for cloning gists."
+  (or
+   (when-let ((proj
+               (locate-dominating-file
+                default-directory
+                ".git"))))
+   (if (igist--dir-empty-p default-directory)
+       default-directory
+     (igist-parent-dir default-directory))
+   default-directory))
+
+;;;###autoload
+(defun igist-clone-gist (gist-id directory &optional protocol)
+  "Clone a GitHub gist to a specified DIRECTORY using a chosen PROTOCOL.
+
+Argument GIST-ID is a string that represents the ID of the gist to be cloned.
+
+Argument DIRECTORY is a string that represents the DIRECTORY where the gist will
+be cloned.
+
+Optional argument PROTOCOL is a string prefix that represents the PROTOCOL
+to be used for cloning the gist.
+It can be either \"git@\" or \"https://\".
+If not provided, the default PROTOCOL is \"git@\"."
+  (interactive
+   (let* ((gist-id (or (igist-tabulated-list-get-id)
+                       (cdr
+                        (assq 'id
+                              (or igist-current-gist
+                                  (cdr
+                                   (igist-completing-read-gists
+                                    "Gist to clone: "
+                                    #'identity))))))))
+     (list gist-id
+           (read-directory-name
+            "Clone to: "
+            (pcase igist-clone-default-directory
+              ('default-directory default-directory)
+              ((pred functionp)
+               (funcall igist-clone-default-directory gist-id))
+              ((pred not))
+              ((pred (not file-exists-p))
+               (make-directory igist-clone-default-directory t)
+               igist-clone-default-directory)
+              (_ igist-clone-default-directory))
+            nil
+            nil
+            gist-id)
+           (pcase (car (read-multiple-choice "Protocol"
+                                             '((?g "git@ (default)")
+                                               (?h "https://"))))
+             (?h "https://")
+             (_ "git@")))))
+  (require 'shell)
+  (require 'comint)
+  (let ((url (format (if (and protocol
+                              (string-prefix-p "http" protocol))
+                         "https://gist.github.com/%s.git"
+                       "git@gist.github.com:%s.git")
+                     gist-id)))
+    (when (and (file-exists-p directory)
+               (not (igist--dir-empty-p directory)))
+      (user-error "Cannot clone to non-empty directory"))
+    (message "running git clone %s" url)
+    (let
+        ((proc)
+         (project-dir-exist-p (file-exists-p directory))
+         (buffer (generate-new-buffer (format "igist-git-clone-%s" gist-id))))
+      (progn (switch-to-buffer buffer)
+             (with-current-buffer buffer
+               (if project-dir-exist-p
+                   (setq default-directory directory)
+                 (mkdir directory t)
+                 (setq default-directory directory))
+               (setq proc (apply #'start-process
+                                 "igist-git-clone"
+                                 buffer "git" "clone"
+                                 (list url
+                                       directory)))
+               (shell-command-save-pos-or-erase)
+               (when (fboundp 'shell-mode)
+                 (shell-mode))
+               (view-mode +1))
+             (set-process-sentinel
+              proc
+              (lambda (process _state)
+                (cond ((zerop (process-exit-status process))
+                       (dired directory)
+                       (kill-buffer (process-buffer process)))
+                      (t
+                       (message (with-current-buffer (process-buffer process)
+                                  (buffer-string)))
+                       (kill-buffer (process-buffer process))
+                       (when (and (not project-dir-exist-p)
+                                  (file-exists-p directory))
+                         (delete-directory directory))))))
+             (when (fboundp 'comint-output-filter)
+               (set-process-filter proc #'comint-output-filter))))))
 
 ;;;###autoload
 (defun igist-explore-public-gists (&optional background)
@@ -5271,6 +5418,7 @@ editing mode."
     ("D" "Delete" igist-delete-current-gist :inapt-if-not igist-editable-p)
     ("d" "Description" igist-list-edit-description :inapt-if-not
      igist-tabulated-list-get-id)
+    ("L" "Clone" igist-clone-gist)
     ("{" igist-tabulated-list-widen-current-column
      :description (lambda
                     ()
@@ -5308,6 +5456,7 @@ editing mode."
     ("S" "Star" igist-star-gist :inapt-if-not igist-get-current-gist-id)
     ("U" "Unstar" igist-unstar-gist :inapt-if-not igist-get-current-gist-id)
     ("D" "Delete" igist-delete-current-gist :inapt-if-not igist-editable-p)
+    ("L" "Clone" igist-clone-gist  :inapt-if-not igist-get-current-user-name)
     ("P" igist-transient-toggle-public)
     ("R" igist-set-current-filename-variable)
     ("d" igist-set-current-description-variable)]
@@ -5319,7 +5468,13 @@ editing mode."
     ("g" "Refresh" igist-list-refresh :inapt-if-not-derived igist-list-mode)
     ("K" "Cancel load" igist-list-cancel-load :inapt-if-not-derived
      igist-list-mode)
-    ("X" "Kill buffers" igist-kill-all-gists-buffers)]
+    ("X" "Kill buffers" igist-kill-all-gists-buffers)
+    ("L" "Clone gist" igist-clone-gist
+     :if (lambda ()
+           (not (or (igist-edit-mode-p)
+                    (derived-mode-p
+                     'igist-list-mode))))
+     :inapt-if-not igist-get-current-user-name)]
    [:if-not-derived igist-list-mode
                     "Create"
                     ("n" "New" igist-create-new-gist :inapt-if-not
