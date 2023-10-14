@@ -3273,9 +3273,7 @@ Argument GIST is an alist representing a GIST."
   "Incremental search of gist files hiding the non-matches as we go."
   (interactive nil igist-list-mode)
   (setq igist-filters nil)
-  (igist-tabulated-list-print t)
-  (when transient-current-command
-    (transient-setup transient-current-command)))
+  (igist-tabulated-list-print t))
 
 (transient-define-prefix igist-filters-menu ()
   "A menu for filtering tabulated Gist's views."
@@ -3334,7 +3332,8 @@ Argument GIST is an alist representing a GIST."
                                          'transient-inactive-value))
                            " filters"
                            " "))
-    :inapt-if-nil igist-filters)]
+    :inapt-if-nil igist-filters)
+   ("RET" "Done" ignore)]
   (interactive)
   (transient-setup #'igist-filters-menu))
 
