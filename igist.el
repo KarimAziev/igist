@@ -5253,6 +5253,41 @@ Argument LIST-FORMAT is a list that defines the format of the table."
      (propertize "]" 'face
                  'transient-inactive-value))))
 
+(defun igist-add-transient-face (value &optional default)
+  "Format VALUE as string with face property.
+
+Optional argument DEFAULT is used if the VALUE argument is not
+provided."
+  (propertize (format "%s" (or value default ""))
+              'face (if value 'transient-value 'transient-unreachable)))
+
+(defun igist-current-column-width-description ()
+  "Format and highlight the current column width ."
+  (let ((value (caddr
+                (igist-table-current-column-spec))))
+    (concat "width: " (igist-add-transient-face value))))
+
+(defun igist-current-column-name-description ()
+  "Format and highlight the current column width ."
+  (igist-add-transient-face
+   igist-table-current-column "(No Column)"))
+
+(defun igist-concat-descriptions (&rest args)
+  "Concatenate all string or list arguments ARGS, ignoring nil values.
+
+The arguments ARGS are expected to be strings or cons cells,
+which are then processed and concatenated into a single string."
+  (mapconcat
+   (lambda (it)
+     (cond ((stringp it) it)
+           ((listp it)
+            (mapconcat #'igist-concat-descriptions it ""))
+           (t (format "%s" it))))
+   (remove nil args)
+   ""))
+
+
+
 ;;;###autoload (autoload 'igist-table-menu "igist" nil t)
 (transient-define-prefix igist-table-menu ()
   "Invoke a transient prefix command to modify table columns in Igist list mode."
@@ -5264,77 +5299,61 @@ Argument LIST-FORMAT is a list that defines the format of the table."
      (mapcar
       (apply-partially #'transient-parse-suffix
                        transient--prefix)
-      (pcase-let ((`(,_field-name ,col-name ,width ,sortable ,format-spec .
+      (pcase-let ((`(,_field-name ,_col-name ,_width ,sortable ,format-spec .
                                   ,props)
                    (igist-table-current-column-spec)))
-        (list (list "n" #'igist-table-update-current-column-name
-                    :description
-                    (lambda ()
-                      (concat "Column Name: "
-                              (propertize (or col-name "") 'face
-                                          'transient-value))))
-              (list "w" #'igist-table-update-current-column-width
-                    :description
-                    (lambda ()
-                      (concat "Width: "
-                              (propertize
-                               (format "%s"
-                                       width)
-                               'face
-                               'transient-value))))
-              (list "<right>" #'igist-table-widen-current-column
-                    :description (lambda
-                                   ()
-                                   (format "Increase %s width (%s)"
-                                           (or igist-table-current-column "")
-                                           (caddr
-                                            (igist-table-current-column-spec))))
-                    :transient t)
-              (list "<left>" #'igist-table-narrow-current-column
-                    :description (lambda
-                                   ()
-                                   (format "Decrease %s width (%s)"
-                                           (or igist-table-current-column "")
-                                           (caddr
-                                            (igist-table-current-column-spec))))
-                    :transient t)
-              ""
-              (list "s" #'igist-table-update-current-column-sortable
-                    :description
-                    (lambda ()
-                      (format "Sortable: %s" sortable)))
-              (list "f" 'ignore :description
-                    (lambda ()
-                      (format "Format: %s " format-spec)))
-              (list "a" #'igist-table-update-current-column-align
-                    :description
-                    (lambda ()
-                      (concat
-                       "Align: "
-                       (propertize "[" 'face
-                                   'transient-inactive-value)
-                       (mapconcat
-                        (lambda (key)
-                          (let ((value (plist-get props
-                                                  key)))
-                            (propertize (format "%s" key)
-                                        'face
-                                        (if
-                                            value
-                                            'transient-value
-                                          'transient-inactive-value))))
-                        '(:center-align :right-align)
-                        (propertize "|" 'face
-                                    'transient-inactive-value))
-                       (propertize "]" 'face
-                                   'transient-inactive-value))))
-              (list "p" #'igist-table-update-current-column-pad-right
-                    :description
-                    (lambda ()
-                      (format ":pad-right %s"
-                              (plist-get
-                               props
-                               :pad-right))))))))]
+        (list
+         (list "n" #'igist-table-update-current-column-name
+               :description
+               (lambda ()
+                 (igist-concat-descriptions
+                  "Rename "
+                  (igist-current-column-name-description))))
+         (list "w" #'igist-table-update-current-column-width
+               :description #'igist-current-column-width-description)
+         (list "<right>" #'igist-table-widen-current-column
+               :description (lambda ()
+                              (igist-concat-descriptions
+                               "Increase "
+                               (igist-current-column-width-description)))
+               :transient t)
+         (list "<left>" #'igist-table-narrow-current-column
+               :description (lambda ()
+                              (igist-concat-descriptions
+                               "Decrease "
+                               (igist-current-column-width-description)))
+               :transient t)
+         ""
+         (list "s" #'igist-table-update-current-column-sortable
+               :description
+               (lambda ()
+                 (igist-concat-descriptions "Toggle sortable "
+                                            (igist-add-transient-face sortable))))
+         (list "f" 'ignore :description
+               (lambda ()
+                 (format "Format: %s " format-spec)))
+         (list "a" #'igist-table-update-current-column-align
+               :description
+               (lambda ()
+                 (igist-concat-descriptions
+                  "Align: "
+                  (propertize "[" 'face 'transient-inactive-value)
+                  (mapconcat
+                   (lambda (key)
+                     (propertize (format "%s" key) 'face
+                                 (if (plist-get props key)
+                                     'transient-value
+                                   'transient-inactive-value)))
+                   '(:center-align :right-align)
+                   (propertize "|" 'face 'transient-inactive-value))
+                  (propertize "]" 'face 'transient-inactive-value))))
+         (list "p" #'igist-table-update-current-column-pad-right
+               :description
+               (lambda ()
+                 (format "Right padding %s"
+                         (igist-add-transient-face
+                          (plist-get props :pad-right)
+                          1))))))))]
   [("M-<left>" "Move column backward" igist-swap-current-column-backward
     :transient nil)
    ("M-<right>" "Move column forward" igist-swap-current-column
