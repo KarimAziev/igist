@@ -1,5 +1,21 @@
 #+TITLE: Changelog
 
+* v1.5.0    UNRELEASED
+- =Igist= now uses its own rendering engine instead of =tabulated-list-mode=. This improves performance.
+- Added new commands for filtering by languages, files, and description, which can be accessed with the transient prefix command - =igist-filters-menu=. By default, it is also bound to "/" in list buffers.
+- Added commands for adding and editing columns, which can be accessed with the transient prefix command - =igist-table-menu=. By default, it is also bound to "C" in list buffers.
+Added a new command for cloning gists (=igist-clone-gist=). It is also bound to "C" in list buffers by default.
+- New custom variables:
+ + ~igist-user-gists-init-collapsed~: Whether the gists should be collapsed by default in user buffers.
+ + ~igist-explore-gists-init-collapsed~: Whether the gists should be collapsed by default in explore buffers.
+ + ~igist-clone-default-directory~: The default directory to use when =igist-clone-gist= reads the destination.
+ + ~igist-use-header-line~: Whether the Igist List buffer should use a header line. If nil, an overlay will be used.
+ + ~igist-tabulated-list-padding~: The number of characters preceding each Igist List mode entry.
+ + ~igist-tabulated-list-tty-sort-indicator-desc~: Indicator for columns sorted in descending order, for =text-mode= frames.
+ + ~igist-tabulated-list-tty-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
+ + ~igist-tabulated-list-gui-sort-indicator-desc~: Indicator for columns sorted in descending order, for =gui= frames.
+ + ~igist-tabulated-list-gui-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =gui= frames.
+
 * v1.4.1    2023-08-19
 ** Fixes
 - Fixed sorting triggered by clicking on the header line.
