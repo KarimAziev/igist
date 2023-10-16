@@ -500,17 +500,6 @@ Render the API URL for the given URL."
 (defvar igist-explore-buffer-name "*igist-explore*"
   "Buffer name for tabulated gists display of multiple owners.")
 
-(defun igist-pick-from-alist (keys alist)
-  "Filter ALIST by KEYS.
-
-Argument ALIST is a list of key-value pairs.
-Argument KEYS is a list of KEYS to filter the alist by."
-  (let ((filtered-alist '()))
-    (dolist (key keys)
-      (when-let ((cell (assq key alist)))
-        (setq filtered-alist (cons cell filtered-alist))))
-    (nreverse filtered-alist)))
-
 (defcustom igist-explore-gists-init-collapsed t
   "Whether the gists should be collapsed by default in explore buffers."
   :type 'boolean
@@ -700,14 +689,22 @@ and save the result with command `igist-save-column-settings'."
                           comments_url truncated))))
   :group 'igist)
 
-(defcustom igist-list-format (igist-pick-from-alist
-                              '(id
-                                description
-                                public
-                                updated_at
-                                comments
-                                files)
-                              (copy-tree igist-default-formats))
+(defcustom igist-list-format '((id "ID" 9 nil "%s" :pad-right 4)
+                               (description "Description" 50
+                                            igist-sort-pred-string "%s")
+                               (public "Public" 8 igist-sort-pred-boolean
+                                       igist-render-public)
+                               (updated_at "Updated" 15 igist-sort-pred-date
+                                           igist-render-time)
+                               (comments "Comments" 9 igist-sort-pred-integer
+                                         igist-render-comments
+                                         :center-align t)
+                               (files "Files" 10 igist-sort-pred-list "%s"
+                                      :children
+                                      ((filename "File" 90 nil "%s")
+                                       (language "Language" 8 nil
+                                                 igist-render-language :right-align t))
+                                      :align-to-column 1))
   "The format of the Gists to display in users buffers.
 
 Each element in the alist represents a column and has the following structure:
@@ -1370,6 +1367,17 @@ which may be shorter."
 (defun igist-alist-get (key alist)
   "Find the first element of ALIST whose car equals KEY and return its cdr."
   (cdr (assoc key alist)))
+
+(defun igist-pick-from-alist (keys alist)
+  "Filter ALIST by KEYS.
+
+Argument ALIST is a list of key-value pairs.
+Argument KEYS is a list of KEYS to filter the alist by."
+  (let ((filtered-alist '()))
+    (dolist (key keys)
+      (when-let ((cell (assq key alist)))
+        (setq filtered-alist (cons cell filtered-alist))))
+    (nreverse filtered-alist)))
 
 (defun igist-download-url (url)
   "Download URL and return string."
@@ -5280,8 +5288,6 @@ which are then processed and concatenated into a single string."
            (t (format "%s" it))))
    (remove nil args)
    ""))
-
-
 
 ;;;###autoload (autoload 'igist-table-menu "igist" nil t)
 (transient-define-prefix igist-table-menu ()
