@@ -118,7 +118,13 @@ Or if you use ~straight.el~:
                ("RET" . igist-list-edit-gist-at-point)
                ("+" . igist-list-add-file)
                ("-" . igist-delete-current-filename)
+               ("/" . igist-filters-menu)
+               ("?" . igist-dispatch)
+               ("C" . igist-table-menu)
                ("D" . igist-delete-current-gist)
+               ("G" . igist-tabulated-list-revert)
+               ("K" . igist-list-cancel-load)
+               ("L" . igist-clone-gist)
                ("S" . igist-star-gist)
                ("U" . igist-unstar-gist)
                ("a" . igist-add-comment)
@@ -130,12 +136,16 @@ Or if you use ~straight.el~:
                ("s" . igist-tabulated-list-sort)
                ("v" . igist-list-view-current)
                ("w" . igist-copy-gist-url)
-               ("K" . igist-list-cancel-load)
                ("{" . igist-tabulated-list-narrow-current-column)
                ("}" . igist-tabulated-list-widen-current-column)
-               ("<tab>" . igist-toggle-row-children-at-point)
-               ("<backtab>" . igist-toggle-all-children)
-               ("C" . igist-table-menu))
+               ("C-M-b" . igist-tabulated-backward-column)
+               ("C-M-f" . igist-tabulated-forward-column)
+               ("C-M-n" . igist-list-forward-row-and-preview)
+               ("C-M-p" . igist-list-backward-row-and-preview)
+               ("M-[" . igist-swap-current-column-backward)
+               ("M-]" . igist-swap-current-column)
+               ("M-{" . igist-swap-current-column-backward)
+               ("M-}" . igist-swap-current-column))
          (:map igist-edit-mode-map
                ([remap save-buffer] . igist-save-current-gist)
                ("M-o" . igist-dispatch)
@@ -358,8 +368,17 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 - ~igist-current-user-name~: This variable should be set to a string that contains your GitHub username.
 - ~igist-auth-marker~: This variable can either be a string that contains the OAuth token or a symbol indicating where to retrieve the OAuth token.
 - ~igist-message-function~: A custom function for displaying messages. Should accept the same arguments as the =message= function.
-- ~igist-per-page-limit~: The number of results displayed per page should be a value ranging between 30 to 100. The default value is 30.
+- ~igist-per-page-limit~: The number of results to fetch per page. The default value is 30.
 - ~igist-ask-for-description~: Determines when to prompt for a description before posting new gists. The default setting prompts for a description before saving a new gist.
 - ~igist-enable-copy-gist-url-p~: Specifies whether and when to addp the URL of a new or updated gist to the kill ring. The default setting is after the creation of new gists.
 - ~igist-list-format~: Specifies the format of the user's Tabulated Gists buffers.
 - ~igist-explore-format~: Specifies the format of the Explore Public Gists tabulated buffers.
+- ~igist-user-gists-init-collapsed~: Whether the gists should be collapsed by default in user buffers.
+- ~igist-explore-gists-init-collapsed~: Whether the gists should be collapsed by default in explore buffers.
+- ~igist-clone-default-directory~: Default directory to use when =igist-clone-gist= reads destination.
+- ~igist-use-header-line~: Whether the Igist List buffer should use a header line. If nil, an overlay will be used.
+- ~igist-tabulated-list-padding~: Number of characters preceding each IGist List mode entry.
+- ~igist-tabulated-list-tty-sort-indicator-desc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
+- ~igist-tabulated-list-tty-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
+- ~igist-tabulated-list-gui-sort-indicator-desc~: Indicator for columns sorted in descending order, for =gui= frames.
+- ~igist-tabulated-list-gui-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =gui= frames..
