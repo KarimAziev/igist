@@ -240,7 +240,8 @@ frames."
   :type 'boolean)
 
 (defcustom igist-use-header-line t
-  "Whether the Igist List buffer should use a header line."
+  "Whether the Igist List buffer should use a header line.
+If nil, an overlay will be used."
   :type 'boolean
   :group 'igist)
 
