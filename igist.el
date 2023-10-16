@@ -3124,9 +3124,7 @@ If not provided, the default value is \"Language: \"."
       (igist--add-filter #'igist--has-language-pred)
     (igist--remove-filter
      #'igist--has-language-pred))
-  (igist-tabulated-list-print t)
-  (when transient-current-command
-    (transient-setup transient-current-command)))
+  (igist-tabulated-list-print t))
 
 (defun igist--file-match-p-pred (gist)
   "Check whether GIST has file that match `igist-files-filter'."
@@ -3194,8 +3192,7 @@ gists."
                                 (igist-schedule-render)))))
                         nil t))
           (read-string prompt))
-      (when transient-current-command
-        (transient-setup transient-current-command)))))
+      (igist-transient-setup-current-command))))
 
 (defun igist-combine-filters (gist)
   "Combine filters to match GIST descriptions or files.
@@ -3248,8 +3245,7 @@ Argument GIST is an alist representing a GIST."
                                  t)))))
                         nil t))
           (read-string "Search: "))
-      (when transient-current-command
-        (transient-setup transient-current-command)))))
+      (igist-transient-setup-current-command))))
 
 (defun igist-search-by-descriptions ()
   "Incremental search of gist files hiding the non-matches as we go."
@@ -3868,7 +3864,8 @@ the function FN."
       (igist-explore-public-gists)
     (when-let ((owner (igist-get-owner
                        (car igist-list-response))))
-      (igist-list-load-gists owner))))
+      (igist-list-load-gists owner)))
+  (igist-transient-setup-current-command))
 
 (defun igist-schedule-render (&optional delay)
   "Schedule the rendering of the gists with an optional DELAY.
@@ -4766,8 +4763,7 @@ initial position in the list."
   (setq-default igist-current-user-name
                 (igist-change-user "GitHub user name: "
                                    igist-current-user-name))
-  (when transient-current-command
-    (transient-setup transient-current-command)))
+  (igist-transient-setup-current-command))
 
 ;; Transient
 (transient-define-argument igist-set-current-filename-variable ()
@@ -4923,8 +4919,7 @@ widen."
     (when igist-table-current-column
       (igist-table-inc-column-width n)
       (igist-remember-pos t (igist--tabulated-list-revert))
-      (when transient-current-command
-        (transient-setup transient-current-command)))))
+      (igist-transient-setup-current-command))))
 
 (defun igist-tabulated-list-narrow-current-column (&optional n)
   "Narrow the current tabulated list column by N chars.
@@ -5202,8 +5197,7 @@ column position."
       (igist--tabulated-list-revert)
       (igist-goto-column col-name)
       (setq igist-table-current-column col-name)
-      (when transient-current-command
-        (transient-setup transient-current-command)))))
+      (igist-transient-setup-current-command))))
 
 (defun igist-transient-render-cols (list-format)
   "Render columns for a transient description LIST-FORMAT.
