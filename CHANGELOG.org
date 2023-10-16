@@ -4,7 +4,8 @@
 - =Igist= now uses its own rendering engine instead of =tabulated-list-mode=. This improves performance.
 - Added new commands for filtering by languages, files, and description, which can be accessed with the transient prefix command - =igist-filters-menu=. By default, it is also bound to "/" in list buffers.
 - Added commands for adding and editing columns, which can be accessed with the transient prefix command - =igist-table-menu=. By default, it is also bound to "C" in list buffers.
-Added a new command for cloning gists (=igist-clone-gist=). It is also bound to "C" in list buffers by default.
+- Added a new command for cloning gists (=igist-clone-gist=). It is also bound to "C" in list buffers by default.
+- Added commands for forwarding entries and preview: =igist-list-backward-row-and-preview= (bound "C-M-n" in lists buffer) and =igist-list-backward-row-and-preview= (bound to "C-M-p" in lists buffer). 
 - New custom variables:
  + ~igist-user-gists-init-collapsed~: Whether the gists should be collapsed by default in user buffers.
  + ~igist-explore-gists-init-collapsed~: Whether the gists should be collapsed by default in explore buffers.
