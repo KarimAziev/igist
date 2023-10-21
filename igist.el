@@ -245,6 +245,38 @@ If nil, an overlay will be used."
   :type 'boolean
   :group 'igist)
 
+(defcustom igist-immediate-resize-strategy 20
+  "Strategy for resizing tabulated entries.
+
+This variable is used in the `igist-tabulated-list-widen-current-column' to
+prevent performance issues. According to it's value, some entries may be updated
+to this new width immediately, while others - after a slight delay.
+
+- If the value is an integer (e.g. 20), then that many entries near the current
+entry will be adjusted immediately. The remaining entries are re-rendered with
+the updated new width after a debounced delay of 0.5 seconds.
+
+- If the value is t, all entries in the list will have their column width
+changed immediately.
+
+- If the value is `visible', only the on-screen entries in the list will have
+their column width changed immediately. Off-screen entries will be updated after
+a debounced delay of 1 second.
+
+- If the value is nil or have any other value, only the entry pointed by the
+cursor will be altered immediately. The remaining entries are re-rendered with
+the updated new width after a debounced delay of 0.5 seconds.
+
+The debouncing mechanism prevents multiple rapid call executions in quick
+succession, thereby improving the overall performance while providing immediate
+visual feedback for the resizing operation."
+  :type '(choice
+          (const :tag "Resize only current entry" nil)
+          (integer :tag "Maxiumum number of entries" 20)
+          (const :tag "All visible entries within the window" visible)
+          (const :tag "All entries" t))
+  :group 'igist)
+
 (defvar-local igist-tabulated-list-entries nil
   "Entries displayed in the current IGist Buffer.")
 (put 'igist-tabulated-list-entries 'permanent-local t)
@@ -4901,13 +4933,33 @@ Argument STEP is the amount by which the column width should be increased."
     (setf (caddr spec)
           (max 1 (+ (caddr spec) step)))))
 
-(defun igist-tabulated-list-widen-current-column (&optional n)
-  "Widen or narrow the current column in a tabulated list.
 
-Argument N is an optional argument that specifies the number of columns to
-widen."
+(defun igist-tabulated-list-widen-current-column (&optional n)
+  "Increase the width of the current column at point at N.
+
+To prevent performance issues some entries may be updated to this new width
+immediately, while others - after a slight delay. Custom variable
+`igist-immediate-resize-strategy' controls this behaviour:
+
+- If `igist-immediate-resize-strategy' is an integer (e.g. 20), then that many
+entries near the current entry will be adjusted immediately. The remaining
+entries are re-rendered with the updated new width after a debounced delay
+of 0.5 seconds.
+
+- If `igist-immediate-resize-strategy' is t, all entries in the list
+ will have their column width changed immediately.
+
+- If `igist-immediate-resize-strategy' is `visible', only the on-screen entries
+in the list will have their column width changed immediately. Off-screen entries
+will be updated after a debounced delay of 1 second.
+
+- If `igist-immediate-resize-strategy' is nil or have any other value,
+only the entry pointed by the cursor will be altered immediately. The remaining
+entries are re-rendered with the updated new width after a debounced delay
+of 0.5 seconds."
   (interactive "p")
   (unless n (setq n 1))
+  (igist-cancel-timer 'igist-render-timer)
   (let ((col (igist-closest-column))
         (keep-old-col
          (memq last-command
@@ -4924,11 +4976,85 @@ widen."
                  (igist-tabulated-forward--column (- saved-idx curr-idx))
                (igist-tabulated-list-goto-column igist-table-current-column))))
           (t (setq igist-table-current-column
-                   (igist-tabulated-column-at-point))))
+                   (igist-closest-column))))
     (when igist-table-current-column
       (igist-table-inc-column-width n)
-      (igist-remember-pos t (igist--tabulated-list-revert))
+      (pcase igist-immediate-resize-strategy
+        ('visible
+         (let ((start (window-start))
+               (end (window-end)))
+           (igist-remember-pos t
+             (goto-char start)
+             (igist-update-forward-or-backward start
+                                               end
+                                               1))
+           (igist-tabulated-list-init-header)
+           (igist-debounce 'igist-render-timer 1
+                           #'igist--tabulated-list-revert)))
+        ((pred integerp)
+         (let ((start (window-start))
+               (end (window-end)))
+           (let ((count (length
+                         (igist-remember-pos t
+                           (igist-update-forward-or-backward
+                            start
+                            end
+                            -1 (/
+                                igist-immediate-resize-strategy
+                                2))))))
+             (igist-remember-pos t
+               (igist-update-forward-or-backward start
+                                                 end
+                                                 1
+                                                 (-
+                                                  igist-immediate-resize-strategy
+                                                  count))))
+           (igist-tabulated-list-init-header)
+           (igist-debounce 'igist-render-timer 0.5
+                           #'igist--tabulated-list-revert)))
+        ('t (igist-debounce 'igist-render-timer 0.5
+                            #'igist--tabulated-list-revert))
+        (_  (igist-update-entry (gethash (igist-tabulated-list-get-id)
+                                         igist-rendered-hash))
+            (igist-tabulated-list-init-header)
+            (igist-debounce 'igist-render-timer 0.5
+                            #'igist--tabulated-list-revert)))
+      (igist-tabulated-list-goto-column igist-table-current-column)
       (igist-transient-setup-current-command))))
+
+(defun igist-update-forward-or-backward (min-start min-end direction &optional
+                                                   max-len)
+  "Collect unique IDs from a specified region and update associated entries.
+
+This function iterates over entries in the tabulated list, retrieves unique IDs,
+and updates entries associated with these IDs. The iteration avoids entries
+located before MIN-START or after MIN-END. The optional argument MAX-LEN limits
+the number of IDs to be collected.
+
+The DIRECTION argument controls the direction of iteration: a positive value
+iterates forward and a negative value iterates backward. If the DIRECTION is
+unevaluated or zero, the function iterates both ways.
+
+After the IDs are collected and associated entries updated, the buffer is set to
+unmodified by calling `set-buffer-modified-p' with nil as an argument.
+
+The function returns a list of IDs that were collected and updated."
+  (let ((ids))
+    (while
+        (when-let ((id (and
+                        (or (not max-len)
+                            (> max-len (length ids)))
+                        (igist-tabulated-list-get-id))))
+          (unless (member id ids)
+            (push id ids)
+            (when-let ((hash (gethash id
+                                      igist-rendered-hash)))
+              (igist-update-entry hash)))
+          (when (zerop (forward-line direction))
+            (< min-start (point) min-end))))
+    (set-buffer-modified-p nil)
+    ids))
+
 
 (defun igist-tabulated-list-narrow-current-column (&optional n)
   "Narrow the current tabulated list column by N chars.
@@ -4936,18 +5062,6 @@ Interactively, N is the prefix numeric argument, and defaults to
 1."
   (interactive "p")
   (igist-tabulated-list-widen-current-column (- n)))
-
-(defun igist-table-widen-current-column ()
-  "Widen current column in table."
-  (interactive)
-  (igist-table-inc-column-width 1)
-  (igist--tabulated-list-revert))
-
-(defun igist-table-narrow-current-column ()
-  "Narrow current column in table."
-  (interactive)
-  (igist-table-inc-column-width -1)
-  (igist--tabulated-list-revert))
 
 (defun igist-transient-setup-current-command ()
   "Setup the transient specified by `transient-current-command' if it is non nil."
@@ -5312,13 +5426,13 @@ which are then processed and concatenated into a single string."
                   (igist-current-column-name-description))))
          (list "w" #'igist-table-update-current-column-width
                :description #'igist-current-column-width-description)
-         (list "<right>" #'igist-table-widen-current-column
+         (list "<right>" #'igist-tabulated-list-widen-current-column
                :description (lambda ()
                               (igist-concat-descriptions
                                "Increase "
                                (igist-current-column-width-description)))
                :transient t)
-         (list "<left>" #'igist-table-narrow-current-column
+         (list "<left>" #'igist-tabulated-list-narrow-current-column
                :description (lambda ()
                               (igist-concat-descriptions
                                "Decrease "
