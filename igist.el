@@ -1929,81 +1929,78 @@ Argument DATA is an association list that represents the values to be rendered.
 Argument USED-WIDTH is an integer that represents the width used so far.
 Argument NOT-LAST-COL is a boolean value that indicates whether the current
 column is the last one or not."
-  (let ((vect (apply #'vector spec)))
-    (let ((field-name (aref vect 0))
-          (column-name (aref vect 1))
-          (width (aref vect 2))
-          (format-val (aref vect 4))
-          (props (nthcdr 5 spec)))
-      (let ((value (cdr (assq field-name data)))
-            (opoint (point))
-            (pad-right (or (plist-get props :pad-right) 1)))
-        (let* ((col-desc
-                (cond ((and (plist-get props :children))
-                       (if value
-                           (list
-                            (format "%s" (length value))
-                            'action
-                            #'igist-toggle-children-row 'button-data value)
-                         (format "%s" (length value))))
-                      ((functionp format-val)
-                       (or (funcall format-val value) ""))
-                      (t (format
-                          (or format-val "%s")
-                          (or value "")))))
-               (label
-                (let ((d
-                       (cond ((stringp col-desc) col-desc)
-                             ((eq (car col-desc) 'image) " ")
-                             (t (car col-desc)))))
-                  (if (and d (string-match-p "[\n\r\f]" d))
-                      (string-join (split-string d "[\n\r\f]" t) " ")
-                    d)))
-               (label-width (string-width label))
-               (help-echo (concat column-name ": " label)))
-          (when (and not-last-col
-                     (>= label-width width))
-            (setq label (truncate-string-to-width
-                         label width nil nil t nil)
-                  label-width width))
-          (setq label (bidi-string-mark-left-to-right label))
-          (when-let ((shift
-                      (cond ((not (> width label-width))
-                             nil)
-                            ((plist-get props :center-align)
-                             (/ (- width label-width) 2))
-                            ((plist-get props :right-align)
-                             (- width label-width)))))
-            (insert (propertize (make-string shift ?\s)
-                                'display
-                                `(space :align-to ,(+ used-width
-                                                      shift))))
-            (setq width (- width shift))
-            (setq used-width (+ used-width shift)))
-          (cond ((stringp col-desc)
-                 (insert (if (get-text-property 0 'help-echo label)
-                             label
-                           (propertize label 'help-echo help-echo))))
-                ((eq (car col-desc) 'image)
-                 (insert (propertize " "
-                                     'display col-desc
-                                     'help-echo help-echo)))
-                (t (apply #'insert-text-button label (cdr col-desc))))
-          (let ((next-x (+ used-width pad-right width)))
-            (when not-last-col
-              (when (> pad-right 0)
-                (insert (make-string pad-right ?\s)))
-              (insert (propertize
-                       (make-string (- width (min width label-width)) ?\s)
-                       'display `(space :align-to ,next-x))))
-            (add-text-properties opoint (point)
-                                 (list 'igist-tabulated-list-column-name
-                                       column-name
-                                       'field-name
-                                       field-name
-                                       field-name
-                                       value))
-            next-x))))))
+  (pcase-let ((`(,field-name ,column-name ,width ,_sortable ,format-val .
+                             ,props)
+               spec))
+    (let ((value (cdr (assq field-name data)))
+          (opoint (point))
+          (pad-right (or (plist-get props :pad-right) 1)))
+      (let* ((col-desc
+              (cond ((and (plist-get props :children))
+                     (if value
+                         (list
+                          (format "%s" (length value))
+                          'action
+                          #'igist-toggle-children-row 'button-data value)
+                       (format "%s" (length value))))
+                    ((functionp format-val)
+                     (or (funcall format-val value) ""))
+                    (t (format
+                        (or format-val "%s")
+                        (or value "")))))
+             (label
+              (let ((d
+                     (cond ((stringp col-desc) col-desc)
+                           ((eq (car col-desc) 'image) " ")
+                           (t (car col-desc)))))
+                (if (and d (string-match-p "[\n\r\f]" d))
+                    (string-join (split-string d "[\n\r\f]" t) " ")
+                  d)))
+             (label-width (string-width label))
+             (help-echo (concat column-name ": " label)))
+        (when (and not-last-col
+                   (>= label-width width))
+          (setq label (truncate-string-to-width
+                       label width nil nil t "|")
+                label-width width))
+        (setq label (bidi-string-mark-left-to-right label))
+        (when-let ((shift
+                    (cond ((not (> width label-width))
+                           nil)
+                          ((plist-get props :center-align)
+                           (/ (- width label-width) 2))
+                          ((plist-get props :right-align)
+                           (- width label-width)))))
+          (insert (propertize (make-string shift ?\s)
+                              'display
+                              `(space :align-to ,(+ used-width
+                                                    shift))))
+          (setq width (- width shift))
+          (setq used-width (+ used-width shift)))
+        (cond ((stringp col-desc)
+               (insert (if (get-text-property 0 'help-echo label)
+                           label
+                         (propertize label 'help-echo help-echo))))
+              ((eq (car col-desc) 'image)
+               (insert (propertize " "
+                                   'display col-desc
+                                   'help-echo help-echo)))
+              (t (apply #'insert-text-button label (cdr col-desc))))
+        (let ((next-x (+ used-width pad-right width)))
+          (when not-last-col
+            (when (> pad-right 0)
+              (insert (make-string pad-right ?\s)))
+            (insert (propertize
+                     (make-string (- width (min width label-width)) ?\s)
+                     'display `(space :align-to ,next-x))))
+          (add-text-properties opoint (point)
+                               (list 'igist-tabulated-list-column-name
+                                     column-name
+                                     'field-name
+                                     field-name
+                                     field-name
+                                     value))
+          next-x)))))
 
 
 (defun igist-list-render-list-format (list-format data &optional padding props)
