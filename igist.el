@@ -407,7 +407,8 @@ expanded when toggling the children row."
   (setq igist-default-collapsed (not igist-list-hidden-ids))
   (setq igist-list-hidden-ids (if igist-list-hidden-ids
                                   nil
-                                (mapcar (apply-partially #'igist-alist-get-symb 'id)
+                                (mapcar (apply-partially
+                                         #'igist-alist-get-symb 'id)
                                         igist-tabulated-list-entries)))
   (igist-tabulated-list-print t))
 
@@ -1507,11 +1508,12 @@ GIST should be raw GitHub item."
       (when-let ((parent (igist-tabulated-gist-at-point)))
         (if (= 1 (length (igist-alist-get-symb 'files parent)))
             (cdr (igist-normalize-gist-file parent
-                                            (igist-alist-get-symb 'filename
-                                                             (cdar
-                                                              (igist-alist-get-symb
-                                                               'files
-                                                               parent)))))
+                                            (igist-alist-get-symb
+                                             'filename
+                                             (cdar
+                                              (igist-alist-get-symb
+                                               'files
+                                               parent)))))
           (igist-read-gist-file "Filename: " parent)))))
 
 (defun igist-list-edit-gist-at-point (&optional _entry)
@@ -2935,7 +2937,9 @@ Argument FILENAME is a string that represents the name of a file."
                                          (format
                                           "Gist %s %s"
                                           (or filename
-                                              (igist-alist-get-symb 'filename gist))
+                                              (igist-alist-get-symb
+                                               'filename
+                                               gist))
                                           (igist-make-file-counter gist))))
     (setq-local igist-current-gist gist)
     (setq-local igist-current-filename (if gist-id
@@ -4309,7 +4313,8 @@ Argument GIST is the gist that the user wants to delete."
             (description (buffer-local-value 'igist-current-description buffer))
             (filename (buffer-local-value 'igist-current-filename buffer)))
         (or (not (equal filename (igist-alist-get-symb 'filename gist)))
-            (not (equal description (igist-alist-get-symb 'description gist)))))))
+            (not (equal description (igist-alist-get-symb
+                                     'description gist)))))))
 
 (defun igist-save-gist-buffer (buffer &optional callback)
   "Save the gist BUFFER with optional CALLBACK.
@@ -5010,17 +5015,12 @@ of 0.5 seconds."
                          (igist-remember-pos t
                            (igist-update-forward-or-backward
                             start
-                            end
-                            -1 (/
-                                igist-immediate-resize-strategy
-                                2))))))
+                            end -1
+                            (/ igist-immediate-resize-strategy 2))))))
              (igist-remember-pos t
-               (igist-update-forward-or-backward start
-                                                 end
-                                                 1
-                                                 (-
-                                                  igist-immediate-resize-strategy
-                                                  count))))
+               (igist-update-forward-or-backward
+                start
+                end 1 (- igist-immediate-resize-strategy count))))
            (igist-tabulated-list-init-header)
            (igist-debounce 'igist-render-timer 0.5
                            #'igist--tabulated-list-revert)))
