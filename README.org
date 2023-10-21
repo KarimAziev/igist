@@ -5,7 +5,7 @@
 [[https://melpa.org/#/igist][file:https://melpa.org/packages/igist-badge.svg]]
 
 * About
-The Emacs everywhere goal continues. =igist= is a modern Emacs package that aims to help you never leave Emacs to manage your GitHub gists.
+=igist= is a modern package that aims to help you never leave Emacs to manage your GitHub gists.
 
 [[./igist-table-demo.gif][./igist-table-demo.gif]]
 
