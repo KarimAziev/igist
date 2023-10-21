@@ -3500,8 +3500,8 @@ Argument NEWVAL is the new value to be set for `igist-table-list-format'."
 
 (defun igist--tabulated-list-revert ()
   "Revert the tabulated list to its original format in Igist."
-  (igist-tabulated-list-print t)
-  (igist-tabulated-list-init-header))
+  (igist-tabulated-list-init-header)
+  (igist-tabulated-list-print t))
 
 (add-variable-watcher 'igist-list-format #'igist--revert-tabulated-buffers)
 (add-variable-watcher 'igist-explore-format #'igist--revert-tabulated-buffers)
