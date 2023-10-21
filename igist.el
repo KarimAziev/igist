@@ -5007,7 +5007,7 @@ of 0.5 seconds."
                                                1))
            (igist-tabulated-list-init-header)
            (igist-debounce 'igist-render-timer 1
-                           #'igist--tabulated-list-revert)))
+                           #'igist-tabulated-list-print t)))
         ((pred integerp)
          (let ((start (window-start))
                (end (window-end)))
@@ -5023,14 +5023,15 @@ of 0.5 seconds."
                 end 1 (- igist-immediate-resize-strategy count))))
            (igist-tabulated-list-init-header)
            (igist-debounce 'igist-render-timer 0.5
-                           #'igist--tabulated-list-revert)))
-        ('t (igist-debounce 'igist-render-timer 0.5
-                            #'igist--tabulated-list-revert))
-        (_  (igist-update-entry (gethash (igist-tabulated-list-get-id)
-                                         igist-rendered-hash))
-            (igist-tabulated-list-init-header)
-            (igist-debounce 'igist-render-timer 0.5
-                            #'igist--tabulated-list-revert)))
+                           #'igist-tabulated-list-print t)))
+        ('t (igist--tabulated-list-revert))
+        (_
+         (when igist-rendered-hash
+           (igist-update-entry (gethash (igist-tabulated-list-get-id)
+                                        igist-rendered-hash)))
+         (igist-tabulated-list-init-header)
+         (igist-debounce 'igist-render-timer 0.5
+                         #'igist-tabulated-list-print t)))
       (igist-tabulated-list-goto-column igist-table-current-column)
       (igist-transient-setup-current-command))))
 
