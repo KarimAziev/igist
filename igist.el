@@ -296,6 +296,10 @@ non-nil, means to invert the resulting sort.")
   "Find the first element of ALIST whose car is eq KEY and return its cdr."
   (cdr (assq key alist)))
 
+(defsubst igist-alist-get (key alist)
+  "Find the first element of ALIST whose car equals KEY and return its cdr."
+  (cdr (assoc key alist)))
+
 (defsubst igist-tabulated-list-get-id (&optional pos)
   "Return the entry ID of the IGist entry at POS.
 POS, if omitted or nil, defaults to point."
@@ -1401,11 +1405,6 @@ which may be shorter."
                         (setq start (min seq-length (+ start length))))
             result))
     (nreverse result)))
-
-(defun igist-alist-get (key alist)
-  "Find the first element of ALIST whose car equals KEY and return its cdr."
-  (cdr (assoc key alist)))
-
 
 (defun igist-pick-from-alist (keys alist)
   "Filter ALIST by KEYS.
