@@ -270,7 +270,7 @@ the updated new width after a debounced delay of 0.5 seconds.
 The debouncing mechanism prevents multiple rapid call executions in quick
 succession, thereby improving the overall performance while providing immediate
 visual feedback for the resizing operation."
-  :type '(choice
+  :type '(radio
           (const :tag "Resize only current entry" nil)
           (integer :tag "Maxiumum number of entries" 20)
           (const :tag "All visible entries within the window" visible)
