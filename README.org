@@ -373,7 +373,7 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 
 ** Comparison with other Emacs Gist Libraries
 
-Several Emacs packages for GitHub gists already exist ([[https://github.com/defunkt/gist][gist]], [[https://github.com/emacs-pe/jist.el][jist.el]], [[https://github.com/mhayashi1120/yagist.el][yagist.el]]).
+Several Emacs packages for GitHub gists already exist ([[https://github.com/defunkt/gist.el][gist.el]], [[https://github.com/emacs-pe/jist.el][jist.el]], [[https://github.com/mhayashi1120/yagist.el][yagist.el]]).
 
 =igist= not only includes the core functionalities of managing gists - such as editing, listing, and creating - but also introduces many new features.
 
