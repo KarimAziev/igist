@@ -335,7 +335,8 @@ tabulated list."
 Argument DATA is a list that contains the DATA to be updated in the row."
   (pcase-let* ((col (current-column))
                (`(,beg . ,end)
-                (igist-find-entry-bounds (cdr (assq 'id data)))))
+                (save-excursion
+                  (igist-find-entry-bounds (cdr (assq 'id data))))))
     (when (and beg end)
       (goto-char beg)
       (let ((inhibit-read-only t))
