@@ -5,28 +5,15 @@
 [[https://melpa.org/#/igist][file:https://melpa.org/packages/igist-badge.svg]]
 
 * About
-
-=igist= is a modern Emacs package that offers enhanced convenience for GitHub Gist enthusiasts.
+The Emacs everywhere goal continues. =igist= is a modern Emacs package that aims to help you never leave Emacs to manage your GitHub gists.
 
 [[./igist-table-demo.gif][./igist-table-demo.gif]]
 
 [[./igist-demo.gif][./igist-demo.gif]]
 
-** Comparison with other Emacs Gist Libraries
-
-Several Emacs packages for GitHub gists already exist. =igist= not only includes the core functionalities of managing gists - such as editing, listing, and creating - but also introduces many new features.
-
-- *Transient Command Interface*: By adopting the transient command interface, =igist= provides context-aware actions for managing GitHub Gists. The use of transient interfaces leads to smoother task flows, reduces the need for keystrokes, and offers a more intuitive user experience.
-
-- *Asynchronous Advanced Rendering*: =igist= presents advanced rendering capabilities, including incremental and asynchronous loading and rendering. This ensures that the Emacs interface remains responsive even when handling a large number of Gists. 
-
-- *Customization on the Fly*: =igist= focuses on providing an interface for live configuration of how gists should be displayed. Users can adjust column width and alignment, alter sortability, and add, rename or remove columns on the fly.
-- *Incremental Filtering*: This feature allows filtering of Gists by filename, description, or programming.
-
 * igist                                                            :TOC_3_gh:QUOTE:
 #+BEGIN_QUOTE
 - [[#about][About]]
-  - [[#comparison-with-other-emacs-gist-libraries][Comparison with other Emacs Gist Libraries]]
   - [[#requirements][Requirements]]
   - [[#installation][Installation]]
     - [[#melpa][MELPA]]
@@ -44,6 +31,7 @@ Several Emacs packages for GitHub gists already exist. =igist= not only includes
     - [[#list-comments][List comments]]
     - [[#editing-comment][Editing comment]]
   - [[#customization][Customization]]
+  - [[#comparison-with-other-emacs-gist-libraries][Comparison with other Emacs Gist Libraries]]
 #+END_QUOTE
 
 ** Requirements
@@ -112,8 +100,7 @@ Or if you use ~straight.el~:
 
 ```elisp
 (use-package igist
-  :bind (("M-o" . igist-dispatch)
-         (:map igist-list-mode-map
+  :bind ((:map igist-list-mode-map
                ("C-j" . igist-list-view-current)
                ("RET" . igist-list-edit-gist-at-point)
                ("+" . igist-list-add-file)
@@ -146,23 +133,23 @@ Or if you use ~straight.el~:
                ("M-]" . igist-swap-current-column)
                ("M-{" . igist-swap-current-column-backward)
                ("M-}" . igist-swap-current-column))
-         (:map igist-edit-mode-map
+               (:map igist-edit-mode-map
                ([remap save-buffer] . igist-save-current-gist)
                ("M-o" . igist-dispatch)
                ("C-c C-c" . igist-save-current-gist-and-exit)
                ("C-c C-k" . kill-current-buffer)
                ("C-c '" . igist-save-current-gist-and-exit))
+         (:map igist-comments-edit-mode-map
+               ("M-o" . igist-dispatch)
+               ("C-c C-c" . igist-post-comment)
+               ("C-c C-k" . kill-current-buffer))
          (:map igist-comments-list-mode-map
                ("+" . igist-add-comment)
                ("-" . igist-delete-comment-at-point)
                ("D" . igist-delete-comment-at-point)
                ("e" . igist-add-or-edit-comment)
                ("g" . igist-load-comments)
-               ("q" . kill-current-buffer))
-         (:map igist-comments-edit-mode-map
-               ("M-o" . igist-dispatch)
-               ("C-c C-c" . igist-post-comment)
-               ("C-c C-k" . kill-current-buffer))))
+               ("q" . kill-current-buffer))))
 ```
 </details>
 #+end_export
@@ -373,6 +360,7 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 - ~igist-enable-copy-gist-url-p~: Specifies whether and when to addp the URL of a new or updated gist to the kill ring. The default setting is after the creation of new gists.
 - ~igist-list-format~: Specifies the format of the user's Tabulated Gists buffers.
 - ~igist-explore-format~: Specifies the format of the Explore Public Gists tabulated buffers.
+- ~igist-immediate-resize-strategy~: Controls the resizing strategy for tabulated entries when using =igist-tabulated-list-widen-current-column=.
 - ~igist-user-gists-init-collapsed~: Whether the gists should be collapsed by default in user buffers.
 - ~igist-explore-gists-init-collapsed~: Whether the gists should be collapsed by default in explore buffers.
 - ~igist-clone-default-directory~: Default directory to use when =igist-clone-gist= reads destination.
@@ -381,4 +369,18 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 - ~igist-tabulated-list-tty-sort-indicator-desc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
 - ~igist-tabulated-list-tty-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
 - ~igist-tabulated-list-gui-sort-indicator-desc~: Indicator for columns sorted in descending order, for =gui= frames.
-- ~igist-tabulated-list-gui-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =gui= frames..
+- ~igist-tabulated-list-gui-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =gui= frames.
+
+** Comparison with other Emacs Gist Libraries
+
+Several Emacs packages for GitHub gists already exist ([[https://github.com/defunkt/gist][gist]], [[https://github.com/emacs-pe/jist.el][jist.el]], [[https://github.com/mhayashi1120/yagist.el][yagist.el]]).
+
+=igist= not only includes the core functionalities of managing gists - such as editing, listing, and creating - but also introduces many new features.
+
+- *Transient Command Interface*: By adopting the transient command interface, =igist= provides context-aware actions for managing GitHub Gists. The use of transient interfaces leads to smoother task flows, reduces the need for keystrokes, and offers a more intuitive user experience.
+
+- *Asynchronous Advanced Rendering*: =igist= presents advanced rendering capabilities, including incremental and asynchronous loading and rendering. This ensures that the Emacs interface remains responsive even when handling a large number of Gists. 
+
+- *Customization on the Fly*: =igist= focuses on providing an interface for live configuration of how gists should be displayed. Users can adjust column width and alignment, alter sortability, and add, rename or remove columns on the fly.
+
+- *Incremental Filtering*: This feature allows filtering of Gists by filename, description, or programming language.
