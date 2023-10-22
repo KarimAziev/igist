@@ -169,7 +169,7 @@ Firsly, you need to ensure that you have [[https://github.com/settings/tokens][a
 2. Select the Developer settings option on the bottom of the sidebar.
 3. Here you'll see a Personal access tokens section, click on it.
 4. Click on "Generate new token", give your token a descriptive name.
-5. Ensure the "gist" scope is checked, this will give igist the necessary permissions it needs to manage your gists.
+5. Ensure the "gist" scope is checked, this will give =igist= the necessary permissions it needs to manage your gists.
 6. Click on Generate token at the bottom of the page. Be sure to copy your new personal access token now as you cannot see it again.
 
 After getting your token, you can supply it to =igist= in one of two ways.
@@ -192,7 +192,7 @@ machine api.github.com login YOUR-GITHUB-USERNAME^igist password YOUR-GITHUB-TOK
 
 You can add this entry to your =~/.authinfo.gpg= file (recommended for secure, encrypted storage) or =~/.authinfo= (see variable =auth-sources=).
 
-You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual, as igist relies on the provided API.
+You can read more in [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][ghub]] manual, as =igist= relies on the provided API.
 
 *** Insecure way
 
@@ -357,14 +357,14 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 - ~igist-message-function~: A custom function for displaying messages. Should accept the same arguments as the =message= function.
 - ~igist-per-page-limit~: The number of results to fetch per page. The default value is 30.
 - ~igist-ask-for-description~: Determines when to prompt for a description before posting new gists. The default setting prompts for a description before saving a new gist.
-- ~igist-enable-copy-gist-url-p~: Specifies whether and when to addp the URL of a new or updated gist to the kill ring. The default setting is after the creation of new gists.
+- ~igist-enable-copy-gist-url-p~: Specifies whether and when to add the URL of a new or updated gist to the kill ring. The default setting is after the creation of new gists.
 - ~igist-list-format~: Specifies the format of the user's Tabulated Gists buffers.
 - ~igist-explore-format~: Specifies the format of the Explore Public Gists tabulated buffers.
 - ~igist-immediate-resize-strategy~: Controls the resizing strategy for tabulated entries when using =igist-tabulated-list-widen-current-column=.
 - ~igist-user-gists-init-collapsed~: Whether the gists should be collapsed by default in user buffers.
 - ~igist-explore-gists-init-collapsed~: Whether the gists should be collapsed by default in explore buffers.
 - ~igist-clone-default-directory~: Default directory to use when =igist-clone-gist= reads destination.
-- ~igist-use-header-line~: Whether the Igist List buffer should use a header line. If nil, an overlay will be used.
+- ~igist-use-header-line~: Whether the IGist List buffer should use a header line. If nil, an overlay will be used.
 - ~igist-tabulated-list-padding~: Number of characters preceding each IGist List mode entry.
 - ~igist-tabulated-list-tty-sort-indicator-desc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
 - ~igist-tabulated-list-tty-sort-indicator-asc~: Indicator for columns sorted in ascending order, for =text-mode= frames.
