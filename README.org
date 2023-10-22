@@ -3,6 +3,8 @@
 #+OPTIONS: ^:nil tags:nil num:nil
 
 [[https://melpa.org/#/igist][file:https://melpa.org/packages/igist-badge.svg]]
+[[https://stable.melpa.org/#/igist][file:https://stable.melpa.org/packages/igist-badge.svg]]
+[[https://github.com/KarimAziev/igist/blob/main/LICENSE][https://img.shields.io/badge/license-GPL-brightgreen.svg]]
 
 * About
 =igist= is a modern package that aims to help you never leave Emacs to manage your GitHub gists.
@@ -18,7 +20,7 @@
   - [[#installation][Installation]]
     - [[#melpa][MELPA]]
     - [[#manually][Manually]]
-    - [[#with-use-package][With ~use-package~]]
+    - [[#with-use-package][With use-package]]
   - [[#auth][Auth]]
     - [[#setting-up-token][Setting Up token]]
     - [[#secure-way-using-auth-sources][Secure Way: Using auth-sources]]
@@ -76,7 +78,7 @@ Download the repository and it to your load path in your init file:
 (require 'igist)
 #+end_src
 
-*** With ~use-package~
+*** With use-package
 
 #+begin_src emacs-lisp :eval no
 (use-package igist
@@ -203,31 +205,25 @@ While not recommended due to security issues, you can set =igist-auth-marker= an
 (setq igist-auth-marker "your-github-oauth-token")
 #+end_src
 
-#+begin_export html
+Example with =use-package=.
 
-<details>
-  <summary>Another example</summary>
-
-```elisp
+#+begin_src elisp
 (use-package igist
-  :init (setq-default igist-ask-for-description 'never)
   :config
   (let ((default-directory user-emacs-directory))
-      (condition-case nil
-          (progn (setq igist-current-user-name
-                       (car-safe
-                        (process-lines "git"
-                                       "config"
-                                       "user.name")))
-                 (setq igist-auth-marker
-                       (or (ignore-errors
-                             (car-safe (process-lines "git" "config"
-                                                      "github.oauth-token")))
-                           igist-auth-marker)))
-        (error (message "Igist-current-user-name cannot setted")))))
-```
-</details>
-#+end_export
+    (condition-case nil
+        (progn (setq igist-current-user-name
+                     (car-safe
+                      (process-lines "git"
+                                     "config"
+                                     "user.name")))
+               (setq igist-auth-marker
+                     (or (ignore-errors
+                           (car-safe (process-lines "git" "config"
+                                                    "github.oauth-token")))
+                         igist-auth-marker)))
+      (error (message "Igist-current-user-name cannot setted")))))
+#+end_src
 
 
 *Note*: In this method, your OAuth token will be stored as plain text in your emacs config file, which is insecure. Ensure your config file permissions are appropriately set to prevent unauthorized access.
