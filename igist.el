@@ -1564,7 +1564,7 @@ GIST should be raw GitHub item."
                     (pop-to-buffer-same-window buff)))))))))))
 
 (defun igist-list-backward-row-and-preview (&optional n)
-  "Move N lines forward and preview gist."
+  "Move N lines backward and preview gist."
   (interactive)
   (igist-list-forward-row-and-preview (or
                                        (and n (- n))
@@ -2356,8 +2356,7 @@ navigate in a tabulated list."
         (igist-closest-column)))
 
 (defun igist-tabulated-forward--column (&optional arg)
-  "Go to the start of the next column after point on the current line.
-If ARG is provided, move that many columns."
+  "Move to the start of the column forward or backad ARG times."
   (unless arg (setq arg 1))
   (pcase-let* ((`(,beg . ,end)
                 (igist-property-boundaries 'igist-tabulated-list-id
@@ -2385,7 +2384,9 @@ If ARG is provided, move that many columns."
   (igist-tabulated-forward--column (or arg 1)))
 
 (defun igist-tabulated-backward-column (&optional arg)
-  "Go to the start of the next column after point on the current line.
+  "Go to the start of the current or previous column at point.
+If point is inside column, go to the start of current, otherwise,
+go to the previous one.
 If ARG is provided, move that many columns."
   (interactive "P")
   (igist-tabulated-forward--column (or arg -1)))
@@ -2590,7 +2591,10 @@ If LOADING is non nil show spinner, otherwise hide."
           (igist-refresh-buffer-vars gist))))))
 
 (defun igist-sync-gists-lists (response)
-  "Synchronize gists buffers with RESPONSE."
+  "Synchronize gists buffers with the provided RESPONSE after a delay.
+
+Argument RESPONSE is a variable that holds the response from the API call to
+synchronize the gists."
   (igist-debounce 'igist-sync-timer
                   1
                   #'igist--sync-gists-edit-buffers
@@ -3191,7 +3195,7 @@ If not provided, the default value is \"Language: \"."
        (cdr (assq 'files gist)))))
 
 (defun igist--description-match-p-pred (gist)
-  "Check whether GIST has file that match `igist-files-filter'."
+  "Check whether GIST has file that match `igist-description-filter'."
   (or (not igist-description-filter)
       (when-let ((descr (cdr (assq 'description gist))))
         (string-match-p igist-description-filter descr))))
@@ -3213,7 +3217,7 @@ Argument PRED is a predicate function used to add or remove filters."
 
 
 (defun igist-search-by-regex (prompt value-sym pred)
-  "Search IGipst files by regex and update the list in `real-time'.
+  "Search IGist files by regex and update the list in `real-time'.
 
 Argument PROMPT is a string that is used as a PROMPT in the minibuffer.
 
