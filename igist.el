@@ -223,8 +223,8 @@ frames."
   :type 'character)
 
 (defcustom igist-tabulated-list-tty-sort-indicator-desc ?^
-  "Indicator for columns sorted in ascending order, for `text-mode' frames.
-See `igist-tabulated-list-gui-sort-indicator-asc' for the indicator used on GUI
+  "Indicator for columns sorted in descending order, for `text-mode' frames.
+See `igist-tabulated-list-gui-sort-indicator-desc' for the indicator used on GUI
 frames."
   :group 'igist
   :type 'character)
@@ -1101,12 +1101,12 @@ at the values with which this function was called."
     igist-current-user-name))
 
 (defun igist-get-user-buffer-name (user)
-  "Return the name of buffer with USER's gists."
+  "Return a buffer name for a GitHub USER, if USER is a non-empty string."
   (when user
     (concat "*igist-" user "*")))
 
 (defun igist-get-logged-user-buffer ()
-  "Return the name of buffer with USER's gists."
+  "Retrieve buffer for the logged GitHub user."
   (let ((buff-name (igist-get-user-buffer-name
                     igist-current-user-name)))
     (and buff-name
@@ -1470,7 +1470,7 @@ Argument KEYS is a list of KEYS to filter the alist by."
         (get-text-property (point) 'filename))))
 
 (defun igist-tabulated-gist-file-at-point ()
-  "Get tabulated gist with file at point."
+  "Retrieve normalized file data at cursor."
   (when-let ((parent (igist-tabulated-gist-at-point))
              (filename (igist-gist-filename-at-point)))
     (cdr (igist-normalize-gist-file parent filename))))
@@ -1503,7 +1503,7 @@ GIST should be raw GitHub item."
     (browse-url gist-url)))
 
 (defun igist-list-gist-to-fetch ()
-  "Get tabulated gist with file at point."
+  "Get gist's file at point or the first file of current gist."
   (or (igist-tabulated-gist-file-at-point)
       (when-let ((parent (igist-tabulated-gist-at-point)))
         (if (= 1 (length (igist-alist-get-symb 'files parent)))
@@ -3217,7 +3217,7 @@ Argument PRED is a predicate function used to add or remove filters."
 
 
 (defun igist-search-by-regex (prompt value-sym pred)
-  "Search IGist files by regex and update the list in `real-time'.
+  "Search IGist files by regex and update the list incrementally.
 
 Argument PROMPT is a string that is used as a PROMPT in the minibuffer.
 
@@ -3308,7 +3308,7 @@ Argument GIST is an alist representing a GIST."
       (igist-transient-setup-current-command))))
 
 (defun igist-search-by-descriptions ()
-  "Incremental search of gist files hiding the non-matches as we go."
+  "Filter gists incrementally by description regex."
   (interactive nil igist-list-mode)
   (igist-search-by-regex "Description: "
                          'igist-description-filter
@@ -3316,7 +3316,7 @@ Argument GIST is an alist representing a GIST."
 
 
 (defun igist-search-files ()
-  "Incremental search of gist files hiding the non-matches as we go."
+  "Filter gists incrementally by files regex."
   (interactive nil igist-list-mode)
   (setq igist-list-hidden-ids nil)
   (igist-search-by-regex "File: "
@@ -3326,7 +3326,7 @@ Argument GIST is an alist representing a GIST."
 
 
 (defun igist-reset-all-filters ()
-  "Incremental search of gist files hiding the non-matches as we go."
+  "Reset all filters and refresh the list."
   (interactive nil igist-list-mode)
   (setq igist-filters nil)
   (igist-tabulated-list-print t))
@@ -5396,13 +5396,13 @@ provided."
               'face (if value 'transient-value 'transient-unreachable)))
 
 (defun igist-current-column-width-description ()
-  "Format and highlight the current column width ."
+  "Format and highlight the current column width."
   (let ((value (caddr
                 (igist-table-current-column-spec))))
     (concat "width: " (igist-add-transient-face value))))
 
 (defun igist-current-column-name-description ()
-  "Format and highlight the current column width ."
+  "Format and highlight the current column name."
   (igist-add-transient-face
    igist-table-current-column "(No Column)"))
 
