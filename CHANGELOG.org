@@ -1,5 +1,13 @@
 #+TITLE: Changelog
 
+* v1.5.1    2023-11-10
+
+** Refactor
+- Unused functions =igist-render-files= and =igist-tabulated-list--column-number= have been removed to clean up the codebase.
+** Documentation
+- Correct typos in documentation strings.
+- Updated README.
+
 * v1.5.0    2023-10-21
 ** Performance Improvements:
  - The =igist= has switched to its own rendering engine from =tabulated-list-mode=, resulting in improved performance and more customization options. Additionally, a new mode for exploring public gists, called =igist-explore-mode=, has been derived from =igist-list-mode=.
