@@ -447,15 +447,6 @@ time."
        (parse-iso8601-time-string value))
     ""))
 
-(defun igist-render-files (files)
-  "Render FILES and join them with newlines and padding.
-
-Argument FILES is an alist of gist files."
-  (list
-   (format "%s" (length files))
-   'action
-   #'igist-toggle-children-row 'button-data files))
-
 (defun igist-render-comments (comments)
   "Default renderer for COMMENTS column."
   (cons
@@ -1708,14 +1699,6 @@ Arguments A and B are the alists of owner's fields, including login."
   (igist-sort-pred-string
    (igist-alist-get-symb 'login a)
    (igist-alist-get-symb 'login b)))
-
-(defun igist-tabulated-list--column-number (name)
-  "Determine the column number of a given NAME in the `igist-table-list-format'.
-
-Argument NAME is a variable that is expected to hold the NAME of the column in
-the `igist-table-list-format'."
-  (seq-position igist-table-list-format name (lambda (a b)
-                                               (equal (cadr a) b))))
 
 (defun igist-list--get-sorter ()
   "Return a sorting predicate for the current tabulated-list.
