@@ -4309,7 +4309,7 @@ Argument GIST is the gist that the user wants to delete."
 Argument CALLBACK is an optional function or macro that will be called after the
 gist BUFFER is saved.
 
-Also run hooks from `igist-before-save-hook'."
+Also run hooks from `igist-before-save-hook' and `before-save-hook'."
   (with-current-buffer buffer
     (setq-local header-line-format (list ""
                                          (if (facep 'warning)
@@ -4319,12 +4319,20 @@ Also run hooks from `igist-before-save-hook'."
                                            "Saving...")))
     (run-hooks 'igist-before-save-hook)
     (run-hooks 'before-save-hook))
-  (if
-      (not (igist-alist-get-symb 'id (buffer-local-value
-                                      'igist-current-gist buffer)))
-      (igist-save-new-gist buffer callback)
-    (when (igist-gist-modified-p buffer)
-      (igist-save-existing-gist buffer callback))))
+  (cond ((not (igist-alist-get-symb 'id
+                                    (buffer-local-value
+                                     'igist-current-gist buffer)))
+         (igist-save-new-gist buffer callback))
+        ((igist-gist-modified-p buffer)
+         (igist-save-existing-gist buffer callback))
+        (t (with-current-buffer buffer
+             (setq-local header-line-format
+                         (format
+                          "Gist %s %s"
+                          igist-current-filename
+                          (igist-make-file-counter igist-current-gist)))
+             (message "*igist: gist is not modified*")))))
+
 
 (defun igist-save-current-gist ()
   "Post the current gist and stay in the buffer."
