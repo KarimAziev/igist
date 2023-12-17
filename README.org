@@ -188,9 +188,9 @@ To employ this method, set =igist-auth-marker= to the symbol =igist=:
 
 Next, add an entry to your =auth-sources=:
 
-#+begin_src plaintext
+#+begin_example
 machine api.github.com login YOUR-GITHUB-USERNAME^igist password YOUR-GITHUB-TOKEN
-#+end_src
+#+end_example
 
 You can add this entry to your =~/.authinfo.gpg= file (recommended for secure, encrypted storage) or =~/.authinfo= (see variable =auth-sources=).
 
@@ -224,9 +224,13 @@ Example with =use-package=.
                          igist-auth-marker)))
       (error (message "Igist-current-user-name cannot setted")))))
 #+end_src
+#+begin_quote
+[!IMPORTANT]
+
+In this method, your OAuth token will be stored as plain text in your emacs config file, which is insecure. Ensure your config file permissions are appropriately set to prevent unauthorized access.
+#+end_quote
 
 
-*Note*: In this method, your OAuth token will be stored as plain text in your emacs config file, which is insecure. Ensure your config file permissions are appropriately set to prevent unauthorized access.
 
 
 ** Usage
@@ -243,7 +247,7 @@ There are two ways in which gists can be presented - as a table or as minibuffer
 *** Table
 
 - ~M-x igist-list-gists~ - to display gists of logged GitHub user.
-  
+
 - ~M-x igist-explore-public-gists~ - list public gists sorted by most recently updated to least recently updated.
   [[./igist-explore-demo.png][./igist-explore-demo.png]]
 
