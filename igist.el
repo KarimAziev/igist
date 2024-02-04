@@ -1826,13 +1826,14 @@ Its default value is nil."
           (when (plist-get props :children)
             (setq children (plist-get props :children))
             (setq children-indent (plist-get props :align-to-column))))
+        (when (and label (string-match-p "[\n\r\f]" label))
+          (setq label (string-join (split-string label "[\n\r\f]" t) " "))
+          (setq lablen (string-width label)))
         (when (and (>= lablen 3)
                    not-last-col
                    (> lablen available-space))
           (setq label
-                (truncate-string-to-width label available-space nil t t)))
-        (when (and label (string-match-p "[\n\r\f]" label))
-          (setq label (string-join (split-string label "[\n\r\f]" t) " ")))
+                (truncate-string-to-width label (max 1 available-space) nil nil t t)))
         (push
          (cond ((not sortable)
                 (propertize label 'igist-tabulated-list-column-name
@@ -1946,7 +1947,7 @@ column is the last one or not."
         (when (and not-last-col
                    (>= label-width width))
           (setq label (truncate-string-to-width
-                       label width nil nil t "|")
+                       label (max 1 width) nil nil t t)
                 label-width width))
         (setq label (bidi-string-mark-left-to-right label))
         (when-let ((shift
