@@ -5422,9 +5422,9 @@ which are then processed and concatenated into a single string."
    (lambda (&rest _argsn)
      (mapcar
       (apply-partially #'transient-parse-suffix
-                       transient--prefix)
+                       (oref transient--prefix command))
       (pcase-let ((`(,_field-name ,_col-name ,_width ,sortable ,format-spec .
-                                  ,props)
+                     ,props)
                    (igist-table-current-column-spec)))
         (list
          (list "n" #'igist-table-update-current-column-name
