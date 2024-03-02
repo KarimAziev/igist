@@ -5478,7 +5478,8 @@ which are then processed and concatenated into a single string."
                  (format "Right padding %s"
                          (igist-add-transient-face
                           (plist-get props :pad-right)
-                          1))))))))]
+                          1))))))))
+   :class transient-column]
   [("M-<left>" "Move column backward" igist-swap-current-column-backward
     :transient nil)
    ("M-<right>" "Move column forward" igist-swap-current-column
