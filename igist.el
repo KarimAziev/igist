@@ -417,25 +417,72 @@ expanded when toggling the children row."
   (interactive)
   (igist-toggle-children-row))
 
-(defun igist-format-time-diff (time)
-  "Calculate and format the time difference from the current TIME.
+(defun igist--format-plural (count singular-str)
+  "Format COUNT with SINGULAR-STR, adding \"s\" for plural.
 
-Argument TIME is the time value that will be compared with the current time to
-calculate the time difference."
-  (let ((diff-secs (- (float-time (current-time))
-                      (float-time time))))
-    (pcase-let ((`(,format-str . ,value)
-                 (cond ((< diff-secs 60)
-                        (cons "%d second" (truncate diff-secs)))
-                       ((< diff-secs 3600)
-                        (cons "%d minute" (truncate (/ diff-secs 60))))
-                       ((< diff-secs 86400)
-                        (cons "%d hour" (truncate (/ diff-secs 3600))))
-                       ((< diff-secs 2592000)
-                        (cons "%d day" (truncate (/ diff-secs 86400))))
-                       (t
-                        (cons "%d month" (truncate (/ diff-secs 2592000)))))))
-      (format (concat format-str (if (= value 1) " ago" "s ago")) value))))
+Argument COUNT is an integer representing the quantity to consider for
+pluralization.
+
+Argument SINGULAR-STR is a string representing the singular form of the word to
+be potentially pluralized."
+  (concat (format "%d " count)
+          (concat singular-str
+                  (if (= count 1) "" "s"))))
+
+(defun igist-format-time-diff (time)
+  "Format a human-readable string representing TIME difference.
+
+Argument TIME is a time value representing the number of seconds since the epoch
+\\=(January 1, 1970, 00:00:00 GMT)."
+  (let ((diff-secs
+         (- (float-time (encode-time (append (list 0)
+                                             (cdr (decode-time
+                                                   (current-time))))))
+            (float-time
+             (encode-time (append (list 0)
+                                  (cdr (decode-time time))))))))
+    (if (zerop (round diff-secs))
+        "Now"
+      (let* ((past (> diff-secs 0))
+             (diff-secs-int (if past diff-secs (- diff-secs)))
+             (suffix (if past "ago" "from now"))
+             (minutes-secs 60)
+             (hours-secs (* 60 minutes-secs))
+             (day-secs (* 24 hours-secs))
+             (month-secs (* 30 day-secs))
+             (year-secs (* 365 day-secs))
+             (res
+              (cond ((< diff-secs-int minutes-secs)
+                     (igist--format-plural (truncate diff-secs-int) "second"))
+                    ((< diff-secs-int hours-secs)
+                     (igist--format-plural (truncate (/ diff-secs-int
+                                                        minutes-secs))
+                                           "minute"))
+                    ((< diff-secs-int day-secs)
+                     (igist--format-plural (truncate
+                                            (/ diff-secs-int hours-secs))
+                                           "hour"))
+                    ((< diff-secs-int month-secs)
+                     (igist--format-plural (truncate (/ diff-secs-int day-secs))
+                                           "day"))
+                    ((< diff-secs-int year-secs)
+                     (igist--format-plural (truncate
+                                            (/ diff-secs-int month-secs))
+                                           "month"))
+                    (t
+                     (let* ((months (truncate (/ diff-secs-int month-secs)))
+                            (years (/ months 12))
+                            (remaining-months (% months 12)))
+                       (string-join
+                        (delq nil
+                              (list
+                               (when (> years 0)
+                                 (igist--format-plural years "year"))
+                               (when (> remaining-months 0)
+                                 (igist--format-plural remaining-months "month"))))
+                        " "))))))
+        (concat res " " suffix)))))
+
 
 (defun igist-render-time (value)
   "Format a given VALUE as a date and time.
