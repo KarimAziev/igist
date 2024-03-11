@@ -5621,22 +5621,22 @@ editing mode."
                      'igist-list-mode))))
      :inapt-if-not igist-get-current-user-name)]
    [:if-not-derived igist-list-mode
-                    "Create"
-                    ("n" "New" igist-create-new-gist :inapt-if-not
-                     igist-get-current-user-name)
-                    ("b" "New from buffer" igist-new-gist-from-buffer
-                     :inapt-if-not
-                     igist-get-current-user-name)
-                    ("p" igist-post-files
-                     :description
-                     (lambda ()
-                       (if-let ((marked-files
-                                 (and (fboundp
-                                       'dired-get-marked-files)
-                                      (dired-get-marked-files))))
-                           (format "Post %d marked files" (length marked-files))
-                         "Post files"))
-                     :inapt-if-not igist-get-current-user-name)]]
+    "Create"
+    ("n" "New" igist-create-new-gist :inapt-if-not
+     igist-get-current-user-name)
+    ("b" "New from buffer" igist-new-gist-from-buffer
+     :inapt-if-not
+     igist-get-current-user-name)
+    ("p" igist-post-files
+     :description
+     (lambda ()
+       (if-let ((marked-files
+                 (and (fboundp
+                       'dired-get-marked-files)
+                      (dired-get-marked-files))))
+           (format "Post %d marked files" (length marked-files))
+         "Post files"))
+     :inapt-if-not igist-get-current-user-name)]]
   [:if-non-nil
    igist-current-gist
    ["Files"
@@ -5673,14 +5673,14 @@ editing mode."
                             " ")))
     ("s" "Show languages statistics" igist-print-languages-chart)]]
   [:if igist-comments-list-mode-p
-       ["Comments"
-        ("a" "Add" igist-add-comment :inapt-if-not igist-get-current-user-name)
-        ("g" "Reload" igist-load-comments :inapt-if-not
-         igist-get-current-user-name)
-        ("e" "Edit" igist-add-or-edit-comment :inapt-if-not
-         igist-get-comment-id-at-point)
-        ("D" "Delete" igist-delete-comment-at-point :inapt-if-not
-         igist-get-comment-id-at-point)]]
+   ["Comments"
+    ("a" "Add" igist-add-comment :inapt-if-not igist-get-current-user-name)
+    ("g" "Reload" igist-load-comments :inapt-if-not
+     igist-get-current-user-name)
+    ("e" "Edit" igist-add-or-edit-comment :inapt-if-not
+     igist-get-comment-id-at-point)
+    ("D" "Delete" igist-delete-comment-at-point :inapt-if-not
+     igist-get-comment-id-at-point)]]
   ["User"
    ("u" igist-set-current-user
     :description (lambda ()
