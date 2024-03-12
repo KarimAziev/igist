@@ -2454,12 +2454,12 @@ Argument FN is the function or macro that will be executed.
 Argument ARGS is a list of additional arguments that will be passed to the FN."
   (when (and buffer (buffer-live-p buffer))
     (with-current-buffer buffer
+      (igist-cancel-timer timer-sym)
       (let ((wnd (get-buffer-window buffer)))
         (if wnd
             (with-selected-window wnd
               (apply fn args))
-          (apply fn args)))
-      (igist-cancel-timer timer-sym))))
+          (apply fn args))))))
 
 (defun igist-cancel-timer (timer-sym)
   "Cancel a timer if it exists and set the value of TIMER-SYM to nil.
