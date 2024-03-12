@@ -1479,13 +1479,13 @@ Argument KEYS is a list of KEYS to filter the alist by."
 
 (defun igist-set-major-mode (filename)
   "Guess major mode for FILENAME."
-  (let ((buffer-file-name (or
-                           (if (file-name-absolute-p filename)
-                               filename
-                             (expand-file-name filename default-directory)))))
+  (let ((buffer-file-name (if (file-name-absolute-p filename)
+                              filename
+                            (expand-file-name filename default-directory))))
     (ignore-errors
-      (set-auto-mode)
-      (font-lock-ensure))))
+      (let ((inhibit-message t)
+            (message-log-max nil))
+        (set-auto-mode t)))))
 
 (defun igist-alist-find-by-prop (prop value alist)
   "Return first element in ALIST which property PROP equals VALUE."
