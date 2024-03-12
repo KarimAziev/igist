@@ -104,7 +104,7 @@ Or if you use ~straight.el~:
 (use-package igist
   :bind ((:map igist-list-mode-map
                ("C-j" . igist-list-view-current)
-               ("RET" . igist-list-edit-gist-at-point)
+               ("RET" . igist-list-edit-gist-at-point-async)
                ("+" . igist-list-add-file)
                ("-" . igist-delete-current-filename)
                ("/" . igist-filters-menu)
@@ -259,7 +259,7 @@ This commands render and load gists with pagination. To stop or pause loading us
 #+NAME: igist-list-mode-map
 | Key            | Description                            | Command                                      |
 |----------------+----------------------------------------+----------------------------------------------|
-| =RET=          | edit gist at point                     | =igist-list-edit-gist-at-point=              |
+| =RET=          | edit gist at point                     | =igist-list-edit-gist-at-point-async=        |
 | =v= or =C-j=   | view gist at point                     | =igist-list-view-current=                    |
 | =<backtab>=    | toggle all children                    | =igist-toggle-all-children=                  |
 | =<tab>=        | toggle row children at point           | =igist-toggle-row-children-at-point=         |
