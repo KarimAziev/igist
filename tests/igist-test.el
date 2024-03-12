@@ -207,7 +207,7 @@
 
 
 (ert-deftest igist-test-normalize-full-gist ()
-  "Test the function that normalizes GitHub Gist data."
+  "Check if normalized gist data matches expected structure and length."
   (let* ((gist (igist-test--get-gist-stub))
          (normalized-gist (igist-normalize-gist gist)))
     (should (equal (length normalized-gist) 3))
