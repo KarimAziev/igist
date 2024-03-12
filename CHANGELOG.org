@@ -1,5 +1,24 @@
 #+TITLE: Changelog
 
+* v1.6.0    2024-03-12
+
+** New commands:
+
+- Added a new command =igist-list-edit-gist-at-point-async= for displaying editable buffers asynchronously. The existing =igist-list-edit-gist-at-point= command is still available, but its keybinding has changed to the new command.
+- Introduced =igist-kill-all-edit-buffers= to close all igist buffers where =igist-edit-mode= is active. Updated keybindings in the transient menu to include the "Kill all edit buffers" option with the shortcut "x e".
+
+** Fixes:
+
+- Ensured timer cancellation occurs before function execution. This change possibly fixes issue #7.
+- Improved management and display of error and loading states in gist editing buffers.
+- Explicitly specify =:class= transient-column in transient definitions using :setup-children, following a change highlighted by commit [beecdc8](https://github.com/magit/transient/commit/beecdc85799231338314bd20292f71fc8cd687e8) in the transient library to prevent warnings and ensure future compatibility.
+
+** Improvements:
+
+- Enhanced time difference formatting in tables.
+- External gists are now read-only.
+
+
 * v1.5.1    2023-11-10
 
 ** Refactor
