@@ -1239,6 +1239,44 @@ order."
   "Return the value of `igist-comment-id' text property at point."
   (get-text-property (point) 'igist-comment-id))
 
+(defun igist--request-format-error (err-status)
+  "Format and return an igist error message from ERR-STATUS.
+
+Argument ERR-STATUS is the value of `:error' property,
+provided by `url-retrieve'."
+  (concat (propertize
+           "iGist error: "
+           'face
+           'error)
+          (mapconcat
+           (apply-partially
+            #'format
+            "%s")
+           (delq nil
+                 (list (or
+                        (when-let ((type
+                                    (ignore-errors
+                                      (cadr
+                                       err-status))))
+                          type)
+                        err-status)
+                       (ignore-errors
+                         (caddr
+                          err-status))
+                       (ignore-errors
+                         (alist-get
+                          'message
+                          (car-safe
+                           (last
+                            err-status))))
+                       (ignore-errors
+                         (alist-get
+                          'documentation_url
+                          (car-safe
+                           (last
+                            err-status))))))
+           " ")))
+
 ;; Request api
 (cl-defun igist-request (method resource &optional params &key query payload
                                 headers silent unpaginate noerror reader auth
@@ -2723,15 +2761,11 @@ synchronize the gists."
 (defun igist-show-request-error (value)
   "Pluck error `igist-message' and status from VALUE and display it."
   (let ((str
-         (if-let ((status (seq-find #'numberp value)))
-             (let ((msg (igist-alist-get-symb 'message (car (last value)))))
-               (format "IGist request error: %s (%s)" status msg))
-           (format "IGist request error: %s" value))))
-    (message
-     (or (if (facep 'error)
-             (propertize str 'face 'error)
-           str)
-         "igist error"))))
+         (or (igist--request-format-error value)
+             (format "Igist error while formating error status: %s" value))))
+    (if igist-message-function
+        (igist-message (or str))
+      (message str))))
 
 (defun igist-star-gist ()
   "Star currently viewing gist or gist at point."
@@ -4137,6 +4171,7 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
         (igist-tabulated-list-init-header))
       (if igist-list-loading
           (progn
+            (igist-spinner-stop)
             (setq igist-list-cancelled
                   (lambda ()
                     (igist-list-request url user
@@ -4159,12 +4194,14 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
                         :query `((per_page . ,per-page))
                         :forge 'github
                         :errorback
-                        (lambda (&rest args)
+                        (lambda (err &rest _args)
+                          (igist-show-request-error err)
                           (when buffer
                             (igist-with-exisiting-buffer
                                 buffer
-                              (igist-spinner-stop)))
-                          (igist-show-request-error (car args)))
+                              (setq igist-list-loading nil)
+                              (setq igist-list-cancelled nil)
+                              (igist-spinner-stop))))
                         :callback
                         (lambda (value _headers _status req)
                           (condition-case nil
