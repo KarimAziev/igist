@@ -4397,6 +4397,13 @@ Also run hooks from `igist-before-save-hook' and `before-save-hook'."
                             (kill-buffer (buffer-name))
                             (igist-message "Gist saved"))))
 
+(defun igist-kill-all-edit-buffers ()
+  "Close all buffers where `igist-edit-mode' is active."
+  (interactive)
+  (dolist (buff (buffer-list))
+    (when (buffer-local-value 'igist-edit-mode buff)
+      (kill-buffer buff))))
+
 (defun igist-ivy-read-gists (prompt url)
   "Read a gist in the minibuffer, with Ivy completion.
 
@@ -5660,7 +5667,8 @@ editing mode."
     ("g" "Refresh" igist-list-refresh :inapt-if-not-derived igist-list-mode)
     ("K" "Cancel load" igist-list-cancel-load :inapt-if-not-derived
      igist-list-mode)
-    ("X" "Kill buffers" igist-kill-all-gists-buffers)
+    ("x l" "Kill all list buffers" igist-kill-all-gists-buffers)
+    ("x e" "Kill all edit buffers" igist-kill-all-edit-buffers)
     ("L" "Clone gist" igist-clone-gist
      :if (lambda ()
            (not (or (igist-edit-mode-p)
