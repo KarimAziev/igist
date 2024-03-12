@@ -82,7 +82,7 @@
 ;; M-x `igist-list-view-current'
 ;;      Fetch tabulated gist entry at point.
 
-;; M-x `igist-list-edit-gist-at-point' (&optional _entry)
+;; M-x `igist-list-edit-gist-at-point-async' (&optional _entry)
 ;;      Open tabulated GIST-ITEM at point in edit buffer.
 
 ;; M-x `igist-browse-gist'
@@ -108,6 +108,7 @@
 
 ;; M-x `igist-list-edit-description' (&rest _)
 ;;      Edit description for current gist at point in tabulated list mode.
+
 ;; Comments commands:
 
 ;; M-x `igist-post-comment'
@@ -933,6 +934,16 @@ You have to manually create or update the token at
 https://github.com/settings/tokens.  This variable
 only serves as documentation.")
 
+(defvar-local igist-current-gist-error nil
+  "Current gist error in the edit buffer.")
+
+(put 'igist-current-gist-error 'permanent-local t)
+
+(defvar-local igist-current-gist-loading nil
+  "Current gist status in the edit buffer.")
+
+(put 'igist-current-gist-loading 'permanent-local t)
+
 (defvar-local igist-current-gist nil
   "Current gist in the edit buffer.")
 
@@ -989,8 +1000,8 @@ only serves as documentation.")
 
 (defvar igist-list-mode-map
   (let ((map (make-sparse-keymap)))
-  ;; gist actions
-    (define-key map (kbd "RET") #'igist-list-edit-gist-at-point)
+    ;; gist actions
+    (define-key map (kbd "RET") #'igist-list-edit-gist-at-point-async)
     (define-key map (kbd "v") #'igist-list-view-current)
     (define-key map (kbd "C-j") #'igist-list-view-current)
     (define-key map (kbd "+") #'igist-list-add-file)
@@ -1290,42 +1301,51 @@ mode line.
 Arguments PARAMS, QUERY, PAYLOAD, HEADERS, SILENT, UNPAGINATE, NOERROR, READER,
 USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
  meaning, as in `ghub-request'."
-  (when buffer
-    (igist-set-loading t buffer))
-  (ghub-request method
-                resource
-                params
-                :username (or username (igist-get-current-user-name))
-                :query query
-                :auth (or auth
-                          (when (igist-get-current-user-name)
-                            igist-auth-marker)
-                          'none)
-                :forge (or forge 'github)
-                :host (or host "api.github.com")
-                :callback
-                (lambda (value headers status req)
-                  (unless (ghub-continue req)
+  (let ((edit-mode-p (and (buffer-live-p buffer)
+                          (buffer-local-value
+                           'igist-edit-mode buffer))))
+    (when buffer
+      (igist-set-loading t buffer))
+    (ghub-request method
+                  resource
+                  params
+                  :username (or username (igist-get-current-user-name))
+                  :query query
+                  :auth (or auth
+                            (when (igist-get-current-user-name)
+                              igist-auth-marker)
+                            'none)
+                  :forge (or forge 'github)
+                  :host (or host "api.github.com")
+                  :callback
+                  (lambda (value headers status req)
+                    (unless (ghub-continue req)
+                      (when buffer
+                        (igist-set-loading nil buffer))
+                      (when callback
+                        (funcall callback value headers status
+                                 req))))
+                  :payload payload
+                  :headers headers
+                  :silent silent
+                  :unpaginate unpaginate
+                  :noerror noerror
+                  :reader reader
+                  :errorback
+                  (lambda (err &rest args)
+                    (igist-show-request-error err)
                     (when buffer
                       (igist-set-loading nil buffer))
-                    (when callback
-                      (funcall callback value headers status
-                               req))))
-                :payload payload
-                :headers headers
-                :silent silent
-                :unpaginate unpaginate
-                :noerror noerror
-                :reader reader
-                :errorback
-                (lambda (&rest args)
-                  (when buffer
-                    (igist-set-loading nil buffer))
-                  (igist-show-request-error (car args))
-                  (when errorback
-                    (apply errorback args)))
-                :value value
-                :extra extra))
+                    (when edit-mode-p
+                      (igist-with-exisiting-buffer buffer
+                        (setq igist-current-gist-loading nil
+                              igist-current-gist-error (or (igist--request-format-error err)
+                                                           "IGist error while formating error status"))
+                        (igist-update-gist-header-line)))
+                    (when errorback
+                      (apply errorback args)))
+                  :value value
+                  :extra extra)))
 
 (cl-defun igist-get (resource &optional params &key buffer query payload headers
                               silent unpaginate noerror reader username auth
@@ -1592,6 +1612,13 @@ GIST should be raw GitHub item."
                                                parent)))))
           (igist-read-gist-file "Filename: " parent)))))
 
+(defun igist-list-edit-gist-at-point-async (&optional _entry)
+  "Edit a selected gist in a new buffer asynchronously."
+  (interactive)
+  (when-let ((gist (igist-list-gist-to-fetch)))
+    (let ((buff (igist-setup-async-edit-buffer gist)))
+      (switch-to-buffer-other-window buff))))
+
 (defun igist-list-edit-gist-at-point (&optional _entry)
   "Edit the gist at the current point in a new window."
   (interactive)
@@ -1610,7 +1637,7 @@ GIST should be raw GitHub item."
                             (window-left current-window)
                             (split-window-right nil current-window))))
           (with-selected-window wnd
-            (let ((buff (igist-setup-edit-buffer gist)))
+            (let ((buff (igist-setup-async-edit-buffer gist)))
               (pop-to-buffer-same-window buff))))))))
 
 (defun igist-list-forward-row-and-preview (&optional n)
@@ -1625,11 +1652,11 @@ GIST should be raw GitHub item."
                     (igist-normalize-gist-file
                      parent
                      (igist-alist-get-symb 'filename
-                                      (cdar
-                                       (igist-alist-get-symb
-                                        'files
-                                        parent)))))))
-        (let ((buff (igist-setup-edit-buffer file)))
+                                           (cdar
+                                            (igist-alist-get-symb
+                                             'files
+                                             parent)))))))
+        (let ((buff (igist-setup-async-edit-buffer file)))
           (unless (get-buffer-window buff)
             (let ((current-window (selected-window)))
               (with-selected-window current-window
@@ -2631,10 +2658,6 @@ If LOADING is non nil show spinner, otherwise hide."
 (defun igist-refresh-buffer-vars (gist)
   "Setup buffer gist variables from GIST."
   (setq-local igist-current-filename (igist-alist-get-symb 'filename gist))
-  (setq-local header-line-format (format
-                                  "Gist %s %s"
-                                  igist-current-filename
-                                  (igist-make-file-counter gist)))
   (setq-local igist-current-gist gist)
   (setq-local igist-current-description
               (igist-alist-get-symb
@@ -2643,7 +2666,8 @@ If LOADING is non nil show spinner, otherwise hide."
   (setq-local igist-current-public
               (igist-alist-get-symb
                'public
-               gist)))
+               gist))
+  (igist-update-gist-header-line))
 
 (defun igist--sync-gists-edit-buffers (response)
   "Synchronize gists buffers with RESPONSE."
@@ -2851,10 +2875,12 @@ synchronize the gists."
                              (setq buffer-file-name (concat
                                                      (temporary-file-directory)
                                                      (buffer-name)))
-                             (set-auto-mode)
-                             (font-lock-ensure)
+                             (set-auto-mode t)
                              (igist-edit-mode))
                            (igist-setup-local-vars new-gist new-filename)
+                           (setq igist-current-gist-loading nil
+                                 igist-current-gist-error nil)
+                           (igist-update-gist-header-line)
                            (set-buffer-modified-p nil)
                            (when (memq igist-enable-copy-gist-url-p
                                        '(t after-update))
@@ -2959,22 +2985,22 @@ The Gist will be created without editing."
                 `((description . ,(or (buffer-local-value
                                        'igist-current-description
                                        buffer)
-                                      (when (eq
-                                             igist-ask-for-description
-                                             'before-save)
-                                        (read-string "Description: "))
-                                      ""))
+                                   (when (eq
+                                          igist-ask-for-description
+                                          'before-save)
+                                    (read-string "Description: "))
+                                   ""))
                   (public . ,(buffer-local-value 'igist-current-public
-                                                 buffer))
+                              buffer))
                   (files
                    (,(intern file)
                     .
                     ((content .
-                              ,(with-current-buffer
-                                   buffer
-                                 (buffer-substring-no-properties
-                                  (point-min)
-                                  (point-max))))))))
+                      ,(with-current-buffer
+                           buffer
+                         (buffer-substring-no-properties
+                          (point-min)
+                          (point-max))))))))
                 :buffer buffer
                 :callback
                 (lambda (value &rest _)
@@ -2987,7 +3013,10 @@ The Gist will be created without editing."
                          (concat
                           (igist-alist-get-symb 'id value) "-" file))
                         (igist-setup-local-vars
-                         new-gist file))
+                         new-gist file)
+                        (setq igist-current-gist-loading nil
+                              igist-current-gist-error nil)
+                        (igist-update-gist-header-line))
                       (when (memq igist-enable-copy-gist-url-p
                                   '(t after-new))
                         (when-let ((url (igist-get-current-gist-url)))
@@ -2997,19 +3026,54 @@ The Gist will be created without editing."
                         (funcall callback)))
                     (igist-load-logged-user-gists))))))
 
+(defun igist-update-gist-header-line ()
+  "Set up the header line for a GIST buffer with status indicators.
+
+Argument GIST is an alist representing the gist data.
+
+Argument FILENAME is a string representing the name of the file in the gist.
+
+Optional argument LOADING is a string or nil indicating the loading status.
+
+Optional argument ERROR-MESSAGE is a string or nil indicating an error message."
+  (setq-local header-line-format
+              (list "" 'header-line-indent
+                    (format
+                     "Gist %s %s"
+                     igist-current-filename
+                     (if igist-current-gist
+                         (igist-make-file-counter
+                          igist-current-gist)
+                       "(New)"))
+                    " "
+                    (cond ((stringp igist-current-gist-loading)
+                           (propertize
+                            (format "%s" igist-current-gist-loading)
+                            'face 'warning))
+                          (igist-current-gist-loading
+                           (propertize
+                            "Loading"
+                            'face 'warning)))
+                    " "
+
+                    (cond ((stringp igist-current-gist-error)
+                           (propertize
+                            (format "%s" igist-current-gist-error)
+                            'face 'error))
+                          (igist-current-gist-error
+                           (propertize
+                            "Error"
+                            'face 'error))))))
+
 (defun igist-setup-local-vars (gist filename)
   "Set up local variables with given GIST and FILENAME.
 
-Argument FILENAME is a string that represents the name of a file."
+Argument FILENAME is a string that represents the name of a file.
+
+Optional argument LOADING is a string or nil indicating the loading status.
+
+Optional argument ERROR-MESSAGE is a string or nil indicating an error message."
   (let ((gist-id (cdr (assq 'id gist))))
-    (setq-local header-line-format (list "" 'header-line-indent
-                                         (format
-                                          "Gist %s %s"
-                                          (or filename
-                                              (igist-alist-get-symb
-                                               'filename
-                                               gist))
-                                          (igist-make-file-counter gist))))
     (setq-local igist-current-gist gist)
     (setq-local igist-current-filename (if gist-id
                                            (or igist-current-filename
@@ -3032,6 +3096,7 @@ Argument FILENAME is a string that represents the name of a file."
 
 Argument GIST is a variable representing a gist object."
   (igist-alist-get-symb 'login (igist-alist-get-symb 'owner gist)))
+
 
 (defun igist-setup-edit-buffer (gist &optional setup-fn)
   "Set up a buffer for editing a specified GIST in Emacs.
@@ -3060,6 +3125,7 @@ content."
                                          name))
           (igist-set-major-mode buffer-file-name)
           (igist-setup-local-vars gist filename)
+          (igist-update-gist-header-line)
           (igist-edit-ensure-edit-mode)
           (current-buffer))
       (setq buffer (get-buffer-create name))
@@ -3087,6 +3153,81 @@ content."
           (set-buffer-modified-p nil))
         buffer))))
 
+(defun igist-setup-async-edit-buffer (gist &optional setup-fn)
+  "Set up a buffer async for editing a specified GIST in Emacs.
+
+Argument GIST is a data structure that contains information about a specific
+gist, such as its ID and filename.
+Argument SETUP-FN is an optional function that is called to perform additional
+setup on the buffer after it has been created and filled with the gist's
+content."
+  (let* ((filename (or (igist-alist-get-symb 'filename gist)
+                       (read-string "Filename: ")))
+         (gist-id (igist-alist-get-symb 'id gist))
+         (buff-name (igist-make-gist-key
+                     `((id . ,(or gist-id "newgist"))
+                       (filename . ,filename)))))
+    (or
+     (when-let ((buff (and (get-buffer buff-name))))
+       (and (not (buffer-local-value 'igist-current-gist-error buff))
+            (buffer-local-value 'igist-edit-mode buff)
+            buff))
+     (let ((url (igist-alist-get-symb 'raw_url gist)))
+       (with-current-buffer (get-buffer-create buff-name)
+         (setq igist-current-gist-error nil
+               igist-current-gist-loading (and url t))
+         (igist-setup-local-vars gist filename)
+         (igist-edit-ensure-edit-mode)
+         (igist-update-gist-header-line))
+       (when url
+         (url-retrieve
+          url
+          (lambda (status)
+            (condition-case proc-err
+                (let* ((err
+                        (when-let ((err-status (plist-get status :error)))
+                          (igist--request-format-error err-status)))
+                       (content
+                        (unless err
+                          (goto-char (point-min))
+                          (when (re-search-forward "^$" nil 'move)
+                            (forward-char 1)
+                            (buffer-substring-no-properties
+                             (point)
+                             (point-max))))))
+                  (igist-with-exisiting-buffer (get-buffer buff-name)
+                    (setq igist-current-gist-error err
+                          igist-current-gist-loading nil)
+                    (when content
+                      (setq buffer-read-only (not (igist-editable-p gist)))
+                      (let ((inhibit-read-only t))
+                        (save-excursion
+                          (delete-region (point-min)
+                                         (point-max))
+                          (insert content))
+                        (decode-coding-region (point-min)
+                                              (point-max) 'dos)
+                        (setq buffer-file-name (concat (temporary-file-directory)
+                                                       buff-name))
+                        (igist-set-major-mode buffer-file-name)
+                        (when setup-fn
+                          (funcall setup-fn)))
+                      (igist-setup-local-vars gist filename)
+                      (igist-edit-ensure-edit-mode)
+                      (setq buffer-undo-list nil)
+                      (set-buffer-modified-p nil))
+                    (igist-update-gist-header-line))
+                  (when err
+                    (igist-message err)))
+              (error
+               (message "igist error: %s" proc-err)
+               (igist-with-exisiting-buffer
+                   (get-buffer buff-name)
+                 (setq igist-current-gist-error (format "%s" proc-err)
+                       igist-current-gist-loading nil)
+                 (igist-update-gist-header-line)))))))
+       (get-buffer buff-name)))))
+
 (defun igist-setup-new-gist-buffer (filename content)
   "Create a new buffer for a gist with a specified FILENAME and CONTENT.
 
@@ -3112,13 +3253,13 @@ created file."
             (insert content))
           (set-buffer-modified-p nil))
         (igist-edit-mode))
-      (setq header-line-format (or (concat "New gist: " filename)))
       (setq-local igist-current-gist nil)
       (setq-local igist-current-filename filename)
       (setq-local igist-current-description
                   (when (eq igist-ask-for-description 'immediately)
                     (read-string "Description: ")))
-      (setq-local igist-current-public (yes-or-no-p "Public?")))
+      (setq-local igist-current-public (yes-or-no-p "Public?"))
+      (igist-update-gist-header-line))
     buffer))
 
 (defun igist-setup-comment-buffer (gist-id &optional comment-id comment-body)
@@ -3479,7 +3620,7 @@ Argument GIST is an alist representing a GIST."
 (defun igist-edit-buffer (gist &optional setup-fn)
   "Display GIST in popup window.
 If SETUP-FN is a non nil, it will be called without args."
-  (pop-to-buffer (apply #'igist-setup-edit-buffer (list gist setup-fn)))
+  (pop-to-buffer (apply #'igist-setup-async-edit-buffer (list gist setup-fn)))
   (igist-popup-minibuffer-select-window))
 
 (defun igist-edit-gist (gist-cell)
@@ -3944,7 +4085,7 @@ the function FN."
               (filename
                (when (igist-alist-get-symb 'id gist)
                  (igist-read-filename-new gist))))
-    (let ((buff (igist-setup-edit-buffer
+    (let ((buff (igist-setup-async-edit-buffer
                  (append `((filename . ,filename))
                          (igist-pick-from-alist
                           '(owner
@@ -4348,7 +4489,7 @@ Argument GIST is the gist that the user wants to delete."
                 (data (igist-pick-from-alist
                        '(owner id files description) gist)))
            (pop-to-buffer
-            (igist-setup-edit-buffer data))))))
+            (igist-setup-async-edit-buffer data))))))
 
 (defun igist-read-description (&rest _args)
   "Update description for current gist without saving."
@@ -4395,28 +4536,24 @@ Argument CALLBACK is an optional function or macro that will be called after the
 gist BUFFER is saved.
 
 Also run hooks from `igist-before-save-hook' and `before-save-hook'."
-  (with-current-buffer buffer
-    (setq-local header-line-format (list ""
-                                         (if (facep 'warning)
-                                             (propertize
-                                              "Saving..."
-                                              'face  'warning)
-                                           "Saving...")))
-    (run-hooks 'igist-before-save-hook)
-    (run-hooks 'before-save-hook))
-  (cond ((not (igist-alist-get-symb 'id
-                                    (buffer-local-value
-                                     'igist-current-gist buffer)))
-         (igist-save-new-gist buffer callback))
-        ((igist-gist-modified-p buffer)
-         (igist-save-existing-gist buffer callback))
-        (t (with-current-buffer buffer
-             (setq-local header-line-format
-                         (format
-                          "Gist %s %s"
-                          igist-current-filename
-                          (igist-make-file-counter igist-current-gist)))
-             (message "*igist: gist is not modified*")))))
+  (if (not (igist-editable-p))
+      (user-error "Igist: You can't edit this gist")
+    (with-current-buffer buffer
+      (setq igist-current-gist-loading "Saving"
+            igist-current-gist-error nil)
+      (igist-update-gist-header-line)
+      (condition-case nil
+          (progn (run-hooks 'igist-before-save-hook)
+                 (run-hooks 'before-save-hook))
+        (error
+         (message
+          "IGist: Error running igist-before-save-hook and before-save-hook"))))
+    (cond ((not (igist-alist-get-symb 'id
+                                      (buffer-local-value
+                                       'igist-current-gist buffer)))
+           (igist-save-new-gist buffer callback))
+          (t
+           (igist-save-existing-gist buffer callback)))))
 
 
 (defun igist-save-current-gist ()
@@ -5626,7 +5763,6 @@ See also `igist-before-save-hook'."
   :keymap igist-edit-mode-map
   :global nil
   (when igist-edit-mode
-    (setq buffer-read-only nil)
     (set-buffer-modified-p nil)))
 
 (put 'igist-edit-mode 'permanent-local t)
@@ -5641,7 +5777,7 @@ editing mode."
   [[:if-derived
     igist-list-mode
     "Gist at point"
-    ("RET" "Edit" igist-list-edit-gist-at-point :inapt-if-not
+    ("RET" "Edit" igist-list-edit-gist-at-point-async :inapt-if-not
      igist-tabulated-list-get-id)
     ("v" "View" igist-list-view-current :inapt-if-not
      igist-tabulated-list-get-id)
