@@ -5025,7 +5025,7 @@ initial position in the list."
            (annotf (lambda (str)
                      (format "^%s" (cdr (assoc str alist)))))
            (login-name (completing-read (or prompt
-                                            "Github user name: ")
+                                            "GitHub user name: ")
                                         (lambda (str pred action)
                                           (if (eq action 'metadata)
                                               `(metadata
