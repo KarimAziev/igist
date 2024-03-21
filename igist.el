@@ -4318,6 +4318,7 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
         (igist-tabulated-list-init-header))
       (if igist-list-loading
           (progn
+            (setq igist-list-loading nil)
             (igist-spinner-stop)
             (setq igist-list-cancelled
                   (lambda ()
