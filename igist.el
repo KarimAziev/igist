@@ -4328,8 +4328,7 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
         (setq igist-list-loading t)
         (setq igist-list-page 1)
         (igist-spinner-show)
-        (let ((per-page (igist-list-get-per-page-query
-                         buffer)))
+        (let ((per-page (igist-list-get-per-page-query buffer)))
           (ghub-request "GET" url
                         nil
                         :auth (if (igist-get-current-user-name)
@@ -4359,9 +4358,12 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
                                                             callback-args))
                             (error (setq igist-list-cancelled nil)
                                    (setq igist-list-loading nil)
-                                   (igist-spinner-stop))))))
-        (unless background
-          (igist-ensure-buffer-visible buffer))))))
+                                   (igist-spinner-stop))))))))
+    (unless background
+      (igist-ensure-buffer-visible buffer))
+    buffer))
+
+
 
 (defun igist-delete-other-gist-or-file (gist)
   "Delete a GIST or file based on the user input.
