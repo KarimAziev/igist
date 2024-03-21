@@ -3168,10 +3168,16 @@ content."
                      `((id . ,(or gist-id "newgist"))
                        (filename . ,filename)))))
     (or
-     (when-let ((buff (and (get-buffer buff-name))))
-       (and (not (buffer-local-value 'igist-current-gist-error buff))
-            (buffer-local-value 'igist-edit-mode buff)
-            buff))
+     (when-let ((buff (get-buffer buff-name)))
+       (when (or
+              (buffer-local-value 'igist-current-gist-loading buff)
+              (and (buffer-modified-p buff)
+                   (not (buffer-local-value 'igist-current-gist-error buff)))
+              (not (buffer-local-value 'igist-edit-mode buff)))
+         (with-current-buffer buff
+           (igist-setup-local-vars gist filename)
+           (igist-edit-ensure-edit-mode))
+         buff))
      (let ((url (igist-alist-get-symb 'raw_url gist)))
        (with-current-buffer (get-buffer-create buff-name)
          (setq igist-current-gist-error nil
