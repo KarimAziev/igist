@@ -3676,7 +3676,7 @@ MAX is length of most longest key."
                                     buffer-file-name))))
       (concat (file-name-base buffer-file-name) "." ext)
     (let ((case-fold-search t))
-      (string-join (split-string (buffer-name) "[^-a-z0-9.]" t) ""))))
+      (string-join (split-string (buffer-name) "[^-a-z0-9_.]" t) ""))))
 
 (defun igist-imenu-prev-index-position ()
   "Move point to previous line in current buffer."
