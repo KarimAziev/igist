@@ -1,5 +1,18 @@
 #+TITLE: Changelog
 
+* v1.6.1    2024-03-22
+
+** Custom Variables:
+
+- Added a new option, "Auto," to the =igist-ask-for-description= customization, allowing for the automatic generation of descriptions when creating or updating gists.
+- The unused custom variable =igist-debug-enabled-p= has been renamed to =igist-debug=. Conditional debug logging has also been added to some functions.
+
+** Fixes:
+
+- Refetch the gist buffer if it has not been modified.
+- Corrected the setting of the major mode in new Gist buffers.
+- Ensure list buffer respects non-nil background argument during loading.
+
 * v1.6.0    2024-03-12
 
 ** New commands:
