@@ -235,10 +235,24 @@ frames."
   :group 'igist
   :type 'integer)
 
-(defcustom igist-debug-enabled-p nil
-  "Whether to allow debug logging."
+(defcustom igist-debug nil
+  "Whether to allow debug logging.
+
+Debug messages are logged to the *IGIST-DEBUG* buffer.
+
+If t, all messages will be logged.
+If a number, all messages will be logged, as well shown via `message'.
+If a list, it is a list of the types of messages to be logged."
   :group 'igist
-  :type 'boolean)
+  :type '(radio
+          (const :tag "none" nil)
+          (const :tag "all" t)
+          (checklist :tag "custom"
+                     (integer :tag "Allow echo message buffer")
+                     (const :tag "Loaded list callback" list-callback)
+                     (const :tag "Update rerender" list-update)
+                     (const :tag "Print list" list-print)
+                     (symbol :tag "Other"))))
 
 (defcustom igist-use-header-line t
   "Whether the Igist List buffer should use a header line.
@@ -306,15 +320,23 @@ non-nil, means to invert the resulting sort.")
 POS, if omitted or nil, defaults to point."
   (get-text-property (or pos (point)) 'igist-tabulated-list-id))
 
-(defun igist-log (msg &rest args)
-  "Log debug messages if `igist-debug-enabled-p' is non nil.
+(defun igist-debug (tag &rest args)
+  "Log debug messages based on the variable `igist-debug'.
 
-Argument MSG is a string that represents the message to be logged.
-Optional argument ARGS is a list of arguments that can be used to format the
-message string."
-  (and igist-debug-enabled-p
-       (apply #'message (concat (or msg ""))
-              args)))
+Argument TAG is a symbol or string used to identify the debug message.
+
+Remaining arguments ARGS are format string followed by objects to format,
+similar to `format' function arguments."
+  (when (and igist-debug
+             (or (eq igist-debug t)
+                 (numberp igist-debug)
+                 (and (listp igist-debug)
+                      (memq tag igist-debug))))
+    (with-current-buffer (get-buffer-create "*IGIST-DEBUG*")
+      (goto-char (point-max))
+      (insert (format "%s" tag) " -> " (apply #'format args) "\n")
+      (when (numberp igist-debug)
+        (apply #'message args)))))
 
 (defun igist-find-entry-bounds (id)
   "Find and return the boundaries of a specific entry in a tabulated list.
@@ -2269,6 +2291,9 @@ Argument UPDATE is an optional boolean flag that determines whether the
 tabulated list should be updated or not.
 Argument REMEMBER-POS is an optional boolean flag that determines whether the
 current position in the tabulated list should be remembered or not."
+  (when igist-debug
+    (igist-debug 'list-print "Printing %d entries"
+                 (length igist-tabulated-list-entries)))
   (igist-remember-pos remember-pos
     (let ((inhibit-read-only t)
           (entries igist-tabulated-list-entries)
@@ -2294,6 +2319,8 @@ tabulated list.
 
 REQ is a `ghub--req' struct, used for loading next page."
   (when igist-rendered-hash
+    (when igist-debug
+      (igist-debug 'list-update "Update rerender of %d entries" (length entries)))
     (igist-with-position
      (dolist (entry entries)
        (when-let ((data (gethash (cdr (assq 'id entry))
@@ -4161,16 +4188,37 @@ Argument CALLBACK-ARGS is a variable that holds the arguments to be passed to
 the CALLBACK function."
   (let ((cancel-fn))
     (cond ((not (buffer-live-p buffer))
+           (when igist-debug
+             (igist-debug 'list-callback "buffer %s is not live" buffer))
            nil)
           ((setq cancel-fn (buffer-local-value 'igist-list-cancelled buffer))
            (with-current-buffer buffer
+             (when igist-debug
+               (igist-debug 'list-callback
+                            "buffer %S cancelled: setting igist-list-response from %d to %d items"
+                            buffer
+                            (length
+                             igist-list-response)
+                            (length
+                             value)))
              (setq igist-list-response value
                    igist-list-cancelled nil
                    igist-list-loading nil)
              (when (functionp cancel-fn)
+               (when igist-debug
+                 (igist-debug 'list-callback
+                              "cancelled %S: executing cancel callback"
+                              buffer))
                (funcall cancel-fn))))
           ((not (bufferp (ghub-continue req)))
            (with-current-buffer buffer
+             (when igist-debug
+               (igist-debug 'list-callback
+                            "loading ended: setting igist-list-response from %d to %d items"
+                            (length
+                             igist-list-response)
+                            (length
+                             value)))
              (setq igist-list-response value
                    igist-list-loading nil
                    igist-list-cancelled nil)
@@ -4186,6 +4234,13 @@ the CALLBACK function."
                (1- (length
                     (buffer-local-value 'igist-tabulated-list-entries buffer))))
            (with-current-buffer buffer
+             (when igist-debug
+               (igist-debug 'list-callback
+                            "%S page %d fetched: igist-list-response %d => %d"
+                            buffer
+                            igist-list-page
+                            (length igist-list-response)
+                            (length value)))
              (setq igist-list-response value
                    igist-list-loading t
                    igist-list-page (1+ (or igist-list-page 0)))
@@ -4199,15 +4254,29 @@ the CALLBACK function."
                 value))))
           (t
            (with-current-buffer buffer
+             (when igist-debug
+               (igist-debug 'list-callback
+                            "%S updating page %d: igist-list-response (%d) => (%d)"
+                            buffer
+                            igist-list-page
+                            (length igist-list-response)
+                            (length value)))
              (setq igist-list-response value
                    igist-list-loading t
                    igist-list-page (1+ (or igist-list-page 0)))
-             (let ((per-page (and (get-buffer-window buffer)
-                                  (ghub-req-extra req))))
+             (let* ((per-page (and (get-buffer-window buffer)
+                                   (ghub-req-extra req)))
+                    (items (and per-page
+                                (igist-take-last per-page value))))
+               (and igist-debug
+                    (igist-debug 'list-callback
+                                 "%S per-page %d, updating %d items"
+                                 buffer
+                                 per-page (length items)))
                (when per-page
                  (igist-debounce 'igist-render-timer 0.5
                                  #'igist-tabulated-list-update-entries
-                                 (igist-take-last per-page value))))
+                                 items)))
              (when value
                (igist-sync-gists-lists
                 value)))))))
