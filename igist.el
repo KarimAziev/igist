@@ -4271,7 +4271,7 @@ represent a JSON false value.  It defaults to `:false'."
       (json-read-from-string str))))
 
 (defun igist--read-json-payload (_status)
-  "Parse and handle JSON payload from Github API response."
+  "Parse and handle JSON payload from GitHub API response."
   (let ((raw (ghub--decode-payload)))
     (and raw
          (condition-case nil
