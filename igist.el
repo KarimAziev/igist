@@ -880,6 +880,7 @@ Program `pandoc' should be installed for `org-mode'."
   :type '(radio
           (const :tag "Never" nil)
           (const :tag "Immediately" immediately)
+          (const :tag "Auto" auto)
           (const :tag "Before posting" before-save))
   :group 'igist)
 
@@ -1705,6 +1706,39 @@ Argument USER is the username of the user whose gists will be loaded."
         (read-string "User: "))))
   (igist-list-load-gists user))
 
+(defun igist--generate-description (input)
+  "Generate a human-readable description from a given INPUT string."
+  (let* ((case-fold-search nil)
+         (sans-ext (file-name-sans-extension input))
+         (ext (file-name-extension input))
+         (split-regex "\\([a-z0-9]\\)\\([A-Z]\\)")
+         (words (split-string
+                 (replace-regexp-in-string split-regex "\\1 \\2" sans-ext)
+                 "[^A-Za-z0-9]+"))
+         (formatted-words (mapconcat #'capitalize words " ")))
+    (string-trim
+     (if ext
+         (concat formatted-words " #" ext)
+       formatted-words))))
+
+(defun igist--generate-description-from-files (filenames &optional primary-file)
+  "Generate description from files with tags for their extensions.
+
+Argument FILENAMES is a list of strings representing file names.
+
+Optional argument PRIMARY-FILE is a string representing the primary file name;
+it defaults to the first element of FILENAMES."
+  (let* ((tags (mapcar (apply-partially #'concat "#")
+                       (delete-dups (delq nil (mapcar #'file-name-extension
+                                                      (if primary-file
+                                                          (append (list
+                                                                   primary-file)
+                                                                  filenames)
+                                                        filenames))))))
+         (file (or primary-file (car filenames) ""))
+         (descr (igist--generate-description (file-name-base file))))
+    (push descr tags)
+    (string-join (delq nil tags) " ")))
 
 (defun igist-list-edit-description (&optional id)
   "Edit the description of a specified gist pin the igist list.
@@ -1726,36 +1760,17 @@ It has no default value."
          (description (igist-alist-get-symb
                        'description gist)))
     (cond ((igist-editable-p gist)
-           (let*
-               ((input
-                 (if
-                     (and
-                      description
-                      (not
-                       (string-empty-p
-                        description)))
-                     description
-                   (let* ((files (igist-alist-get-symb
-                                  'files
-                                  gist))
-                          (file
-                           (alist-get
-                            'filename
-                            (cdar files))))
-                     (and file
-                          (with-temp-buffer
-                            (insert (file-name-base
-                                     file))
-                            (let ((case-fold-search nil))
-                              (while (re-search-backward "[A-Z]+" nil t 1)
-                                (unless (bobp)
-                                  (insert "\s"))))
-                            (string-trim
-                             (buffer-substring-no-properties
-                              (point-min)
-                              (point-max))))))))
-                (payload `((description .
-                                        ,(read-string "Description: " input)))))
+           (let* ((input
+                   (if (and description (not (string-empty-p description)))
+                       description
+                     (igist--generate-description-from-files
+                      (mapcar (apply-partially
+                               #'igist-alist-get-symb
+                               'filename)
+                              (igist-alist-get-symb 'files
+                               gist)))))
+                  (payload `((description .
+                              ,(read-string "Description: " input)))))
              (igist-patch (concat "/gists/" id)
                           nil
                           :silent t
@@ -2808,7 +2823,6 @@ synchronize the gists."
         (push `(description . ,description) data)
       data)))
 
-
 (defun igist-show-request-error (value)
   "Pluck error `igist-message' and status from VALUE and display it."
   (let ((str
@@ -2916,7 +2930,7 @@ synchronize the gists."
                                (igist-message "Copied %s" url)))
                            (when callback
                              (funcall callback))))
-                     (igist-message "Couldn't save gist."))
+                     (igist-message "igist: Couldn't save gist."))
                    (igist-with-exisiting-buffer (igist-get-logged-user-buffer)
                      (igist-list-load-gists igist-current-user-name t))))))
 
@@ -3015,7 +3029,10 @@ The Gist will be created without editing."
                                    (when (eq
                                           igist-ask-for-description
                                           'before-save)
-                                    (read-string "Description: "))
+                                    (read-string "Description: "
+                                     (and igist-current-filename
+                                      (igist--generate-description
+                                       igist-current-filename))))
                                    ""))
                   (public . ,(buffer-local-value 'igist-current-public
                               buffer))
@@ -3293,8 +3310,12 @@ created file."
       (setq-local igist-current-gist nil)
       (setq-local igist-current-filename filename)
       (setq-local igist-current-description
-                  (when (eq igist-ask-for-description 'immediately)
-                    (read-string "Description: ")))
+                  (pcase igist-ask-for-description
+                    ('auto (igist--generate-description
+                            filename))
+                    ('immediately (read-string "Description: "
+                                               (igist--generate-description
+                                                filename)))))
       (setq-local igist-current-public (yes-or-no-p "Public?"))
       (igist-update-gist-header-line))
     buffer))
@@ -4580,12 +4601,27 @@ Argument GIST is the gist that the user wants to delete."
       (setq igist-current-description
             (or igist-current-description
                 (igist-alist-get-symb 'description
-                                 igist-current-gist)))
+                                      igist-current-gist)))
     (let ((descr
            (read-string "Description: "
-                        (or igist-current-description
+                        (or (and igist-current-description
+                                 (not (string-empty-p
+                                       igist-current-description))
+                                 igist-current-description)
+                            (if-let
+                                ((files
+                                  (mapcar (apply-partially
+                                           #'igist-alist-get-symb
+                                           'filename)
+                                          (igist-alist-get-symb 'files
+                                                                igist-current-gist))))
+                                (igist--generate-description-from-files
+                                 files igist-current-filename)
+                              (and igist-current-filename
+                                   (igist--generate-description
+                                    igist-current-filename)))
                             (igist-alist-get-symb 'description
-                                             igist-current-gist)))))
+                                                  igist-current-gist)))))
       (setq igist-current-description descr))))
 
 (defun igist-read-filename (&rest _args)
