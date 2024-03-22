@@ -27,6 +27,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'cl-lib)
 (require 'igist)
 
 (defun igist-test--get-gist-stub ()
@@ -393,6 +394,7 @@
 
 
 (ert-deftest igist-test-igist-files-to-gist-alist ()
+  "Test conversion of file paths to gist alist with content verification."
   (let ((temp-file-path (make-temp-file "test-file"))
         (test-content "Testing igist-files-to-gist-alist"))
     (with-temp-file temp-file-path
@@ -403,6 +405,7 @@
       (should (string= (cdadar gist-alist) test-content)))))
 
 (ert-deftest igist-test-igist-property-boundaries ()
+  "Check boundaries of `igist-tabulated-list-id' property in buffer text."
   (with-temp-buffer
     (insert "entry 1\nentry 2")
     (put-text-property 1 7 'igist-tabulated-list-id 1)
@@ -414,6 +417,7 @@
     (should-not (igist-property-boundaries 'igist-tabulated-list-id 7))))
 
 (ert-deftest igist-test-igist-find-entry-bounds ()
+  "Test finding bounds of entries with specific IDs in a buffer."
   (with-temp-buffer
     (insert "entry 1\nentry 2")
     (put-text-property 1 7 'igist-tabulated-list-id 1)
@@ -425,6 +429,89 @@
     (should (equal (igist-find-entry-bounds 2)
                    (cons 9 14)))
     (should-not (igist-find-entry-bounds 3))))
+
+(ert-deftest igist-test-igist--format-plural ()
+  "Test plural formatting of words based on quantity."
+  (should (string= (igist--format-plural 1 "cat") "1 cat"))
+  (should (string= (igist--format-plural 0 "cat") "0 cats"))
+  (should (string= (igist--format-plural 2 "cat") "2 cats"))
+  (should (string= (igist--format-plural -1 "cat") "-1 cats")))
+
+
+(ert-deftest igist-test-igist-format-time-diff ()
+  "Test formatting of time differences as human-readable strings."
+  (cl-letf (((symbol-function 'current-time)
+             (lambda ()
+               (encode-time 0 0 0 1 1 2000))))
+    (should
+     (string= (igist-format-time-diff (encode-time 0 0 0 1 1 2000)) "Now"))
+    (should (string= (igist-format-time-diff (encode-time 59 59 23 31 12 1999))
+                     "1 minute ago"))
+    (should (string= (igist-format-time-diff (encode-time 59 58 23 31 12 1999))
+                     "2 minutes ago"))
+    (should (string= (igist-format-time-diff (encode-time 0 59 22 31 12 1999))
+                     "1 hour ago"))
+    (should (string= (igist-format-time-diff (encode-time 0 0 0 31 12 1999))
+                     "1 day ago"))
+    (should (string= (igist-format-time-diff (encode-time 0 0 0 1 12 1999))
+                     "1 month ago"))
+    (should (string= (igist-format-time-diff (encode-time 0 0 0 1 1 1999))
+                     "1 year ago"))))
+
+(ert-deftest igist-test-igist--generate-description ()
+  "Test generating human-readable descriptions from file names."
+  ;; Test without extension
+  (should (equal (igist--generate-description "fileName") "File Name"))
+  ;; Test with extension
+  (should (equal (igist--generate-description "anotherFileName.ext")
+                 "Another File Name #ext"))
+  ;; Test mixed case and numbers
+  (should (equal (igist--generate-description "test123File") "Test123 File"))
+  ;; Test special characters
+  (should (equal (igist--generate-description "special-char_file-Name.data")
+                 "Special Char File Name #data"))
+  ;; Test all lower case with extension
+  (should (equal (igist--generate-description "lowercase.ext") "Lowercase #ext"))
+  ;; Test all upper case with extension
+  (should (equal (igist--generate-description "UPPERCASE.EXT") "Uppercase #EXT")))
+
+(ert-deftest test-igist--generate-description-from-files ()
+  "Test generating descriptions from file names and extensions."
+  ;; Test with multiple filenames, no primary-file specified
+  (should (equal (igist--generate-description-from-files '("testFile.txt"
+                                                           "anotherFile.md"
+                                                           "image.png"))
+                 "Test File #txt #md #png"))
+  ;; Test with primary-file specified
+  (should (equal
+           (igist--generate-description-from-files
+            '("fileOne.docx"
+              "fileTwo.xlsx"
+              "importantPresentation.pptx")
+            "importantPresentation.pptx")
+           "Important Presentation #pptx #docx #xlsx"))
+  ;; Test with repeated extensions
+  (should (equal (igist--generate-description-from-files '("firstScript.py"
+                                                           "secondScript.py"
+                                                           "note.md"))
+                 "First Script #py #md"))
+  ;; Test with a single file and without extension
+  (should (equal (igist--generate-description-from-files '("README"))
+                 "Readme"))
+  ;; Test all lower case files with digits and underscores
+  (should (equal (igist--generate-description-from-files '("code_snippet_123.js"
+                                                           "documentation.txt"
+                                                           "image2.jpg"
+                                                           "image1.jpg")
+                                                         "test_cases.py")
+                 "Test Cases #py #js #txt #jpg"))
+  ;; Tests with special characters and mixed case
+  (should (equal (igist--generate-description-from-files
+                  '("My-Project-Summary_V1.doc"
+                    "Financial-Report_V1.xlsx")
+                  "Project-Overview_V1.ppt")
+                 "Project Overview V1 #ppt #doc #xlsx")))
+
 
 
 (provide 'igist-test)
