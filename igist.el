@@ -3182,6 +3182,10 @@ content."
        (with-current-buffer (get-buffer-create buff-name)
          (setq igist-current-gist-error nil
                igist-current-gist-loading (and url t))
+         (unless buffer-file-name
+           (setq buffer-file-name (concat (temporary-file-directory)
+                                          buff-name)))
+         (igist-set-major-mode buffer-file-name)
          (igist-setup-local-vars gist filename)
          (igist-edit-ensure-edit-mode)
          (igist-update-gist-header-line))
