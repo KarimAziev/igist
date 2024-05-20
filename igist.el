@@ -6044,5 +6044,43 @@ editing mode."
     (igist-table-init-current-column))
   (transient-setup #'igist-dispatch))
 
+(dolist (cmd '(igist-filters-menu
+               igist-tabulated-list-revert
+               igist-tabulated-list-sort
+               igist-tabulated-list-narrow-current-column
+               igist-tabulated-list-widen-current-column
+               igist-tabulated-backward-column
+               igist-tabulated-forward-column
+               igist-list-cancel-load
+               igist-list-refresh
+               igist-list-view-current
+               igist-list-edit-gist-at-point-async
+               igist-list-forward-row-and-preview
+               igist-list-backward-row-and-preview
+               igist-list-edit-gist-at-point
+               igist-list-add-column
+               igist-swap-current-column-backward
+               igist-swap-current-column
+               igist-table-menu
+               igist-table-update-current-column-align
+               igist-table-update-current-column-pad-right
+               igist-table-update-current-column-sortable
+               igist-table-update-current-column-width
+               igist-table-update-current-column-name
+               igist-goto-column
+               igist-search-by-files-and-description-regex
+               igist-search-by-descriptions
+               igist-search-files
+               igist-reset-all-filters
+               igist-reset-columns-settings
+               igist-toggle-language-filter
+               igist--transient-switch-column
+               igist-save-column-settings
+               igist-list-remove-column
+               igist-toggle-row-children-at-point))
+  (function-put cmd 'command-modes
+                '(igist-list-mode
+                  igist-explore-mode)))
+
 (provide 'igist)
 ;;; igist.el ends here
