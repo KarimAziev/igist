@@ -1,5 +1,14 @@
 #+TITLE: Changelog
 
+* v1.6.2    2024-06-08
+
+** Fixes:
+
+- Resolved issue where the =igist= list sometimes returned an empty list after a long processing time by using =igist--request= instead of =ghub-request=. This also fixes another bug caused by the latest version of ghub (magit/ghub@2061136) where only the first page of gists was loaded, and subsequent pages were not fetched. (#7)
+
+** Minor Changes:
+- Excluded igist mode-specific commands from the completion list in non-relevant modes to improve user experience and reduce clutter in the command completion list.
+
 * v1.6.1    2024-03-22
 
 ** Custom Variables:
@@ -65,7 +74,7 @@
 * v1.4.1    2023-08-19
 ** Fixes
 - Fixed sorting triggered by clicking on the header line.
-- Fixed an issue where =igist-edit-mode= and the related local variables were lost after changing major mode. 
+- Fixed an issue where =igist-edit-mode= and the related local variables were lost after changing major mode.
 
 * v1.4.0    2023-08-17
 
