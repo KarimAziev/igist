@@ -185,6 +185,8 @@
 (require 'parse-time)
 (require 'ghub)
 
+(defvar url-http-end-of-headers)
+
 (declare-function text-property-search-backward "text-property-search")
 
 (defvar-local igist-list-hidden-ids nil)
@@ -198,6 +200,7 @@
 (defvar-local igist-filters nil)
 (defvar-local igist-rendered-hash nil)
 (defvar-local igist-default-collapsed nil)
+
 
 
 (defvar igist-tabulated-list--original-order nil)
@@ -1329,46 +1332,46 @@ USERNAME, AUTH, HOST, FORGE, CALLBACK, ERRORBACK, VALUE and EXTRA have the same
                            'igist-edit-mode buffer))))
     (when buffer
       (igist-set-loading t buffer))
-    (ghub-request method
-                  resource
-                  params
-                  :username (or username (igist-get-current-user-name))
-                  :query query
-                  :auth (or auth
-                            (when (igist-get-current-user-name)
-                              igist-auth-marker)
-                            'none)
-                  :forge (or forge 'github)
-                  :host (or host "api.github.com")
-                  :callback
-                  (lambda (value headers status req)
-                    (unless (ghub-continue req)
+    (igist--request method
+                    resource
+                    params
+                    :username (or username (igist-get-current-user-name))
+                    :query query
+                    :auth (or auth
+                              (when (igist-get-current-user-name)
+                                igist-auth-marker)
+                              'none)
+                    :forge (or forge 'github)
+                    :host (or host "api.github.com")
+                    :callback
+                    (lambda (value headers status req)
+                      (unless (ghub-continue req)
+                        (when buffer
+                          (igist-set-loading nil buffer))
+                        (when callback
+                          (funcall callback value headers status
+                                   req))))
+                    :payload payload
+                    :headers headers
+                    :silent silent
+                    :unpaginate unpaginate
+                    :noerror noerror
+                    :reader reader
+                    :errorback
+                    (lambda (err &rest args)
+                      (igist-show-request-error err)
                       (when buffer
                         (igist-set-loading nil buffer))
-                      (when callback
-                        (funcall callback value headers status
-                                 req))))
-                  :payload payload
-                  :headers headers
-                  :silent silent
-                  :unpaginate unpaginate
-                  :noerror noerror
-                  :reader reader
-                  :errorback
-                  (lambda (err &rest args)
-                    (igist-show-request-error err)
-                    (when buffer
-                      (igist-set-loading nil buffer))
-                    (when edit-mode-p
-                      (igist-with-exisiting-buffer buffer
-                        (setq igist-current-gist-loading nil
-                              igist-current-gist-error (or (igist--request-format-error err)
-                                                           "IGist error while formating error status"))
-                        (igist-update-gist-header-line)))
-                    (when errorback
-                      (apply errorback args)))
-                  :value value
-                  :extra extra)))
+                      (when edit-mode-p
+                        (igist-with-exisiting-buffer buffer
+                          (setq igist-current-gist-loading nil
+                                igist-current-gist-error (or (igist--request-format-error err)
+                                                             "IGist error while formating error status"))
+                          (igist-update-gist-header-line)))
+                      (when errorback
+                        (apply errorback args)))
+                    :value value
+                    :extra extra)))
 
 (cl-defun igist-get (resource &optional params &key buffer query payload headers
                               silent unpaginate noerror reader username auth
@@ -1752,11 +1755,12 @@ It has no default value."
   (let* ((gist (or (and igist-rendered-hash
                         (gethash id igist-rendered-hash))
                    (igist-alist-find-by-prop 'id id igist-list-response)
-                   (ghub-get (concat "/gists/" id)
-                             nil
-                             :username (igist-get-current-user-name)
-                             :auth igist-auth-marker
-                             :silent t)))
+                   (igist--request "GET"
+                                   (concat "/gists/" id)
+                                   nil
+                                   :username (igist-get-current-user-name)
+                                   :auth igist-auth-marker
+                                   :silent t)))
          (description (igist-alist-get-symb
                        'description gist)))
     (cond ((igist-editable-p gist)
@@ -1768,7 +1772,7 @@ It has no default value."
                                #'igist-alist-get-symb
                                'filename)
                               (igist-alist-get-symb 'files
-                               gist)))))
+                                                    gist)))))
                   (payload `((description .
                               ,(read-string "Description: " input)))))
              (igist-patch (concat "/gists/" id)
@@ -2574,7 +2578,6 @@ Argument ARGS is a list of additional arguments that will be passed to the FN."
 Argument TIMER-SYM is a symbol that represents the timer to be canceled."
   (when-let ((timer-value (symbol-value timer-sym)))
     (when (timerp timer-value)
-      
       (cancel-timer timer-value)
       (set timer-sym nil))))
 
@@ -4381,6 +4384,108 @@ represent a JSON false value.  It defaults to `:false'."
                                                    (point-max)))))
               (documentation_url . "https://github.com/magit/ghub/wiki/Github-Errors")))))))
 
+
+
+(defun igist--handle-response (status req)
+  "Handle the response from a request, processing errors and pagination.
+
+Argument STATUS is a plist representing what happened during the request,
+with the most recent events first, or an empty list if no events have
+occurred.
+
+Each pair is one of:
+
+\(:redirect REDIRECTED-TO) - The request was redirected to this URL.
+
+\(:error (error type . DATA)) - An error occurred.
+
+Argument REQ is the instance of `ghub--req'.
+
+This function is intended to be a replacement for `ghub--handle-response',
+which may not always invoke an error handler in case of an error. See the
+discussion in issue #166 (https://github.com/magit/ghub/issues/166)."
+  (let
+      ((buffer (current-buffer))
+       (err       (plist-get status :error))
+       (prev       (ghub--req-url req))
+       (errorback (ghub--req-errorback req))
+       (header-err
+        (when (memq url-http-end-of-headers '(nil 0))
+          (list 'error 'http
+                "missing headers; but there's a patch for that see https://github.com/magit/ghub/wiki/Known-Issues"))))
+    (unwind-protect
+        (progn
+          (set-buffer-multibyte t)
+          (cond ((and (or err header-err) errorback)
+                 (setf (ghub--req-url req) prev)
+                 (funcall (if (eq errorback t)
+                              'ghub--errorback
+                            errorback)
+                          (or err header-err)
+                          (unless header-err
+                            (ignore-errors
+                              (ghub--handle-response-headers status req)))
+                          status req))
+                (t
+                 (let* ((unpaginate (ghub--req-unpaginate req))
+                        (headers
+                         (unless header-err
+                           (ignore-errors
+                             (ghub--handle-response-headers status req))))
+                        (payload    (ghub--handle-response-payload req))
+                        (payload    (ghub--handle-response-error status payload
+                                                                 req))
+                        (value      (ghub--handle-response-value payload req))
+                        (next       (cdr (assq 'next (ghub-response-link-relations
+                                                      req headers payload)))))
+                   (when (numberp unpaginate)
+                     (cl-decf unpaginate))
+                   (setf (ghub--req-url req)
+                         (url-generic-parse-url next))
+                   (setf (ghub--req-unpaginate req) unpaginate)
+                   (or (and next
+                            unpaginate
+                            (or (eq unpaginate t)
+                                (>  unpaginate 0))
+                            (ghub-continue req))
+                       (let ((callback  (ghub--req-callback req))
+                             (errorback (ghub--req-errorback req)))
+                         (cond ((and err errorback)
+                                (setf (ghub--req-url req) prev)
+                                (funcall (if (eq errorback t)
+                                             'ghub--errorback
+                                           errorback)
+                                         err headers status req))
+                               (callback
+                                (funcall callback value headers status req))
+                               (t value))))))))
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
+
+(defun igist--request (&rest args)
+  "Make a request in Ghub, using `igist--handle-response' to process the response.
+
+This function temporarily overrides the `ghub--make-req' function to use
+`igist--handle-response' as the :handler in the request parameters. This enables
+custom handling of the response, particularly for dealing with errors and
+pagination.
+
+Other arguments ARGS are passed directly to the `ghub-request' function.
+
+This function is intended to address issues discussed in issue #166
+\(https://github.com/magit/ghub/issues/166) by ensuring that a custom error
+handler is always invoked when an error occurs."
+  (let ((orig-fn (symbol-function 'ghub--make-req)))
+    (cl-letf
+        (((symbol-function 'ghub--make-req)
+          (lambda
+            (&rest ghub-args)
+            (apply orig-fn
+                   (plist-put ghub-args :handler #'igist--handle-response)))))
+      (apply #'ghub-request args))))
+
+
 (defun igist-list-request (url user &optional background callback callback-args)
   "Fetch and possibly display a list of gists from a specified URL and USER.
 
@@ -4424,36 +4529,36 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
         (setq igist-list-page 1)
         (igist-spinner-show)
         (let ((per-page (igist-list-get-per-page-query buffer)))
-          (ghub-request "GET" url
-                        nil
-                        :auth (if (igist-get-current-user-name)
-                                  igist-auth-marker
-                                'none)
-                        :username (igist-get-current-user-name)
-                        :host "api.github.com"
-                        :reader #'igist--read-json-payload
-                        :query `((per_page . ,per-page))
-                        :forge 'github
-                        :errorback
-                        (lambda (err &rest _args)
-                          (igist-show-request-error err)
-                          (when buffer
-                            (igist-with-exisiting-buffer
-                                buffer
-                              (setq igist-list-loading nil)
-                              (setq igist-list-cancelled nil)
-                              (igist-spinner-stop))))
-                        :callback
-                        (lambda (value _headers _status req)
-                          (condition-case nil
-                              (progn
-                                (setf (ghub-req-extra req) per-page)
-                                (igist-list-loaded-callback buffer value req
-                                                            callback
-                                                            callback-args))
-                            (error (setq igist-list-cancelled nil)
-                                   (setq igist-list-loading nil)
-                                   (igist-spinner-stop))))))))
+          (igist--request "GET" url
+                          nil
+                          :auth (if (igist-get-current-user-name)
+                                    igist-auth-marker
+                                  'none)
+                          :username (igist-get-current-user-name)
+                          :host "api.github.com"
+                          :reader #'igist--read-json-payload
+                          :query `((per_page . ,per-page))
+                          :forge 'github
+                          :errorback
+                          (lambda (err &rest _args)
+                            (igist-show-request-error err)
+                            (when buffer
+                              (igist-with-exisiting-buffer
+                                  buffer
+                                (setq igist-list-loading nil)
+                                (setq igist-list-cancelled nil)
+                                (igist-spinner-stop))))
+                          :callback
+                          (lambda (value _headers _status req)
+                            (condition-case nil
+                                (progn
+                                  (setf (ghub-req-extra req) per-page)
+                                  (igist-list-loaded-callback buffer value req
+                                                              callback
+                                                              callback-args))
+                              (error (setq igist-list-cancelled nil)
+                                     (setq igist-list-loading nil)
+                                     (igist-spinner-stop))))))))
     (unless background
       (igist-ensure-buffer-visible buffer))
     buffer))
@@ -4723,73 +4828,73 @@ Argument URL is the url of a GitHub gist."
              (done)
              (buff (current-buffer))
              (output-buffer
-              (ghub-get url nil
-                        :query `((per_page . ,igist-per-page-limit))
-                        :auth (if (igist-get-current-user-name)
-                                  igist-auth-marker
-                                'none)
-                        :callback
-                        (lambda (value _headers _status req)
-                          (when (and (active-minibuffer-window)
-                                     (buffer-live-p buff)
-                                     (not done))
-                            (with-current-buffer buff
-                              (setq gists-alist
-                                    (igist-normalize-gists value))
-                              (setq gists-keys
-                                    (mapcar #'car gists-alist)))
-                            (ivy-update-candidates
-                             gists-keys)
-                            (let ((input ivy-text)
-                                  (pos
-                                   (when-let ((wind
-                                               (active-minibuffer-window)))
-                                     (with-selected-window
-                                         wind
-                                       (point)))))
-                              (when (active-minibuffer-window)
-                                (with-selected-window (active-minibuffer-window)
-                                  (delete-minibuffer-contents)))
-                              (progn
-                                (or
-                                 (progn
-                                   (and
-                                    (memq
-                                     (type-of ivy-last)
-                                     cl-struct-ivy-state-tags)
-                                    t))
-                                 (signal 'wrong-type-argument
-                                         (list 'ivy-state ivy-last)))
-                                (let* ((v ivy-last))
-                                  (aset v 2 ivy--all-candidates)))
-                              (when (fboundp 'ivy-state-preselect)
-                                (progn
-                                  (or
-                                   (progn
-                                     (and
-                                      (memq
-                                       (type-of ivy-last)
-                                       cl-struct-ivy-state-tags)
-                                      t))
-                                   (signal 'wrong-type-argument
-                                           (list 'ivy-state ivy-last)))
-                                  (let* ((v ivy-last))
-                                    (aset v 7 ivy--index))))
-                              (ivy--reset-state
-                               ivy-last)
-                              (when-let ((wind
-                                          (active-minibuffer-window)))
-                                (with-selected-window
-                                    wind
-                                  (insert input)
-                                  (goto-char
-                                   (when pos
-                                     (if (> pos
-                                            (point-max))
-                                         (point-max)
-                                       pos)))
-                                  (ivy--exhibit)))
-                              (ghub-continue req)))))))
+              (igist--request url nil
+                              :query `((per_page . ,igist-per-page-limit))
+                              :auth (if (igist-get-current-user-name)
+                                        igist-auth-marker
+                                      'none)
+                              :callback
+                              (lambda (value _headers _status req)
+                                (when (and (active-minibuffer-window)
+                                           (buffer-live-p buff)
+                                           (not done))
+                                  (with-current-buffer buff
+                                    (setq gists-alist
+                                          (igist-normalize-gists value))
+                                    (setq gists-keys
+                                          (mapcar #'car gists-alist)))
+                                  (ivy-update-candidates
+                                   gists-keys)
+                                  (let ((input ivy-text)
+                                        (pos
+                                         (when-let ((wind
+                                                     (active-minibuffer-window)))
+                                           (with-selected-window
+                                               wind
+                                             (point)))))
+                                    (when (active-minibuffer-window)
+                                      (with-selected-window (active-minibuffer-window)
+                                        (delete-minibuffer-contents)))
+                                    (progn
+                                      (or
+                                       (progn
+                                         (and
+                                          (memq
+                                           (type-of ivy-last)
+                                           cl-struct-ivy-state-tags)
+                                          t))
+                                       (signal 'wrong-type-argument
+                                               (list 'ivy-state ivy-last)))
+                                      (let* ((v ivy-last))
+                                        (aset v 2 ivy--all-candidates)))
+                                    (when (fboundp 'ivy-state-preselect)
+                                      (progn
+                                        (or
+                                         (progn
+                                           (and
+                                            (memq
+                                             (type-of ivy-last)
+                                             cl-struct-ivy-state-tags)
+                                            t))
+                                         (signal 'wrong-type-argument
+                                                 (list 'ivy-state ivy-last)))
+                                        (let* ((v ivy-last))
+                                          (aset v 7 ivy--index))))
+                                    (ivy--reset-state
+                                     ivy-last)
+                                    (when-let ((wind
+                                                (active-minibuffer-window)))
+                                      (with-selected-window
+                                          wind
+                                        (insert input)
+                                        (goto-char
+                                         (when pos
+                                           (if (> pos
+                                                  (point-max))
+                                               (point-max)
+                                             pos)))
+                                        (ivy--exhibit)))
+                                    (ghub-continue req)))))))
         (unwind-protect
             (assoc (ivy-read prompt gists-keys
                              :action (lambda (gist)
