@@ -4362,9 +4362,9 @@ represent a JSON false value.  It defaults to `:false'."
            (pcase array-type
              ('list 'list)
              ('array 'vector)
-             (_ 'vector)))
-          (json-null (or null-object :null))
-          (json-false (or false-object :false)))
+             (_ 'list)))
+          (json-null nil)
+          (json-false nil))
       (json-read-from-string str))))
 
 (defun igist--read-json-payload (_status)
