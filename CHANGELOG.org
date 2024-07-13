@@ -1,5 +1,11 @@
 #+TITLE: Changelog
 
+* v1.6.3    2024-07-13
+
+** Fixes:
+
+- Fixed the bug for Emacs versions that lack native JSON support. Due to incorrect response parsing, gists were not rendered. (#8)
+
 * v1.6.2    2024-06-08
 
 ** Fixes:
