@@ -1,5 +1,8 @@
 #+TITLE: Changelog
 
+* v1.6.4    2024-11-08
+- This release doesn't introduce any new features or bug fixes. Instead, it replaces the use of =if-let= and =when-let=, which are obsolete as of Emacs 31.x.
+
 * v1.6.3    2024-07-13
 
 ** Fixes:
