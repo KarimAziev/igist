@@ -1,6 +1,6 @@
 ;;; igist.el --- List, create, update and delete GitHub gists -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2022, 2023 Karim Aziiev <karim.aziiev@gmail.com>
+;; Copyright (C) 2022-2025 Karim Aziiev <karim.aziiev@gmail.com>
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
 ;; URL: https://github.com/KarimAziev/igist
