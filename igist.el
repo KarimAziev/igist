@@ -1615,6 +1615,30 @@ GIST should be raw GitHub item."
     (kill-new gist-url)
     (igist-message "Copied %s" gist-url)))
 
+(defun igist-copy-gist-raw-url ()
+  "Copy the raw URL of a selected gist file to the clipboard."
+  (interactive)
+  (let ((tabulated-gist))
+    (cond ((setq tabulated-gist (igist-tabulated-gist-at-point))
+           (let* ((files (igist-alist-get-symb 'files tabulated-gist))
+                  (url
+                   (igist-alist-get-symb
+                    'raw_url (if (= (length files) 1)
+                                 (car files)
+                               (igist-read-gist-file
+                                "Filename: "
+                                tabulated-gist)))))
+             (kill-new url)
+             (igist-message "Copied %s" url)))
+          (igist-current-gist
+           (let ((gist-url
+                  (igist-alist-get-symb 'raw_url igist-current-gist)))
+             (if (not gist-url)
+                 (user-error "Gist doesn't have a raw URL")
+               (kill-new gist-url)
+               (igist-message "Copied %s" gist-url))))
+          (t (user-error "No gist")))))
+
 (defun igist-browse-gist ()
   "Browse gist at point or currently open."
   (interactive)
@@ -6007,6 +6031,8 @@ editing mode."
     ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
     ("w" "Copy Url" igist-copy-gist-url :inapt-if-not
      igist-tabulated-list-get-id)
+    ("W" "Copy Raw Url" igist-copy-gist-raw-url :inapt-if-not
+     igist-tabulated-list-get-id)
     ("r" "Browse" igist-browse-gist :inapt-if-not igist-tabulated-list-get-id)
     ("S" "Star" igist-star-gist :inapt-if-not igist-tabulated-list-get-id)
     ("U" "Unstar" igist-unstar-gist :inapt-if-not igist-tabulated-list-get-id)
@@ -6047,6 +6073,8 @@ editing mode."
     ("f" "Fork" igist-fork-gist :inapt-if-not igist-forkable)
     ("w" "Copy URL" igist-copy-gist-url
      :inapt-if-not igist-get-current-gist-url)
+    ("W" "Copy Raw Url" igist-copy-gist-raw-url :inapt-if-not
+     (lambda () (igist-alist-get-symb 'raw_url igist-current-gist)))
     ("r" "Browse" igist-browse-gist :inapt-if-not igist-get-current-gist-url)
     ("S" "Star" igist-star-gist :inapt-if-not igist-get-current-gist-id)
     ("U" "Unstar" igist-unstar-gist :inapt-if-not igist-get-current-gist-id)
