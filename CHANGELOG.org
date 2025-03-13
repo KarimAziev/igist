@@ -1,5 +1,9 @@
 #+TITLE: Changelog
 
+* v1.7.0    2025-03-13
+** New commands:
+- Added a new command, =igist-copy-gist-raw-url=, which copies the raw URL of a gist to the clipboard. It works in both tabulated views and in edit mode. The command is also available in the transient menu and is bound to "W".
+
 * v1.6.4    2024-11-08
 - This release doesn't introduce any new features or bug fixes. Instead, it replaces the use of =if-let= and =when-let=, which are obsolete as of Emacs 31.x.
 
