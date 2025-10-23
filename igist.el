@@ -5071,9 +5071,10 @@ empty or not."
   "Return default directory for cloning gists."
   (or
    (when-let* ((proj
-               (locate-dominating-file
-                default-directory
-                ".git"))))
+                (locate-dominating-file
+                 default-directory
+                 ".git")))
+     (file-name-parent-directory proj))
    (if (igist--dir-empty-p default-directory)
        default-directory
      (igist-parent-dir default-directory))
