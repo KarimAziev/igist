@@ -38,7 +38,7 @@
 
 ** Requirements
 
-+ Emacs >= 27.1
++ Emacs >= 29.1
 + ghub
 + transient
 + [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][Github API token]]
@@ -379,7 +379,7 @@ Several Emacs packages for GitHub gists already exist ([[https://github.com/defu
 
 - *Transient Command Interface*: By adopting the transient command interface, =igist= provides context-aware actions for managing GitHub Gists. The use of transient interfaces leads to smoother task flows, reduces the need for keystrokes, and offers a more intuitive user experience.
 
-- *Asynchronous Advanced Rendering*: =igist= presents advanced rendering capabilities, including incremental and asynchronous loading and rendering. This ensures that the Emacs interface remains responsive even when handling a large number of Gists. 
+- *Asynchronous Advanced Rendering*: =igist= presents advanced rendering capabilities, including incremental and asynchronous loading and rendering. This ensures that the Emacs interface remains responsive even when handling a large number of Gists.
 
 - *Customization on the Fly*: =igist= focuses on providing an interface for live configuration of how gists should be displayed. Users can adjust column width and alignment, alter sortability, and add, rename or remove columns on the fly.
 

@@ -6,7 +6,7 @@
 ;; URL: https://github.com/KarimAziev/igist
 ;; Version: 1.7.0
 ;; Keywords: tools
-;; Package-Requires: ((emacs "27.1") (ghub "4.2.2") (transient "0.8.5"))
+;; Package-Requires: ((emacs "29.1") (ghub "4.2.2") (transient "0.8.5"))
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This file is NOT part of GNU Emacs.
