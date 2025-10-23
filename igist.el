@@ -5257,7 +5257,8 @@ reading.
 The third arg HISTORY, if non-nil, specifies a history list and optionally the
 initial position in the list."
   (interactive)
-  (if (stringp igist-auth-marker)
+  (if (and (stringp igist-auth-marker)
+           (not current-prefix-arg))
       (read-string (or prompt "User: ") initial-input history)
     (let* ((alist (mapcar (lambda (it)
                             (let ((parts (split-string it "[\\^]" t)))
