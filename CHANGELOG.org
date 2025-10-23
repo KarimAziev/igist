@@ -1,5 +1,17 @@
 #+TITLE: Changelog
 
+* v1.8.0    2025-10-23
+
+** Changes:
+Updated Emacs version support to 29.1 and above. Because =igist= depends on =ghub=, which dropped support for older versions, =igist= also drops support for older Emacs versions.
+
+** Improvements:
+Honor current-prefix-arg in =igist-change-user= and =igist-set-current-user=: when a prefix argument is given, always present a completing-read populated from auth-source, allowing the user to choose from saved GitHub accounts.
+
+** Fixes:
+Corrected the logic that retrieves the default directory when cloning gists.
+
+
 * v1.7.0    2025-03-13
 ** New commands:
 - Added a new command, =igist-copy-gist-raw-url=, which copies the raw URL of a gist to the clipboard. It works in both tabulated views and in edit mode. The command is also available in the transient menu and is bound to "W".

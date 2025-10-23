@@ -4,7 +4,7 @@
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
 ;; URL: https://github.com/KarimAziev/igist
-;; Version: 1.7.0
+;; Version: 1.8.0
 ;; Keywords: tools
 ;; Package-Requires: ((emacs "29.1") (ghub "4.2.2") (transient "0.8.5"))
 ;; SPDX-License-Identifier: GPL-3.0-or-later
