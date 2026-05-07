@@ -2926,9 +2926,11 @@ synchronize the gists."
                              igist-current-gist))
                            (with-current-buffer
                                buffer
-                             (buffer-substring-no-properties
-                              (point-min)
-                              (point-max))))
+                             (save-excursion
+                               (save-restriction
+                                 (buffer-substring-no-properties
+                                  (point-min)
+                                  (point-max))))))
                  :buffer buffer
                  :callback
                  (lambda (val &rest _ignored)
@@ -3069,9 +3071,11 @@ The Gist will be created without editing."
                     ((content .
                       ,(with-current-buffer
                            buffer
-                         (buffer-substring-no-properties
-                          (point-min)
-                          (point-max))))))))
+                         (save-excursion
+                           (save-restriction
+                             (buffer-substring-no-properties
+                              (point-min)
+                              (point-max))))))))))
                 :buffer buffer
                 :callback
                 (lambda (value &rest _)
