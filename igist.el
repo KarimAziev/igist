@@ -2928,6 +2928,7 @@ synchronize the gists."
                                buffer
                              (save-excursion
                                (save-restriction
+                                 (widen)
                                  (buffer-substring-no-properties
                                   (point-min)
                                   (point-max))))))
@@ -3073,6 +3074,7 @@ The Gist will be created without editing."
                            buffer
                          (save-excursion
                            (save-restriction
+                             (widen)
                              (buffer-substring-no-properties
                               (point-min)
                               (point-max))))))))))
