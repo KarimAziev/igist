@@ -1,5 +1,10 @@
 #+TITLE: Changelog
 
+* v1.8.2    2026-05-08
+
+** Fixes:
+The previous release, v1.8.1, aimed to fix saving a gist from a narrowed region but was incomplete. This release fully fixes the issue. Previously, if the buffer was narrowed, only the narrowed portion was saved; now the entire buffer is saved.
+
 * v1.8.1    2026-05-07
 
 ** Fixes:
