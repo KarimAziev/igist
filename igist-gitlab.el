@@ -4,6 +4,8 @@
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
 ;; URL: https://github.com/KarimAziev/igist
+;; Version: 1.9.0
+;; Package-Requires: ((emacs "29.1") (igist "1.9.0") (ghub "4.2.2"))
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This file is NOT part of GNU Emacs.

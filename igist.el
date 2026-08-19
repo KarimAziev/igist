@@ -1,4 +1,4 @@
-;;; igist.el --- List, create, update and delete GitHub gists and GitLab snippets -*- lexical-binding: t; -*-
+;;; igist.el --- List and manage GitHub gists and GitLab snippets -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2022-2025 Karim Aziiev <karim.aziiev@gmail.com>
 
