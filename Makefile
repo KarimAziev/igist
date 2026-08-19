@@ -1,6 +1,6 @@
 EMACS ?= emacs
-ELS = igist.el
-ELCS = igist.elc
+ELS = igist.el igist-gitlab.el
+ELCS = igist.elc igist-gitlab.elc
 TEST_ELS = tests/test-bootstrap.el tests/igist-test.el
 
 # If the first argument is "test"...

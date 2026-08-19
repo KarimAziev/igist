@@ -7,7 +7,7 @@
 [[https://github.com/KarimAziev/igist/blob/main/LICENSE][https://img.shields.io/badge/license-GPL-brightgreen.svg]]
 
 * About
-=igist= is a modern package that aims to help you never leave Emacs to manage your GitHub gists.
+=igist= is a modern package that aims to help you never leave Emacs to manage your GitHub gists and GitLab snippets.
 
 [[./igist-table-demo.gif][./igist-table-demo.gif]]
 
@@ -25,6 +25,9 @@
     - [[#setting-up-token][Setting Up token]]
     - [[#secure-way-using-auth-sources][Secure Way: Using auth-sources]]
     - [[#insecure-way][Insecure way]]
+  - [[#gitlab-snippets][GitLab snippets]]
+    - [[#gitlab-auth][GitLab Auth]]
+    - [[#gitlab-commands][GitLab commands]]
   - [[#usage][Usage]]
     - [[#list-gists][List gists]]
     - [[#table][Table]]
@@ -76,6 +79,7 @@ Download the repository and it to your load path in your init file:
 #+begin_src emacs-lisp :eval no
 (add-to-list 'load-path "/path/to/igist")
 (require 'igist)
+(require 'igist-gitlab) ; optional, for GitLab snippets support
 #+end_src
 
 *** With use-package
@@ -230,8 +234,44 @@ Example with =use-package=.
 In this method, your OAuth token will be stored as plain text in your emacs config file, which is insecure. Ensure your config file permissions are appropriately set to prevent unauthorized access.
 #+end_quote
 
+** GitLab snippets
 
+=igist= also supports [[https://docs.gitlab.com/api/snippets/][GitLab snippets]]. GitLab snippets are mapped onto the same interface as gists: the snippet *title* is displayed and edited as the gist description, and the snippet *visibility* maps to the public/private flag ("internal" snippets stay internal unless you toggle visibility).
 
+*** GitLab Auth
+
+GitLab authentication mirrors the GitHub one with three dedicated variables:
+
+- =igist-gitlab-host=: the API host, defaults to =gitlab.com/api/v4=. For a self-hosted instance use =gitlab.example.com/api/v4=.
+- =igist-gitlab-user-name=: your GitLab username.
+- =igist-gitlab-auth-marker=: like =igist-auth-marker=, either a personal access token string or a symbol used as the =auth-sources= login suffix (default: =igist=).
+
+First create a [[https://gitlab.com/-/user_settings/personal_access_tokens][GitLab personal access token]] with the =api= scope (=read_api= suffices for read-only usage).
+
+Then either add an entry to your =auth-sources= (e.g. =~/.authinfo.gpg=):
+
+#+begin_example
+machine gitlab.com/api/v4 login GITLAB_USERNAME^igist password GITLAB_TOKEN
+#+end_example
+
+or, insecurely, set the variables directly:
+
+#+begin_src elisp
+(setq igist-gitlab-user-name "your-gitlab-username")
+(setq igist-gitlab-auth-marker "your-gitlab-token")
+#+end_src
+
+*** GitLab commands
+
+- ~M-x igist-gitlab-list-snippets~ — list your snippets in a tabulated buffer.
+- ~M-x igist-gitlab-explore-public-snippets~ — list public snippets, most recently updated first.
+- ~M-x igist-gitlab-create-new-snippet~, ~M-x igist-gitlab-new-snippet-from-buffer~ — create a new snippet.
+
+These are also available in the transient menu (~M-x igist-dispatch~) under "GitLab Snippets".
+
+The usual list and edit commands work on snippets as well: viewing and editing files (including multi-file snippets), saving with =C-c C-c=, adding, renaming and deleting files, editing the title, toggling visibility, listing and posting comments (GitLab *notes*), browsing and cloning the snippet repository.
+
+Not supported, because the GitLab snippets API has no equivalents: starring, forking and listing snippets of other users.
 
 ** Usage
 
@@ -352,6 +392,9 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 
 ** Customization
 
+- ~igist-gitlab-host~: The GitLab API host used for snippet requests, e.g. =gitlab.com/api/v4=.
+- ~igist-gitlab-user-name~: Your GitLab username.
+- ~igist-gitlab-auth-marker~: Either a GitLab personal access token string or a symbol used as the login suffix in your =auth-sources=.
 - ~igist-current-user-name~: This variable should be set to a string that contains your GitHub username.
 - ~igist-auth-marker~: This variable can either be a string that contains the OAuth token or a symbol indicating where to retrieve the OAuth token.
 - ~igist-message-function~: A custom function for displaying messages. Should accept the same arguments as the =message= function.
