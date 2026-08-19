@@ -342,7 +342,8 @@ Loading next pages can be stopped by the command `igist-list-cancel-load'."
   "List the GitLab snippets of `igist-gitlab-user-name'.
 
 Loading of subsequent pages may be halted by the command
-`igist-list-cancel-load'."
+`igist-list-cancel-load'.  If optional argument BACKGROUND is non-nil,
+the buffer is not shown."
   (interactive)
   (while (not (igist-gitlab-get-user-name))
     (setq igist-gitlab-user-name (read-string "GitLab user: ")))
@@ -353,7 +354,8 @@ Loading of subsequent pages may be halted by the command
   "List public GitLab snippets, sorted by the most recently updated.
 
 Loading of subsequent pages may be halted by the command
-`igist-list-cancel-load'."
+`igist-list-cancel-load'.  If optional argument BACKGROUND is non-nil,
+the buffer is not shown."
   (interactive)
   (igist-gitlab-list-request "/snippets/public" t background))
 
