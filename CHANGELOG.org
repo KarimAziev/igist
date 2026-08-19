@@ -1,5 +1,15 @@
 #+TITLE: Changelog
 
+* v1.9.0    2026-08-18
+
+** New features:
+Added support for GitLab snippets. New commands:
+- =igist-gitlab-list-snippets= — list snippets of the authenticated GitLab user.
+- =igist-gitlab-explore-public-snippets= — list public snippets sorted by the most recently updated.
+- =igist-gitlab-create-new-snippet= and =igist-gitlab-new-snippet-from-buffer= — create new snippets.
+
+Listing, editing (including multi-file snippets, renames and visibility toggles), deleting, commenting (GitLab notes), browsing and cloning snippets reuse the gists UI. New customization options: =igist-gitlab-host=, =igist-gitlab-user-name= and =igist-gitlab-auth-marker=.
+
 * v1.8.2    2026-05-08
 
 ** Fixes:
