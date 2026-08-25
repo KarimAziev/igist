@@ -7,7 +7,7 @@
 [[https://github.com/KarimAziev/igist/blob/main/LICENSE][https://img.shields.io/badge/license-GPL-brightgreen.svg]]
 
 * About
-=igist= is a modern package that aims to help you never leave Emacs to manage your GitHub gists.
+=igist= is a modern package that helps you manage GitHub gists and GitLab snippets without leaving Emacs.
 
 [[./igist-table-demo.gif][./igist-table-demo.gif]]
 
@@ -22,6 +22,7 @@
     - [[#manually][Manually]]
     - [[#with-use-package][With use-package]]
   - [[#auth][Auth]]
+    - [[#forge-selection][Forge selection]]
     - [[#setting-up-token][Setting Up token]]
     - [[#secure-way-using-auth-sources][Secure Way: Using auth-sources]]
     - [[#insecure-way][Insecure way]]
@@ -41,7 +42,8 @@
 + Emacs >= 29.1
 + ghub
 + transient
-+ [[https://magit.vc/manual/forge/Token-Creation.html#Token-Creation][Github API token]]
++ A GitHub API token for GitHub gists, or a GitLab token permitted to access
+  snippets when using GitLab
 
 ** Installation
 
@@ -162,6 +164,33 @@ Or if you use ~straight.el~:
 
 - =igist-current-user-name=: This variable should be set to a string containing your GitHub username.
 - =igist-auth-marker=: This variable can either be a string containing the OAuth token or a symbol indicating where to fetch the OAuth token.
+
+*** Forge selection
+
+GitHub remains the default forge.  Use =F= in =igist-dispatch=, or customize
+=igist-forge=, to select GitLab for new list and create operations.  Existing
+igist buffers retain the provider with which they were opened.
+
+For GitLab, configure the username and API host:
+
+#+begin_src elisp
+(setq igist-forge 'gitlab
+      igist-gitlab-current-user-name "your-gitlab-username"
+      igist-gitlab-host "gitlab.com/api/v4")
+#+end_src
+
+With the default =igist-gitlab-auth-marker=, the corresponding encrypted
+auth-source entry is:
+
+#+begin_src authinfo
+machine gitlab.com/api/v4 login your-gitlab-username^igist password YOUR_GITLAB_TOKEN
+#+end_src
+
+The token must be permitted to read and write snippets.  GitLab snippets can be
+listed, viewed, created, updated, renamed, and deleted through the normal igist
+workflow.  GitHub-specific operations that GitLab snippets do not provide, such
+as starring, forking, comments, and arbitrary-user gist listing, are disabled in
+the Transient menu.
 
 *** Setting Up token
 
