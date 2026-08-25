@@ -3299,12 +3299,33 @@ synchronize the gists."
 
 (defun igist--github-update-payload (original-filename filename description
                                                        content)
-  "Return a GitHub update payload for one file and DESCRIPTION."
+  "Return a GitHub update payload for one file and DESCRIPTION.
+
+Argument ORIGINAL-FILENAME is the string name of the existing gist file.
+
+Argument FILENAME is the new file name string, or nil to keep the
+original name.
+
+Argument DESCRIPTION is the gist description string, or nil to omit it.
+
+Argument CONTENT is the string content stored for FILENAME."
   (igist-make-gist-payload original-filename filename description content))
 
 (defun igist--gitlab-update-payload (object original-filename filename
                                             description content public)
-  "Return a GitLab update payload for one file in OBJECT."
+  "Build a GitLab update payload for creating, updating, or moving a file.
+
+Argument OBJECT is an alist for the existing gist; no default.
+
+Argument ORIGINAL-FILENAME is old FILENAME string or nil; no default.
+
+Argument FILENAME is the target file path string; no default.
+
+Argument DESCRIPTION is a string or nil for description; no default.
+
+Argument CONTENT is the file content string; no default.
+
+Argument PUBLIC is a boolean selecting public visibility; no default."
   (let* ((existing-p (and original-filename
                           (igist--object-has-file-p object original-filename)))
          (renamed-p (and existing-p
@@ -5218,7 +5239,12 @@ BUFFER owns request status."
    :reader #'igist--read-json-payload))
 
 (defun igist--gitlab-get-item-request (id &optional host)
-  "Return the converted GitLab snippet identified by ID."
+  "Fetch and convert a GitLab snippet by ID.
+
+Argument ID is a string or number identifying the GitLab snippet.
+
+Optional argument HOST is the GitLab API host string; it defaults to
+the configured GitLab provider host."
   (let ((host (or host (igist--provider-host 'gitlab))))
     (igist--gitlab-convert-snippet
      (igist--request
