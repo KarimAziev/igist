@@ -179,6 +179,10 @@ For GitLab, configure the username and API host:
       igist-gitlab-host "gitlab.com/api/v4")
 #+end_src
 
+=igist-gitlab-host= may also be a function of no arguments which returns the
+host string.  This is useful when selecting among self-managed instances
+dynamically.
+
 With the default =igist-gitlab-auth-marker=, the corresponding encrypted
 auth-source entry is:
 
@@ -190,7 +194,11 @@ The token must be permitted to read and write snippets.  GitLab snippets can be
 listed, viewed, created, updated, renamed, and deleted through the normal igist
 workflow.  GitHub-specific operations that GitLab snippets do not provide, such
 as starring, forking, comments, and arbitrary-user gist listing, are disabled in
-the Transient menu.
+the Transient menu.  Table columns are provider-aware as well: unsupported
+columns are omitted from both the table and the add-column completion.  GitLab
+uses its exact =private=, =internal=, or =public= visibility value instead of
+GitHub's boolean Public column.  Saved non-GitHub layouts are kept separately in
+=igist-provider-table-formats= so they do not alter the existing GitHub layout.
 
 *** Setting Up token
 
@@ -389,6 +397,7 @@ To customize these keybindings edit the variable =igist-comments-edit-mode-map=.
 - ~igist-enable-copy-gist-url-p~: Specifies whether and when to add the URL of a new or updated gist to the kill ring. The default setting is after the creation of new gists.
 - ~igist-list-format~: Specifies the format of the user's Tabulated Gists buffers.
 - ~igist-explore-format~: Specifies the format of the Explore Public Gists tabulated buffers.
+- ~igist-provider-table-formats~: Stores provider-specific list and explore format overrides.
 - ~igist-immediate-resize-strategy~: Controls the resizing strategy for tabulated entries when using =igist-tabulated-list-widen-current-column=.
 - ~igist-user-gists-init-collapsed~: Whether the gists should be collapsed by default in user buffers.
 - ~igist-explore-gists-init-collapsed~: Whether the gists should be collapsed by default in explore buffers.

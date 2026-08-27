@@ -136,6 +136,70 @@
     (should (igist--provider-capable-p 'public-list 'gitlab))
     (should-not (igist--provider-capable-p 'star 'gitlab))))
 
+(ert-deftest igist-test-gitlab-host-may-be-callable ()
+  "Resolve a callable GitLab host and reject invalid results."
+  (let ((igist-gitlab-host
+         (lambda () "gitlab.example/api/v4")))
+    (should (equal (igist--provider-host 'gitlab)
+                   "gitlab.example/api/v4")))
+  (let ((igist-gitlab-host (lambda () nil)))
+    (should-error (igist--provider-host 'gitlab)
+                  :type 'error)))
+
+(ert-deftest igist-test-provider-column-formats ()
+  "Filter and substitute table columns using provider metadata."
+  (let* ((format
+          '((public "Public" 8 igist-sort-pred-boolean igist-render-public)
+            (comments "Comments" 9 igist-sort-pred-integer
+                      igist-render-comments)
+            (forks_url "Forks" 20 igist-sort-pred-string
+                       igist-render-api-url)
+            (files "Files" 10 igist-sort-pred-list "%s"
+                   :children ((filename "File" 90 nil "%s")
+                              (language "Language" 8 nil
+                                        igist-render-language)
+                              (size "Size" 8 nil "%s")))))
+         (gitlab (igist--provider-filter-column-format format 'gitlab))
+         (github (igist--provider-filter-column-format format 'github))
+         (gitlab-files (assq 'files gitlab)))
+    (should (equal (mapcar #'car gitlab) '(visibility files)))
+    (should (equal (cadr (assq 'visibility gitlab)) "Visibility"))
+    (should (eq (nth 4 (assq 'visibility gitlab))
+                'igist-render-visibility))
+    (should
+     (equal (mapcar #'car
+                    (plist-get (nthcdr 5 gitlab-files) :children))
+            '(filename language)))
+    (should (equal (mapcar #'car github)
+                   '(public comments forks_url files)))))
+
+(ert-deftest igist-test-gitlab-column-catalog-hides-unsupported-fields ()
+  "Expose only GitLab-compatible choices in the add-column catalog."
+  (let ((names (igist-pluck-columns-names-from-list-format
+                (igist--provider-column-catalog 'gitlab))))
+    (should (member "Visibility" names))
+    (should-not (member "Public" names))
+    (should-not (member "Comments" names))
+    (should-not (member "Forks" names)))
+  (with-temp-buffer
+    (setq-local igist--context
+                '(:forge gitlab :host "gitlab.example/api/v4"))
+    (should-error (igist-list-add-column "Forks")
+                  :type 'user-error)))
+
+(ert-deftest igist-test-provider-table-format-overrides ()
+  "Use independent saved table layouts for non-GitHub providers."
+  (let ((igist-provider-table-formats
+         '((gitlab :list ((id "Snippet" 12 nil "%s")))))
+        (igist-list-format
+         '((id "ID" 9 nil "%s")
+           (public "Public" 8 nil igist-render-public))))
+    (should (equal (igist--provider-table-format :list 'gitlab)
+                   '((id "Snippet" 12 nil "%s"))))
+    (should (equal (mapcar #'car
+                           (igist--provider-table-format :list 'github))
+                   '(id public)))))
+
 (ert-deftest igist-test-provider-item-names-follow-context ()
   "Test selected and buffer item names are provider-aware."
   (let ((igist-forge 'gitlab))
@@ -503,7 +567,9 @@
 
 (ert-deftest igist-test-gitlab-convert-snippet ()
   "Test conversion from GitLab fields to igist's existing alist shape."
-  (let* ((snippet
+  (let* ((auto-mode-alist '(("\\.el\\'" . emacs-lisp-mode)
+                            ("\\.org\\'" . org-mode)))
+         (snippet
           '((id . 42)
             (title . "Example")
             (description)
@@ -531,12 +597,19 @@
     (should (equal (igist-alist-get-symb 'description converted)
                    "Example"))
     (should (igist-alist-get-symb 'public converted))
+    (should (equal (igist-alist-get-symb 'visibility converted)
+                   "public"))
     (should (equal (igist-get-owner converted) "octocat"))
     (should (equal (mapcar
                     (lambda (file)
                       (igist-alist-get-symb 'filename (cdr file)))
                     (igist-alist-get-symb 'files converted))
                    '("one.el" "two.org")))
+    (should (equal (mapcar
+                    (lambda (file)
+                      (igist-alist-get-symb 'language (cdr file)))
+                    (igist-alist-get-symb 'files converted))
+                   '("Emacs Lisp" "Org")))
     (let ((normalized (igist-normalize-gist converted)))
       (should (equal (mapcar #'car normalized)
                      '("gitlab@gitlab.example%2Fapi%2Fv4:42-one.el"
@@ -544,7 +617,8 @@
 
 (ert-deftest igist-test-gitlab-convert-single-file-list-entry ()
   "Test a compact GitLab list entry becomes one normalizable file."
-  (let* ((snippet '((id . 9)
+  (let* ((auto-mode-alist '(("\\.el\\'" . emacs-lisp-mode)))
+         (snippet '((id . 9)
                     (title . "Compact")
                     (file_name . "compact.el")
                     (raw_url . "https://gitlab.example/raw")
@@ -554,8 +628,27 @@
            snippet "gitlab.example/api/v4"))
          (file (cdar (igist-alist-get-symb 'files converted))))
     (should (equal (igist-alist-get-symb 'filename file) "compact.el"))
+    (should (equal (igist-alist-get-symb 'language file) "Emacs Lisp"))
     (should (equal (igist-alist-get-symb 'raw_url file)
                    "https://gitlab.example/raw"))))
+
+(ert-deftest igist-test-render-comments-respects-provider-capability ()
+  "Render a comment count only when the current provider supports it."
+  (with-temp-buffer
+    (setq-local igist--context
+                '(:forge github :host "api.github.com"))
+    (should (equal (igist-render-comments nil)
+                   '("0" action igist-load-comments)))
+    (setq-local igist--context
+                '(:forge gitlab :host "gitlab.example/api/v4"))
+    (should (equal (igist-render-comments nil) "—"))))
+
+(ert-deftest igist-test-provider-renderers-handle-missing-values ()
+  "Render absent optional URLs safely and exact visibility values."
+  (should (equal (igist-render-url nil) ""))
+  (should (equal (igist-render-api-url nil) ""))
+  (should (equal (igist-render-visibility "internal") "Internal"))
+  (should (equal (igist-render-visibility nil) "")))
 
 (ert-deftest igist-test-gitlab-content-resource ()
   "Test GitLab raw-file resources encode paths and preserve the ref."

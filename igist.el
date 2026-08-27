@@ -523,11 +523,10 @@ time."
 
 (defun igist-render-comments (comments)
   "Default renderer for COMMENTS column."
-  (cons
-   (format "%s" comments)
-   (list
-    'action
-    #'igist-load-comments)))
+  (if (igist--current-provider-capable-p 'comments)
+      (list (format "%s" (or comments 0))
+            'action #'igist-load-comments)
+    "—"))
 
 (defun igist-render-user (owner)
   "Default renderer for OWNER column."
@@ -543,20 +542,30 @@ time."
   "Default renderer for PUBLIC column."
   (if public "Public" "Secret"))
 
+(defun igist-render-visibility (visibility)
+  "Render a provider VISIBILITY value."
+  (if (stringp visibility)
+      (capitalize visibility)
+    ""))
+
 (defun igist-render-url (url)
   "Render URL as a browseable button.
 
 Render the URL for browsing."
-  (list url 'action #'browse-url 'button-data url))
+  (if (stringp url)
+      (list url 'action #'browse-url 'button-data url)
+    ""))
 
 (defun igist-render-api-url (url)
   "Render API URL and download it.
 
 Render the API URL for the given URL."
-  (list url 'action (lambda (it)
-                      (kill-new it)
-                      (igist-message "Copied %s" it))
-        'button-data url))
+  (if (stringp url)
+      (list url 'action (lambda (it)
+                          (kill-new it)
+                          (igist-message "Copied %s" it))
+            'button-data url)
+    ""))
 
 (defun igist-render-language (language)
   "Default renderer for LANGUAGE column."
@@ -574,6 +583,8 @@ Render the API URL for the given URL."
     (comments "Comments" 9 igist-sort-pred-integer igist-render-comments
               :center-align t)
     (public "Public" 8 igist-sort-pred-boolean igist-render-public)
+    (visibility "Visibility" 10 igist-sort-pred-string
+                igist-render-visibility)
     (files "Files" 10 igist-sort-pred-list "%s"
            :children ((filename "File" 90 nil "%s")
                       (language "Language" 8
@@ -596,6 +607,7 @@ Render the API URL for the given URL."
     (git_push_url . igist-sort-pred-string)
     (html_url . igist-sort-pred-string)
     (public . igist-sort-pred-boolean)
+    (visibility . igist-sort-pred-string)
     (created_at . igist-sort-pred-date)
     (updated_at . igist-sort-pred-date)
     (description . igist-sort-pred-string)
@@ -791,7 +803,7 @@ and save the result with command `igist-save-column-settings'."
                           node_id git_pull_url
                           url forks_url commits_url
                           git_push_url
-                          html_url public created_at
+                          html_url public visibility created_at
                           updated_at
                           comments_url truncated))))
   :group 'igist)
@@ -856,10 +868,21 @@ and save the result with command `igist-save-column-settings'."
                           node_id git_pull_url
                           url forks_url commits_url
                           git_push_url
-                          html_url public created_at
+                          html_url public visibility created_at
                           updated_at
                           comments_url truncated))))
   :group 'igist)
+
+(defcustom igist-provider-table-formats nil
+  "Provider-specific saved table format overrides.
+
+Each alist entry has the form (FORGE . PLIST), where PLIST may contain
+`:list' and `:explore' formats.  When an override is absent, igist derives
+the provider view from `igist-list-format' or `igist-explore-format' and
+the provider's supported column fields.  This preserves the historical
+GitHub options while allowing other forges to save independent layouts."
+  :group 'igist
+  :type '(alist :key-type symbol :value-type sexp))
 
 (defcustom igist-enable-copy-gist-url-p 'after-new
   "Whether and when to add new or updated gist's URL to kill ring."
@@ -958,9 +981,12 @@ with the GitHub API."
 
 The value includes GitLab's API prefix because `ghub-request' appends
 provider resources directly to this host.  For a self-managed instance,
-use a value such as \"gitlab.example.com/api/v4\"."
+use a value such as \"gitlab.example.com/api/v4\".  The value may also
+be a function of no arguments which returns such a string."
   :group 'igist
-  :type 'string)
+  :type '(choice
+          (string :tag "Host")
+          (function :tag "Host function")))
 
 (defcustom igist-gitlab-current-user-name ""
   "The GitLab username used for authenticated snippet operations."
@@ -1058,6 +1084,10 @@ The value is an internal plist containing at least `:forge' and
      :item-plural "gists"
      :host "api.github.com"
      :user-name-function igist-get-current-user-name
+     :column-fields (id description created_at updated_at owner comments
+                        public files comments_url html_url forks_url truncated
+                        git_push_url git_pull_url)
+     :file-column-fields (filename language raw_url size type)
      :operations (:create igist--github-create-request
                   :delete-file igist--github-delete-file-request
                   :delete-item igist--github-delete-item-request
@@ -1075,6 +1105,10 @@ The value is an internal plist containing at least `:forge' and
      :host-function igist--gitlab-host
      :user-name-function igist-get-current-gitlab-user-name
      :public-list-authenticated t
+     :column-fields (id description created_at updated_at owner visibility
+                        files html_url git_push_url git_pull_url)
+     :column-aliases ((public . visibility))
+     :file-column-fields (filename language raw_url)
      :operations (:create igist--gitlab-create-request
                   :delete-file igist--gitlab-delete-file-request
                   :delete-item igist--gitlab-delete-item-request
@@ -1299,6 +1333,94 @@ When FORGE is nil, use `igist--current-forge'."
              (igist--provider-get :capabilities forge))
        t))
 
+(defun igist--provider-column-fields (&optional forge child)
+  "Return FORGE's supported column fields.
+
+When CHILD is non-nil, return supported file-subrow fields."
+  (igist--provider-get (if child
+                           :file-column-fields
+                         :column-fields)
+                       forge))
+
+(defun igist--provider-column-field (field forge)
+  "Return the provider column field corresponding to FIELD on FORGE."
+  (or (alist-get field
+                 (igist--provider-get :column-aliases forge)
+                 nil nil #'eq)
+      field))
+
+(defun igist--default-column-spec (field)
+  "Return the default column specification for FIELD."
+  (assq field igist-default-formats))
+
+(defun igist--provider-filter-column-spec (spec forge &optional child)
+  "Return provider-compatible copy of column SPEC for FORGE.
+
+Return nil when the field is unsupported.  When CHILD is non-nil,
+interpret SPEC as a file-subrow column."
+  (let* ((field (car spec))
+         (provider-field (if child
+                             field
+                           (igist--provider-column-field field forge)))
+         (supported (igist--provider-column-fields forge child)))
+    (when (or (null supported)
+              (memq provider-field supported))
+      (when-let* ((result
+                   (copy-tree
+                    (if (eq field provider-field)
+                        spec
+                      (igist--default-column-spec provider-field)))))
+        (when-let* ((props (nthcdr 5 result))
+                    (children (plist-get props :children)))
+          (setf (plist-get props :children)
+                (delq nil
+                      (mapcar
+                       (lambda (column)
+                         (igist--provider-filter-column-spec
+                          column forge t))
+                       children))))
+        result))))
+
+(defun igist--provider-filter-column-format (format &optional forge)
+  "Return FORMAT filtered and adapted for FORGE."
+  (let ((forge (or forge (igist--current-forge))))
+    (delq nil
+          (mapcar
+           (lambda (spec)
+             (igist--provider-filter-column-spec spec forge))
+           format))))
+
+(defun igist--table-format-kind (&optional mode)
+  "Return the table format kind for MODE or the current major mode."
+  (if (eq (or mode major-mode) 'igist-explore-mode)
+      :explore
+    :list))
+
+(defun igist--provider-table-format-override (forge kind &optional formats)
+  "Return FORGE's KIND override from FORMATS or saved provider formats."
+  (plist-get (alist-get forge (or formats igist-provider-table-formats))
+             kind))
+
+(defun igist--provider-table-format (kind &optional forge fallback formats)
+  "Return the active KIND table format for FORGE.
+
+FALLBACK, when non-nil, replaces the corresponding historical format.
+FORMATS, when non-nil, replaces `igist-provider-table-formats' while
+looking up an override."
+  (let* ((forge (or forge (igist--current-forge)))
+         (override (igist--provider-table-format-override
+                    forge kind formats))
+         (base (or override
+                   fallback
+                   (symbol-value (if (eq kind :explore)
+                                     'igist-explore-format
+                                   'igist-list-format)))))
+    (igist--provider-filter-column-format base forge)))
+
+(defun igist--provider-column-catalog (&optional forge)
+  "Return the column catalog available for FORGE."
+  (igist--provider-filter-column-format igist-default-formats forge))
+
 (defun igist--provider-operation (operation &optional forge)
   "Return the function implementing OPERATION for FORGE.
 
@@ -1449,7 +1571,13 @@ When FORGE is nil, use `igist--current-forge'."
 
 (defun igist--gitlab-host ()
   "Return the configured GitLab API host."
-  igist-gitlab-host)
+  (let ((host (if (functionp igist-gitlab-host)
+                  (funcall igist-gitlab-host)
+                igist-gitlab-host)))
+    (unless (and (stringp host)
+                 (not (string-empty-p host)))
+      (error "`igist-gitlab-host' must resolve to a non-empty string"))
+    host))
 
 (defun igist-get-current-gitlab-user-name ()
   "Return the configured GitLab user name, or nil when it is empty."
@@ -4318,6 +4446,18 @@ MAX is length of most longest key."
   (string-trim (buffer-substring (line-beginning-position)
                                  (line-end-position))))
 
+(defun igist--apply-tabulated-buffer-format (format)
+  "Apply FORMAT to the current igist table buffer."
+  (let ((loading igist-list-loading))
+    (when loading
+      (igist-list-cancel-load))
+    (setq igist-table-list-format (copy-tree format))
+    (setq igist-table-current-column nil)
+    (igist-tabulated-list-init-header)
+    (igist-tabulated-list-print t)
+    (when loading
+      (igist-list-refresh))))
+
 (defun igist--revert-tabulated-buffers (sym newval &rest _)
   "Update the format of tabulated buffers based on the new value provided.
 
@@ -4332,25 +4472,40 @@ Argument NEWVAL is the new value to be set for `igist-table-list-format'."
       (when (eq (buffer-local-value 'major-mode buff)
                 mode-sym)
         (with-current-buffer buff
-          (let ((loading igist-list-loading))
-            (when loading
-              (igist-list-cancel-load))
-            (setq igist-table-list-format
-                  newval)
-            (let ((igist-table-list-format newval))
-              (setq igist-table-current-column nil)
-              (igist-tabulated-list-init-header)
-              (igist-tabulated-list-print t)
-              (when loading
-                (igist-list-refresh)))))))))
+          (igist--apply-tabulated-buffer-format
+           (igist--provider-table-format
+            (igist--table-format-kind)
+            (igist--current-forge)
+            newval)))))))
+
+(defun igist--revert-provider-table-formats (_sym newval &rest _)
+  "Apply provider table format NEWVAL to existing igist buffers."
+  (dolist (buff (buffer-list))
+    (when (with-current-buffer buff
+            (derived-mode-p 'igist-list-mode))
+      (with-current-buffer buff
+        (let* ((kind (igist--table-format-kind))
+               (forge (igist--current-forge))
+               (override (plist-get (alist-get forge newval) kind))
+               (fallback (symbol-value
+                          (if (eq kind :explore)
+                              'igist-explore-format
+                            'igist-list-format))))
+          (igist--apply-tabulated-buffer-format
+           (igist--provider-filter-column-format
+            (or override fallback) forge)))))))
 
 (defun igist--tabulated-list-revert ()
   "Revert the tabulated list to its original format in Igist."
+  (setq igist-table-list-format
+        (igist--provider-filter-column-format igist-table-list-format))
   (igist-tabulated-list-init-header)
   (igist-tabulated-list-print t))
 
 (add-variable-watcher 'igist-list-format #'igist--revert-tabulated-buffers)
 (add-variable-watcher 'igist-explore-format #'igist--revert-tabulated-buffers)
+(add-variable-watcher 'igist-provider-table-formats
+                      #'igist--revert-provider-table-formats)
 
 (defun igist-tabulated-list-revert (&rest _ignored)
   "The `revert-buffer-function' for `igist-list-mode'."
@@ -4404,7 +4559,7 @@ the `igist-dispatch' menu command):
   (when (fboundp 'header-line-indent-mode)
     (header-line-indent-mode))
   (setq igist-table-list-format
-        igist-list-format)
+        (igist--provider-table-format :list))
   (setq igist-default-collapsed igist-user-gists-init-collapsed)
   (setq-local revert-buffer-function #'igist-tabulated-list-revert)
   (setq-local imenu-prev-index-position-function
@@ -4443,7 +4598,7 @@ the `igist-dispatch' menu command):
 \\{igist-list-mode-map}."
   (setq igist-default-collapsed igist-explore-gists-init-collapsed)
   (setq igist-table-list-format
-        igist-explore-format))
+        (igist--provider-table-format :explore)))
 
 (defun igist-render-comment-to-md (gist-id comment-alist)
   "Render and comment COMMENT-ALIST for gist with GIST-ID in markdown format."
@@ -5369,6 +5524,17 @@ CALLBACK and CALLBACK-ARGS are forwarded after the list has loaded."
       (igist-alist-get-symb 'title snippet)
       "snippet.txt"))
 
+(defun igist--language-from-filename (filename)
+  "Infer a display language for FILENAME using `auto-mode-alist'."
+  (when-let* ((mode (assoc-default filename auto-mode-alist #'string-match))
+              (mode (if (consp mode) (car mode) mode))
+              ((symbolp mode)))
+    (mapconcat #'capitalize
+               (split-string
+                (string-remove-suffix "-mode" (symbol-name mode))
+                "-" t)
+               " ")))
+
 (defun igist--gitlab-snippet-files (snippet)
   "Convert GitLab SNIPPET files to GitHub-shaped file cells."
   (let ((snippet-files (igist-alist-get-symb 'files snippet)))
@@ -5376,12 +5542,14 @@ CALLBACK and CALLBACK-ARGS are forwarded after the list has loaded."
         (let ((filename (igist--gitlab-file-name snippet nil)))
           `((,(intern filename)
              (filename . ,filename)
+             (language . ,(igist--language-from-filename filename))
              (raw_url . ,(igist-alist-get-symb 'raw_url snippet)))))
       (mapcar
        (lambda (file)
          (let ((filename (igist--gitlab-file-name snippet file)))
            `(,(intern filename)
              (filename . ,filename)
+             (language . ,(igist--language-from-filename filename))
              (raw_url . ,(or (igist-alist-get-symb 'raw_url file)
                               (igist-alist-get-symb 'raw_url snippet))))))
        snippet-files))))
@@ -6681,18 +6849,32 @@ Interactively, N is the prefix numeric argument, and defaults to
 (defun igist-save-column-settings ()
   "Save column settings for igist explore or igist list format."
   (interactive)
-  (let* ((sym (igist-get-current-list-format-sym))
-         (new-value igist-table-list-format))
-    (customize-save-variable sym new-value)
+  (let* ((forge (igist--current-forge))
+         (kind (igist--table-format-kind))
+         (new-value (copy-tree igist-table-list-format)))
+    (if (eq forge 'github)
+        (customize-save-variable (igist-get-current-list-format-sym)
+                                 new-value)
+      (let* ((formats (copy-tree igist-provider-table-formats))
+             (cell (assq forge formats)))
+        (unless cell
+          (setq cell (list forge))
+          (push cell formats))
+        (setcdr cell (plist-put (cdr cell) kind new-value))
+        (customize-save-variable 'igist-provider-table-formats formats)))
     new-value))
 
 (defun igist-reset-columns-settings ()
   "Reset the column settings of the current igist buffer."
   (interactive)
-  (let ((sym (igist-get-current-list-format-sym)))
-    (set-default sym
-                 (or (eval (car (get sym 'saved-value)))
-                     (eval (car (get sym 'standard-value)))))))
+  (let ((forge (igist--current-forge)))
+    (if (eq forge 'github)
+        (let ((sym (igist-get-current-list-format-sym)))
+          (set-default sym
+                       (or (eval (car (get sym 'saved-value)))
+                           (eval (car (get sym 'standard-value))))))
+      (igist--apply-tabulated-buffer-format
+       (igist--provider-table-format (igist--table-format-kind) forge)))))
 
 (defun igist-list-add-column (column-name)
   "Add a new column to the igist table list format.
@@ -6701,27 +6883,35 @@ Argument COLUMN-NAME is a string that represents the name of the column to be
 added."
   (interactive
    (list
-    (let ((col-names (seq-difference (igist-pluck-columns-names-from-list-format
-                                      igist-default-formats)
-                                     (igist-pluck-columns-names-from-list-format
-                                      igist-table-list-format))))
+    (let ((col-names
+           (seq-difference
+            (igist-pluck-columns-names-from-list-format
+             (igist--provider-column-catalog))
+            (igist-pluck-columns-names-from-list-format
+             igist-table-list-format))))
       (completing-read
        "Add column: " col-names
        nil t))))
-  (let* ((spec
-          (let ((igist-table-list-format igist-default-formats))
-            (purecopy (igist-find-column-spec column-name))))
-         (closes-col (igist-find-column-spec (igist-closest-column)))
-         (pos (or (seq-position igist-table-list-format closes-col))))
-    (setq igist-table-list-format
-          (if pos
-              (igist-insert-at igist-table-list-format spec pos)
-            (igist-insert-at igist-table-list-format spec
-                             (max 0
-                                  (1-
-                                   (length
-                                    igist-table-list-format))))))
-    (igist--tabulated-list-revert)))
+  (let* ((forge (igist--current-forge))
+         (catalog (igist--provider-column-catalog forge))
+         (spec
+          (let ((igist-table-list-format catalog))
+            (purecopy (igist-find-column-spec column-name)))))
+    (unless spec
+      (user-error "%s does not provide a %s column"
+                  (igist--provider-get :label forge)
+                  column-name))
+    (let* ((closes-col (igist-find-column-spec (igist-closest-column)))
+           (pos (or (seq-position igist-table-list-format closes-col))))
+      (setq igist-table-list-format
+            (if pos
+                (igist-insert-at igist-table-list-format spec pos)
+              (igist-insert-at igist-table-list-format spec
+                               (max 0
+                                    (1-
+                                     (length
+                                      igist-table-list-format))))))
+      (igist--tabulated-list-revert))))
 
 (defun igist-list-remove-column (column-name)
   "Hide a specified COLUMN-NAME in the current list or explore buffer."
