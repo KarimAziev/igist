@@ -6465,31 +6465,77 @@ initial position in the list."
 (defun igist-select-forge (forge)
   "Select FORGE for new igist list and create operations."
   (interactive
-   (let* ((choices
-           (mapcar (lambda (provider)
-                     (cons (plist-get (cdr provider) :label)
-                           (car provider)))
-                   igist--providers))
-          (label (completing-read "Provider: " choices nil t nil nil
-                                  (igist--provider-get :label igist-forge))))
-     (list (cdr (assoc label choices)))))
+   (list
+    (let* ((selected igist-forge)
+           (selected-label (igist--provider-get :label selected))
+           (choices
+            (mapcar (lambda (provider)
+                      (cons (plist-get (cdr provider) :label)
+                            (car provider)))
+                    igist--providers))
+           (idx
+            (seq-position choices selected-label
+                          (lambda (&rest args)
+                            (apply #'equal
+                                   (mapcar
+                                    (lambda (it)
+                                      (if
+                                          (consp
+                                           it)
+                                          (car
+                                           it)
+                                        it))
+                                    args)))))
+           (next-idx (igist--adjust-next-pos idx (if idx (1+ idx) 0) choices))
+           (value (cdr (nth next-idx choices))))
+      value)))
   (unless (alist-get forge igist--providers)
     (user-error "Unknown igist provider: %S" forge))
   (setq-default igist-forge forge)
-  (igist-message "Selected %s"
-                 (igist--provider-get :label forge))
   (igist-transient-setup-current-command))
+
+(defun igist--choices-description (choices current-choice &optional description)
+  "Return DESCRIPTION followed by CHOICES, highlighting CURRENT-CHOICE.
+
+Argument CHOICES is a sequence of strings to display as choices.
+
+Argument CURRENT-CHOICE is the string in CHOICES to highlight as current.
+
+Optional argument DESCRIPTION is a string prefix; it defaults to nil."
+  (let ((separator (propertize "|" 'face 'transient-inactive-value)))
+    (concat
+     description
+     (propertize "[" 'face 'transient-inactive-value)
+     (mapconcat
+      (lambda (item)
+        (propertize item 'face
+                    (if (equal current-choice item)
+                        'transient-value
+                      'transient-inactive-value)))
+      choices separator)
+     (propertize "]" 'face 'transient-inactive-value))))
 
 (defun igist--forge-description ()
   "Describe the selected forge and, when different, buffer forge."
   (let* ((selected igist-forge)
          (selected-label (igist--provider-get :label selected))
-         (buffer-forge (plist-get igist--context :forge)))
+         (buffer-forge (plist-get igist--context :forge))
+         (choices (mapcar (lambda (provider)
+                            (copy-sequence (plist-get (cdr provider) :label)))
+                          igist--providers))
+         (description (igist--choices-description choices
+                                                  selected-label "Provider "))
+         (buffer-label (copy-sequence
+                        (or (igist--provider-get
+                             :label
+                             (plist-get igist--context :forge))
+                            ""))))
     (if (and buffer-forge (not (eq buffer-forge selected)))
-        (format "Provider %s (buffer: %s)"
-                selected-label
-                (igist--provider-get :label buffer-forge))
-      (format "Provider %s" selected-label))))
+        (concat description
+                (igist--choices-description (list buffer-label)
+                                            buffer-label
+                                            " in buffer "))
+      description)))
 
 (defun igist--selected-item-name (&optional plural)
   "Return the selected provider's item name, optionally PLURAL."
